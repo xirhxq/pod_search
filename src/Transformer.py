@@ -170,7 +170,7 @@ class Transformer:
         self.selfPos = np.array([0, 0, self.h])
         
         self.dockENU = np.array([20, 225, 0])
-        self.dockENU = np.array([-20, 0, 0])
+        self.dockENU = np.array([-20, -20, 0])
         self.usvENU = self.dockENU
 
         self.podPitchBuffer = TimeBuffer('Pod Pitch Buffer')
@@ -214,7 +214,7 @@ class Transformer:
             self.rollB2GB = 0
             print(f'{RED}No rB2GB{RESET}')
         else:
-            self.yawB2GB = 0.68
+            self.yawB2GB = 30.68
             self.pitchB2GB = 0
             self.rollB2GB = 0.22
             print(f'{GREEN}With rB2GB on{RESET}')
