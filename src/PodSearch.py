@@ -726,7 +726,7 @@ class PodSearch:
         self.expectedLaserOnPub.publish(self.expectedLaserOn)
 
     def stepGuide(self):
-        self.trackX = -1 + np.sin((self.toc - self.tic) * 2 * np.pi / 8)
+        self.trackX = np.sin((self.toc - self.tic) * 2 * np.pi / 8)
         self.trackY = -1 + np.sin((self.toc - self.tic) * 2 * np.pi / 6)
         self.trackPoint.id = next(self.idGen)
         self.trackPoint.uavYaw = (self.toc - self.tic) * 3 + self.dockPoint.uavYaw
