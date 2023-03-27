@@ -847,7 +847,10 @@ class PodSearch:
             usvPos = self.ekfs[self.trackName].ekf.x[:3].reshape((3, 1))
             self.ekfLogs[self.trackName].log('usvEKFx', self.ekfs[self.trackName].ekf.x)
             self.ekfLogs[self.trackName].newline()
-            print(f'{self.targetPos = }')
+            self.console.rule(
+                f'[bold green4]'
+                f'Target Pos @ ({self.targetPos.flatten()[:3]})'
+            )
             if self.guideFake:
                 usvToTargetENU = self.fakeTargetPos - usvPos
                 usvToTargetTheta = np.degrees(np.arctan2(usvToTargetENU[1][0], usvToTargetENU[0][0]))
