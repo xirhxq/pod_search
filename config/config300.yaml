@@ -10,7 +10,7 @@ SearchPoints:
     uavPosL: 0
     uavPosU: 7.5
     uavYaw: 0
-    yawRange: 140
+    yawRange: 170
     timeout: 300
   - id: 0
     uavPosF: 0
@@ -26,7 +26,7 @@ targetInitialPos: [[-358], [933], [0]]
 
 preSearchData:
   - pitchDeg: 0
-    yawDeg: -70
+    yawDeg: -53
     hfovDeg: 3
     maxRateDeg: 1
   - pitchDeg: 0
@@ -72,6 +72,7 @@ others:
   - 'tuav2'
   - 'tuav3'
   - 'tuav6'
+  - 'tuav8'
 
 related:
   - 'usv'
@@ -96,4 +97,4 @@ uavYawDeg: 120
 myDatalinkIpAddr: '192.168.147.30'
 usvDatalinkIpAddr: '192.168.147.60'
 
-yawOffsetToUSV: 13
+yawOffsetToUSV: 10
