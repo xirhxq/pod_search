@@ -524,7 +524,7 @@ class PodSearch:
                         maxRateDeg=self.config['trackMaxRateDeg'],
                         laserOn=self.config['laserOn']
                     )
-                    self.vesselFakeR = self.uavPos[2][0] / np.sin(np.radians(np.max(0.1, self.vesselBottomElevation + self.podPitchDegDelayed)))
+                    self.vesselFakeR = self.uavPos[2][0] / np.sin(np.radians(max(0.1, self.vesselBottomElevation + self.podPitchDegDelayed)))
                     score = target.score
                     self.lastVesselCaptureTime[id] = self.getTimeNow()
                     # print(f'{BOLD}{BLUE}{id = } {score = }{RESET}')
