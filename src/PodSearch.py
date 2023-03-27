@@ -1,10 +1,13 @@
 #! /usr/bin/env python3
 
+import re
 import time
 import yaml
 import rich
 import copy
+import json
 import heapq
+import socket
 import argparse
 import datetime
 import pyfiglet
@@ -256,9 +259,8 @@ class PodSearch:
         self.landFlag = -1
         rospy.Subscriber('/usv/suav_land_flag', Int8, lambda msg: setattr(self, 'landFlag', msg.data))
 
-        # [StepTrack & StepGuide] Fake R for vessel & usv
-        self.fakeRVessel = None
-        self.fakeRUSV = None
+        # [StepGuide] distance from datalink
+        self.datalinkR = 0
 
         # [StepGuide] guidance data
         self.usvTargetPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/target_nav_position', PoseStamped, queue_size=1)
@@ -314,6 +316,35 @@ class PodSearch:
         self.taskTime = 0
         self.tic = self.getTimeNow()
         self.toc = self.getTimeNow()
+
+    def getDatalinkR(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            request_json = json.dumps({"get":"radioinfo"}).encode('utf-8')
+            s.sendto(request_json,(self.config['myDatalinkIpAddr'], 9999))
+            s.settimeout(1.0)
+            
+            try:
+                responce, _ = s.recvfrom(1024)
+                responce_str = responce.decode('utf-8')
+
+                match = re.search(r'{.*}',responce_str)
+
+                if match:
+                    valid_json = match.group(0)
+                    try:
+                        responce_data = json.loads(valid_json)
+
+                    except json.JSONDecodeError as e:
+                        print(f"JSON decoding error: {e}")
+
+                for sender in responce_data["senders"]:
+                    dist = sender["dist"]
+                    ipAddr = sender["ipAddr"]
+                    if ipAddr == self.config['usvDatalinkIpAddr']:
+                        self.datalinkR = dist
+
+            except socket.timeout:
+                print("Timed out waiting for a Datalink packet.")
 
     @property
     def othersAllReady(self):
@@ -450,11 +481,9 @@ class PodSearch:
         for target in msg.targets:
             px = (target.cx + self.trackX * (target.w / 2) - 0.5) * 2
             py = (target.cy + self.trackY * (target.h / 2) - 0.5) * 2
-            fpy = (target.cy + (target.h / 2) - 0.5) * 2
             try:
                 self.vesselCameraAzimuth = -np.degrees(np.arctan(np.tan(np.radians(self.podHfovDegDelayed) / 2) * px))
                 self.vesselCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * py))
-                self.fakeVesselCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * fpy))
                 id = str(target.category_id)
                 if id != '100':
                     if self.args.id == 'boat' and self.args.trackVessel:
@@ -471,7 +500,6 @@ class PodSearch:
                         maxRateDeg=self.config['trackMaxRateDeg'],
                         laserOn=self.config['laserOn']
                     )
-                    self.fakeRVessel = self.uavPos[2][0] / np.sin(np.radians(self.fakeVesselCameraElevation))
                     score = target.score
                     self.lastVesselCaptureTime[id] = self.getTimeNow()
                     # print(f'{BOLD}{BLUE}{id = } {score = }{RESET}')
@@ -502,11 +530,9 @@ class PodSearch:
         for target in msg.targets:
             px = (target.cx + self.trackX * (target.w / 2) - 0.5) * 2
             py = (target.cy + self.trackY * (target.h / 2) - 0.5) * 2
-            fpy = (target.cy + (target.h / 2) - 0.5) * 2
             try:
                 self.usvCameraAzimuth = -np.degrees(np.arctan(np.tan(np.radians(self.podHfovDegDelayed) / 2) * px))
                 self.usvCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * py))
-                self.fakeUSVCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * fpy))
                 if target.w < self.config['guideWidth']['min'] or target.w > self.config['guideWidth']['max']:
                     expectedHfovDeg = PodParas.clipHfov(self.podHfovDegDelayed * target.w / self.config['guideWidth']['avg'])
                 elif self.trackData['usv'] is not None:
@@ -520,7 +546,6 @@ class PodSearch:
                     maxRateDeg=self.config['guideMaxRateDeg'],
                     laserOn=self.config['laserOn']
                 )
-                self.fakeRUSV = self.uavPos[2][0] / np.sin(np.radians(self.fakeUSVCameraElevation))
                 self.lastUSVCaptureTime = self.getTimeNow()
             except Exception as e:
                 print(e)
@@ -681,8 +706,7 @@ class PodSearch:
             ekfZ,
             self.uavPos,
             self.rP2BDelayed,
-            R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T,
-            self.fakeRVessel
+            R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T
         )
         print(f'{self.ekfs[self.trackName].ekf.x = }')
         if self.ksbState == 'TargetConfirmed':
@@ -761,6 +785,8 @@ class PodSearch:
                 self.expectedLaserOn = True
             self.pubPYZMaxRate()
         ekfZ = np.array([[self.podLaserRange], [self.usvCameraAzimuth], [self.usvCameraElevation], [self.uavPos[2][0]]])
+        if (not (0 < self.podLaserRange < 3000)) and (0 < self.datalinkR < 3000):
+            ekfZ[0][0] = self.datalinkR
         if not (0 < ekfZ[0][0] < 4000 and ekfZ[1][0] is not None and ekfZ[2][0] is not None):
             ekfZ = np.array([[0], [0], [0], [0]])
         self.ekfs[self.trackName].newFrame(
@@ -768,8 +794,7 @@ class PodSearch:
             ekfZ,
             self.uavPos,
             self.rP2BDelayed,
-            R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T,
-            self.fakeRUSV
+            R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T
         )
         print(f'{self.ekfs[self.trackName].ekf.x = }')
         # if self.toc - self.tic >= 60:
@@ -913,6 +938,11 @@ class PodSearch:
         self.console.rule(
             f'[cyan3]'
             f'KSB state: {self.ksbState}'
+        )
+        self.getDatalinkR()
+        self.console.rule(
+            f'[red3]'
+            f'Datalink range: {self.datalinkR:.2f}'
         )
         if (self.targetId is not None and self.searchRoundCnt > 0) or (self.searchRoundCnt == len(self.config['searchConfig']) - 1 and len(self.vesselDict) == 0):
             self.console.rule(

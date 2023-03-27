@@ -27,7 +27,7 @@ class LocatingEKF:
     def firstFrame(self, Z, uavPos, rP2B, rB2I, fakeR):
         r, alpha, epsilon, h = Z[0][0], Z[1][0], Z[2][0], Z[3][0]
         if r == 0 or r >= 3000:
-            r = fakeR
+            return None
         pCamera = np.array([
             [1],
             [np.tan(np.radians(alpha))],
@@ -43,17 +43,18 @@ class LocatingEKF:
             [0]
         ])
 
-    def newFrame(self, t, Z, uavPos, rP2B, rB2I, fakeR):
+    def newFrame(self, t, Z, uavPos, rP2B, rB2I):
         self.dt = t - self.t
         self.t = t
 
         if self.ekf.x is None:
-            self.ekf.x = self.firstFrame(Z, uavPos, rP2B, rB2I, fakeR)
+            self.ekf.x = self.firstFrame(Z, uavPos, rP2B, rB2I)
 
         else:
             self.setFQ()
             if Z[0] < 10 or Z[0] >= 3000:
-                Z[0] = fakeR
+                self.ekf.predict()
+                return self.ekf.x
 
             def HJacobianAt(x):
                 pCamera = rP2B @ rB2I @ (x[0:3] - uavPos)

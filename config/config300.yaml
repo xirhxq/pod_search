@@ -76,3 +76,6 @@ trackWidth:
 trackMaxRateDeg: 20
 
 uavYawDeg: 120
+
+myDatalinkIpAddr: '192.168.147.30'
+usvDatalinkIpAddr: '192.168.147.20'
