@@ -194,6 +194,8 @@ class PodSearch:
         self.idGen = itertools.cycle(range(66, 89))
         self.searchPointPub = rospy.Publisher(self.uavName + '/searchPoint', Float64MultiArray, queue_size=1)
         
+        self.searchEndPodAngles = None
+
         # [StepSearch] trajectory setting
 
         self.searchAreaPoints = [
@@ -587,7 +589,8 @@ class PodSearch:
     @stepEntrance
     def toStepSearch(self):
         self.state = State.SEARCH
-        self.traCnt = 0
+        if self.searchEndPodAngles is None:
+            self.traCnt = 0
 
     def stepSearch(self):
         self.console.rule(
@@ -596,7 +599,12 @@ class PodSearch:
             f'Round #{self.searchRoundCnt + 1}, View #{self.searchViewCnt + 1}, '
             f'Spend {self.autoTra.expectedTime:.1f}'
         )
-        self.expectedPodAngles = copy.deepcopy(self.tra[self.traCnt])
+        if self.searchEndPodAngles is not None:
+            self.expectedPodAngles = copy.deepcopy(self.searchPodAngles)
+            if self.isAtTarget():
+                self.searchEndPodAngles = None
+        else:
+            self.expectedPodAngles = copy.deepcopy(self.tra[self.traCnt])
         if self.uavState % 10 == 0:
             self.expectedPodAngles.maxRateDeg = 0
             self.console.rule(
@@ -607,14 +615,17 @@ class PodSearch:
         idAndScore = self.getMinScoreTargetIdAndScore()
         if idAndScore is not None and idAndScore[1] < self.config['targetSimilarityThreshold']:
             self.targetId = idAndScore[0]
+            self.searchEndPodAngles = self.getPodAnglesNow()
             self.toStepTrack(self.targetId)
         if self.isAtTarget():
             self.traCnt += 1
         if self.traCnt == len(self.tra):
             if len(self.vesselDict) > 0:
                 self.targetId = self.getMinScoreTargetIdAndScore()[0]
+            self.searchEndPodAngles = None
             self.toStepPrepare()
         if self.targetId is not None and self.getTimeNow() - self.lastVesselCaptureTime[self.targetId] < 0.1:
+            self.searchEndPodAngles = self.getPodAnglesNow()
             self.toStepTrack(self.targetId)
 
     @stepEntrance
