@@ -499,7 +499,12 @@ if __name__ == '__main__':
     parser.add_argument('--frame', help='control mode: B or I', choices=['b', 'i'], default='i')
     args, unknown = parser.parse_known_args()
     while not rospy.is_shutdown():
-        pod_comm = POD_COMM(args)
-        pod_comm.spin()
-        print(f'Retrying...')
-        sleep(0.1)
+        try:
+            pod_comm = POD_COMM(args)
+            pod_comm.spin()
+            print(f'Retrying...')
+            sleep(0.1)
+        except Exception as e:
+            print(e)
+            print(f'Retrying......')
+            sleep(0.5)
