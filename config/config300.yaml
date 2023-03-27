@@ -1,11 +1,11 @@
 SearchArea:
   frontLength: 1300
   leftLength: 300
-  rightLength: 0
+  rightLength: 300
 
 SearchPoints:
   - id: 0
-    uavPosF: -500
+    uavPosF: -800
     uavPosL: 0
     uavPosU: 7.5
     uavYaw: 0
@@ -17,9 +17,9 @@ uavInitialPos: [[0], [0], [7.5]]
 targetInitialPos: [[-700], [700], [0]]
 
 podInitialData:
-  pitchDeg: -5
-  yawDeg: 60
-  hfovDeg: 40
+  pitchDeg: 0
+  yawDeg: 30
+  hfovDeg: 20
   maxRateDeg: 20
 
 preGuideData:
