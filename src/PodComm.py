@@ -121,6 +121,8 @@ class POD_COMM:
     def __init__(self, args):
         self.args = args
         self.startTime = time()
+        self.unitTime = time()
+        self.unitCnt = 0
 
         # serial related paras:
         self.state = READ_DATA_STATE.WAITING_DOWN_FRAME_HEAD_1
@@ -410,6 +412,7 @@ class POD_COMM:
         print(f'Hfov {PodParas.getHfovFromF(self.podF):6.2f} -> {PodParas.getHfovFromF(self.expectedF):6.2f}')
         print(f'Rate r{self.podRollRate:10.2f} p{self.podPitchRate:10.2f} y{self.podYawRate:10.2f}')
         print(f'CHECKSUM right/wrong: {self.checkSumRightCnt}/{self.checkSumWrongCnt}')
+        print(f'Unit time: {time() - self.unitTime:.2f} cnt: {self.checkSumRightCnt - self.unitCnt}')
 
     def rosPub(self):
         self.pitchPub.publish(self.podPitch)
@@ -473,6 +476,15 @@ class POD_COMM:
                 self.tRead.join()
                 self.downSer.close()
                 break
+            if time() - self.unitTime > 0.5:
+                if self.checkSumRightCnt - self.unitCnt < 5:
+                    self.readEnd = True
+                    self.tRead.join()
+                    self.downSer.close()
+                    break
+                self.unitTime = time()
+                self.unitCnt = self.checkSumRightCnt
+                    
 
 
 if __name__ == '__main__':
