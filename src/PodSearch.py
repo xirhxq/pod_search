@@ -161,7 +161,7 @@ class PodSearch:
             lambda msg: setattr(
                 self,
                 'uavYawDeg',
-                np.mod(450 - np.degrees(msg.data[15]) + self.config['yawOffsetToUSV'], 360)
+                np.mod(450 - np.degrees(msg.data[15]) + float(self.config['yawOffsetToUSV']), 360)
             )
         )
 
@@ -439,7 +439,7 @@ class PodSearch:
             msg.quaternion.w
         ]
         self.uavEuler = R.from_quat(quaternion).as_euler('zyx', degrees=True).tolist()
-        self.uavYawDeg = self.uavEuler[0]
+        self.uavYawDeg = self.uavEuler[0] + float(self.config['yawOffsetToUSV'])
 
     @property
     def podPitchDeg(self):
