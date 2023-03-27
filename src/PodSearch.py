@@ -725,7 +725,7 @@ class PodSearch:
             f'[magenta2]'
             f'track ({self.trackX:6.2f}, {self.trackY:6.2f})'
         )
-        if self.getTimeNow() - self.lastVesselCaptureTime[self.trackName] >= 5.0:
+        if self.getTimeNow() - self.lastVesselCaptureTime[self.trackName] >= 20.0:
             self.toStepSearch(reset=False)
         if not self.podLaserOn and self.config['laserOn']:
             self.expectedLaserOn = True
