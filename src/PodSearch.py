@@ -6,23 +6,43 @@ from time import time
 
 from signal import signal, SIGINT
 
+
 def signal_handler(sig, frame):
     print('You pressed Ctrl+C!')
     exit(0)
 
+
 signal(SIGINT, signal_handler)
+
+
+# a state enum class
+class State:
+    INIT = 0
+    SEARCH = 1
+    AIM = 2
+
 
 class PodSearch:
     def __init__(self):
+        self.state = State.INIT
+
         self.pitch = 0.0
         self.yaw = 0.0
         self.zoom = 0.0
+
+        self.expected_pitch = None
+        self.expected_yaw = None
+        self.expected_zoom = None
+        self.max_rate = None
+
         self.tra = [
-            [90 - 30, -55, 60, 20], [90 - 30, 55, 60, 20], 
+            [90 - 30, -55, 60, 20], [90 - 30, 55, 60, 20],
             [90 - 11, 78, 20, 7], [90 - 11, -78, 20, 7],
             [90 - 4, -83, 10, 3], [90 - 4, 83, 10, 3],
             [90, 0, 60, 20]
         ]
+        self.traCnt = 0
+
         self.start_time = time()
         rospy.init_node('pod_search', anonymous=True)
         self.rate = rospy.Rate(10)
@@ -49,32 +69,69 @@ class PodSearch:
 
     def is_at_target(self):
         tol = 0.5
-        ztol = 1
+        zoom_tol = 1
         if abs(self.pitch - self.expected_pitch) < tol and \
-            abs(self.yaw - self.expected_yaw) < tol and \
-            abs(self.zoom - self.expected_zoom) < ztol:
+                abs(self.yaw - self.expected_yaw) < tol and \
+                abs(self.zoom - self.expected_zoom) < zoom_tol:
             return True
+
+    def toStepInit(self):
+        self.state = State.INIT
+
+    def toStepSearch(self):
+        self.state = State.SEARCH
+
+    def toStepAim(self):
+        self.state = State.AIM
+
+    def stepInit(self):
+        self.expected_pitch = 90
+        self.expected_yaw = 0
+        self.expected_zoom = 60
+        self.max_rate = 20
+        self.pubPYZMaxRate()
+
+    def stepSearch(self):
+        if self.traCnt < len(self.tra):
+            self.expected_pitch = self.tra[self.traCnt][0]
+            self.expected_yaw = self.tra[self.traCnt][1]
+            self.expected_zoom = self.tra[self.traCnt][2]
+            self.max_rate = self.tra[self.traCnt][3]
+            self.pubPYZMaxRate()
+            if self.is_at_target():
+                self.traCnt += 1
+        else:
+            self.toStepAim()
+
+    def stepAim(self):
+        pass
+
+    def pubPYZMaxRate(self):
+        self.pitch_pub.publish(self.expected_pitch)
+        self.yaw_pub.publish(self.expected_yaw)
+        self.zoom_pub.publish(self.expected_zoom)
+        self.max_rate_pub.publish(self.max_rate)
+
+    def controlStateMachine(self):
+        if self.state == State.INIT:
+            self.stepInit()
+        elif self.state == State.SEARCH:
+            self.stepSearch()
+        elif self.state == State.AIM:
+            self.stepAim()
+        else:
+            print("Invalid state")
 
     def spin(self):
         while not rospy.is_shutdown():
-            for target in self.tra:
-                self.expected_pitch = target[0]
-                self.expected_yaw = target[1]
-                self.expected_zoom = target[2]
-                self.max_rate = target[3]
-                while not self.is_at_target():
-                    print('---------------------')
-                    print(f'Time: {time() - self.start_time:.2f}')
-                    print(f'Pitch: {self.pitch:.2f} -> {self.expected_pitch:.2f}')
-                    print(f'Yaw: {self.yaw:.2f} -> {self.expected_yaw:.2f}')
-                    print(f'Zoom: {self.zoom:.2f} -> {self.expected_zoom:.2f}')
-                    # print(f'Target: {self.expected_pitch}, {self.expected_yaw}, {self.expected_zoom}')
-                    self.pitch_pub.publish(self.expected_pitch)
-                    self.yaw_pub.publish(self.expected_yaw)
-                    self.zoom_pub.publish(self.expected_zoom)
-                    self.max_rate_pub.publish(self.max_rate)
-                    self.rate.sleep()
-            break
+            print('---------------------')
+            print(f'Time: {time() - self.start_time:.2f}')
+            print(f'Pitch: {self.pitch:.2f} -> {self.expected_pitch:.2f}')
+            print(f'Yaw: {self.yaw:.2f} -> {self.expected_yaw:.2f}')
+            print(f'Zoom: {self.zoom:.2f} -> {self.expected_zoom:.2f}')
+
+            self.controlStateMachine()
+            self.rate.sleep()
 
 
 if __name__ == '__main__':
