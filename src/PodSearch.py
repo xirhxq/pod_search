@@ -30,10 +30,10 @@ class PodSearch:
         self.yaw = 0.0
         self.zoom = 0.0
 
-        self.expected_pitch = None
-        self.expected_yaw = None
-        self.expected_zoom = None
-        self.max_rate = None
+        self.expected_pitch = 90
+        self.expected_yaw = 0
+        self.expected_zoom = 60
+        self.max_rate = 20
 
         self.tra = [
             [90 - 30, -55, 60, 20], [90 - 30, 55, 60, 20],
@@ -74,6 +74,8 @@ class PodSearch:
                 abs(self.yaw - self.expected_yaw) < tol and \
                 abs(self.zoom - self.expected_zoom) < zoom_tol:
             return True
+        else:
+            return False
 
     def toStepInit(self):
         self.state = State.INIT
@@ -90,6 +92,8 @@ class PodSearch:
         self.expected_zoom = 60
         self.max_rate = 20
         self.pubPYZMaxRate()
+        if self.is_at_target():
+            self.toStepSearch()
 
     def stepSearch(self):
         if self.traCnt < len(self.tra):
@@ -104,6 +108,11 @@ class PodSearch:
             self.toStepAim()
 
     def stepAim(self):
+        self.expected_pitch = 90
+        self.expected_yaw = 0
+        self.expected_zoom = 60
+        self.max_rate = 20
+        self.pubPYZMaxRate()
         pass
 
     def pubPYZMaxRate(self):
@@ -125,11 +134,11 @@ class PodSearch:
     def spin(self):
         while not rospy.is_shutdown():
             print('---------------------')
-            print(f'Time: {time() - self.start_time:.2f}')
+            print(f'State: {self.state}')
             print(f'Pitch: {self.pitch:.2f} -> {self.expected_pitch:.2f}')
             print(f'Yaw: {self.yaw:.2f} -> {self.expected_yaw:.2f}')
             print(f'Zoom: {self.zoom:.2f} -> {self.expected_zoom:.2f}')
-
+            print(f'Is at target: {self.is_at_target()}')
             self.controlStateMachine()
             self.rate.sleep()
 
