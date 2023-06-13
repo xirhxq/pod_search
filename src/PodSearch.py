@@ -28,11 +28,11 @@ class PodSearch:
 
         self.pitch = 0.0
         self.yaw = 0.0
-        self.zoom = 0.0
+        self.hfov = 0.0
 
         self.expected_pitch = 90
         self.expected_yaw = 0
-        self.expected_zoom = 60
+        self.expected_hfov = 60
         self.max_rate = 20
 
         self.tra = [
@@ -48,13 +48,13 @@ class PodSearch:
         self.rate = rospy.Rate(10)
         rospy.Subscriber('/pod_comm/pitch', Float32, self.pitch_callback)
         rospy.Subscriber('/pod_comm/yaw', Float32, self.yaw_callback)
-        rospy.Subscriber('/pod_comm/zoom', Float32, self.zoom_callback)
+        rospy.Subscriber('/pod_comm/hfov', Float32, self.hfov_callback)
         self.pitch_pub = rospy.Publisher(
             '/pod_comm/expected_pitch', Float32, queue_size=10)
         self.yaw_pub = rospy.Publisher(
             '/pod_comm/expected_yaw', Float32, queue_size=10)
-        self.zoom_pub = rospy.Publisher(
-            '/pod_comm/expected_zoom', Float32, queue_size=10)
+        self.hfov_pub = rospy.Publisher(
+            '/pod_comm/expected_hfov', Float32, queue_size=10)
         self.max_rate_pub = rospy.Publisher(
             '/pod_comm/max_rate', Float32, queue_size=10)
 
@@ -64,15 +64,15 @@ class PodSearch:
     def yaw_callback(self, data):
         self.yaw = data.data
 
-    def zoom_callback(self, data):
-        self.zoom = data.data
+    def hfov_callback(self, data):
+        self.hfov = data.data
 
     def is_at_target(self):
         tol = 0.5
-        zoom_tol = 1
+        hfov_tol = 1.4
         if abs(self.pitch - self.expected_pitch) < tol and \
                 abs(self.yaw - self.expected_yaw) < tol and \
-                abs(self.zoom - self.expected_zoom) < zoom_tol:
+                abs(self.hfov - self.expected_hfov) < hfov_tol:
             return True
         else:
             return False
@@ -89,7 +89,7 @@ class PodSearch:
     def stepInit(self):
         self.expected_pitch = 90
         self.expected_yaw = 0
-        self.expected_zoom = 60
+        self.expected_hfov = 60
         self.max_rate = 20
         self.pubPYZMaxRate()
         if self.is_at_target():
@@ -99,7 +99,7 @@ class PodSearch:
         if self.traCnt < len(self.tra):
             self.expected_pitch = self.tra[self.traCnt][0]
             self.expected_yaw = self.tra[self.traCnt][1]
-            self.expected_zoom = self.tra[self.traCnt][2]
+            self.expected_hfov = self.tra[self.traCnt][2]
             self.max_rate = self.tra[self.traCnt][3]
             self.pubPYZMaxRate()
             if self.is_at_target():
@@ -110,7 +110,7 @@ class PodSearch:
     def stepAim(self):
         self.expected_pitch = 90
         self.expected_yaw = 0
-        self.expected_zoom = 60
+        self.expected_hfov = 60
         self.max_rate = 20
         self.pubPYZMaxRate()
         pass
@@ -118,7 +118,7 @@ class PodSearch:
     def pubPYZMaxRate(self):
         self.pitch_pub.publish(self.expected_pitch)
         self.yaw_pub.publish(self.expected_yaw)
-        self.zoom_pub.publish(self.expected_zoom)
+        self.hfov_pub.publish(self.expected_hfov)
         self.max_rate_pub.publish(self.max_rate)
 
     def controlStateMachine(self):
@@ -137,7 +137,7 @@ class PodSearch:
             print(f'State: {self.state}')
             print(f'Pitch: {self.pitch:.2f} -> {self.expected_pitch:.2f}')
             print(f'Yaw: {self.yaw:.2f} -> {self.expected_yaw:.2f}')
-            print(f'Zoom: {self.zoom:.2f} -> {self.expected_zoom:.2f}')
+            print(f'HFov: {self.hfov:.2f} -> {self.expected_hfov:.2f}')
             print(f'Is at target: {self.is_at_target()}')
             self.controlStateMachine()
             self.rate.sleep()

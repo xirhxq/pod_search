@@ -150,12 +150,12 @@ class POD_COMM:
         rospy.Rate(10)
         rospy.Subscriber('/pod_comm/expected_pitch', Float32, self.p_callback)
         rospy.Subscriber('/pod_comm/expected_yaw', Float32, self.y_callback)
-        rospy.Subscriber('/pod_comm/expected_zoom', Float32, self.z_callback)
+        rospy.Subscriber('/pod_comm/expected_hfov', Float32, self.hfov_callback)
         rospy.Subscriber('/pod_comm/expected_pitch_yaw', String, self.py_callback)
         rospy.Subscriber('/pod_comm/max_rate', Float32, self.max_rate_callback)
         self.pitch_pub = rospy.Publisher('/pod_comm/pitch', Float32, queue_size=10)
         self.yaw_pub = rospy.Publisher('/pod_comm/yaw', Float32, queue_size=10)
-        self.zoom_pub = rospy.Publisher('/pod_comm/zoom', Float32, queue_size=10)
+        self.hfov_pub = rospy.Publisher('/pod_comm/hfov', Float32, queue_size=10)
 
     def get_time_now(self):
         return time()
@@ -163,7 +163,7 @@ class POD_COMM:
     def get_f(self, half_angle):
         return self.SENSOR_WIDTH / 2 / tan(radians(half_angle / 2))
 
-    def get_half_angle(self, f):
+    def get_hfov(self, f):
         return degrees(atan(self.SENSOR_WIDTH / 2 / f)) * 2
 
     def round(self, val, base):
@@ -300,7 +300,7 @@ class POD_COMM:
         self.expected_yaw = msg.data
         # print('Received expected yaw: ', self.expected_yaw)
 
-    def z_callback(self, msg):
+    def hfov_callback(self, msg):
         self.expected_zoom = self.get_f(msg.data)
         # print('Received expected zoom: ', self.expected_zoom)
     
@@ -314,7 +314,6 @@ class POD_COMM:
         print(f'Pitch {self.pod_pitch:.1f} -> {self.expected_pitch:.1f}')
         print(f'Yaw {self.pod_yaw:.1f} -> {self.expected_yaw:.1f}')
         print(f'Zoom {self.pod_f:.1f} -> {self.expected_zoom:.1f}')
-        # print(f'Elec zoom {self.pod_elec_zoom}')
         # print(f'Yaw deque: {self.pod_yaw_deque}')"
         # if len(self.pod_yaw_deque) > 1:
         #     print(f'Yaw history data: from {self.pod_yaw_deque[0][0].strftime("%H:%M:%S.%f")} to {self.pod_yaw_deque[-1][0].strftime("%H:%M:%S.%f")}')
@@ -324,7 +323,7 @@ class POD_COMM:
     def ros_pub(self):
         self.pitch_pub.publish(self.pod_pitch)
         self.yaw_pub.publish(self.pod_yaw)
-        self.zoom_pub.publish(self.get_half_angle(self.pod_f))
+        self.hfov_pub.publish(self.get_hfov(self.pod_f))
 
     @timer(tol=1 / HZ / 2)
     def spin_once(self):
