@@ -82,6 +82,10 @@ class UP_MSG:
         self.order_B = b'\x44'
         return self.msg()
 
+    def text_onoff(self):
+        self.order_B = b'\x93'
+        return self.msg()
+
     def manual_py_rate(self, prate, yrate):
         self.order_B = b'\x25'
         self.order_C = pack('<h', int(prate))
@@ -105,12 +109,13 @@ def timer(tol=1):
 
 class POD_COMM:
     def __init__(self):
+        self.init = False
         self.state = WAITING_DOWN_FRAME_HEAD_1
         self.expected_pitch = 90.0
         self.expected_yaw = 0.0
         self.expected_zoom = 4.3
         self.start_time = time()
-        self.control_on = 0
+        self.control_on = 1
         self.CONTROL_LOOP_LEN = 12
         self.SENSOR_WIDTH = tan(radians(2.3) / 2) * 2 * 129
 
@@ -177,7 +182,10 @@ class POD_COMM:
     def gen_up_msg(self):
         up = UP_MSG()
 
-        if self.control_on == 0:
+        if self.init == False:
+            up.text_onoff()
+            self.init = True
+        elif self.control_on == 0:
             pitch_diff = self.expected_pitch - self.pod_pitch
             yaw_diff = self.round(self.expected_yaw - self.pod_yaw, 180)
             zoom_diff = self.expected_zoom - self.pod_f
