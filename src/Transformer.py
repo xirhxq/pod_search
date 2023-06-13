@@ -11,7 +11,7 @@
 
 import rospy
 from sensor_msgs.msg import Imu
-from std_msgs.msg import Float32
+from std_msgs.msg import Float32, Bool
 from scipy.spatial.transform import Rotation as R
 import numpy as np
 from math import atan, tan, degrees, radians
@@ -19,6 +19,9 @@ from nav_msgs.msg import Odometry
 from ShowBar import ShowBar
 from spirecv_msgs.msg import TargetsInFrame, Target, ROI
 from collections import deque
+from Classifier import Classifier
+from DataLogger import DataLogger
+import time
 
 
 class TimeBuffer:
@@ -60,6 +63,11 @@ class TimeBuffer:
                 closet_time_diff = time_dif
         return closet_msg
 
+    def get_message_no_delay(self):
+        if not self.buffer:
+            return None
+        return self.buffer[-1][1]
+
     def output_buffer(self):
         print(self.name + ': [')
         t = rospy.Time.now()
@@ -71,6 +79,7 @@ class TimeBuffer:
 class Transformer:
     def __init__(self):
         self.TRANSFORM_DEBUG = False
+        self.order_from_searcher = False
         self.uav_quat = [0, 0, 0, 1]
 
         self.self_pos = [0, 0, 1.6]
@@ -92,6 +101,30 @@ class Transformer:
         rospy.Subscriber('/' + self.pod_name + '/hfov', Float32, self.hfov_callback)
 
         rospy.Subscriber('/uav1/spirecv/common_object_detection', TargetsInFrame, self.targets_callback, queue_size=1)
+
+        rospy.Subscriber('/' + self.pod_name + '/toTransformer', Bool, self.order_from_searcher_callback)
+
+        self.clsfy = Classifier()
+        self.dtlg = DataLogger("data.csv")
+
+        self.start_time = rospy.Time.now().to_sec()
+
+        variable_info = [
+            ("rosTime", "double"),
+            ("podYaw", "double"),
+            ("podPitch", "double"),
+            ("podYawDelayed", "double"),
+            ("podPitchDelayed", "double"),
+            ("targetCnt", "int"),
+        ] + [
+            (f'target{i}[3]', "list") for i in range(10)
+        ]
+
+        self.dtlg.initialize(variable_info)
+        
+
+    def order_from_searcher_callback(self, msg):
+        self.order_from_searcher = msg.data
 
     def pos_callback(self, msg):
         self.self_pos[0] = msg.pose.pose.position.x
@@ -118,11 +151,13 @@ class Transformer:
         # tic = rospy.Time.now().to_sec()
         for target in msg.targets:
             if target.category == 'car':
-                self.transform(target.cx, target.cy)
+                self.transform(target.cx, target.cy, score=target.score)
         # toc = rospy.Time.now().to_sec()
         # print(f'Callback time {toc - tic}')
 
-    def transform(self, pixel_x, pixel_y):
+    def transform(self, pixel_x, pixel_y, score=1):
+        if not self.order_from_searcher:
+            return
         time_diff = 0.4
         try:
             pod_hfov = self.pod_hfov_buffer.get_message(time_diff).data
@@ -161,19 +196,56 @@ class Transformer:
         # print(f'real_target_rel: {real_target_rel}')
 
         real_target_abs = real_target_rel + self.self_pos
-        print(f'pixelxy: ({pixel_x:.2f}, {pixel_y:.2f}) camera: ({cameraYaw:.2f}, {cameraPitch:.2f}) pod: ({pod_yaw:.2f}, {pod_pitch:.2f}) target @ {real_target_abs}')
+        print((
+            f'XY: ({pixel_x:.2f}, {pixel_y:.2f}) '
+            f'cYP: ({cameraYaw:.2f}, {cameraPitch:.2f}) '
+            f'pYP: ({pod_yaw:.2f}, {pod_pitch:.2f}) '
+            f'Target @ {real_target_abs[0]:.2f}, {real_target_abs[1]:.2f}, {real_target_abs[2]:.2f} '
+            f'Score {score:.2f}'
+        ))
 
         if self.TRANSFORM_DEBUG:
             print(f'-' * 20)
+        
+        if not self.out_of_bound(*real_target_abs):
+            self.clsfy.newPos(*real_target_abs)
+            self.clsfy.outputTargets()
+
+    def out_of_bound(self, x, y, z):
+        if x > 10:
+            return True
+        if abs(y) > 5:
+            return True
+        return False
+
+    def log(self):
+            self.dtlg.log("rosTime", rospy.Time.now().to_sec() - self.start_time)
+            self.dtlg.log("podYaw", self.pod_yaw_buffer.get_message_no_delay().data)
+            self.dtlg.log("podPitch", self.pod_pitch_buffer.get_message_no_delay().data)
+            self.dtlg.log("podYawDelayed", self.pod_yaw_buffer.get_message(0.5).data)
+            self.dtlg.log("podPitchDelayed", self.pod_pitch_buffer.get_message(0.5).data)
+            t = self.clsfy.targetsList()
+            self.dtlg.log("targetCnt", len(t))
+            for i in range(10):
+                if i < len(t):
+                    self.dtlg.log(f'target{i}', t[i])
+                else:
+                    self.dtlg.log(f'target{i}', [-1, -1, -1])
+            self.dtlg.newline()
+
+
 
 
 if __name__ == '__main__':
     rospy.init_node('Transformer', anonymous=True)
-    ipt = input('If debug? (y/n): ')
+    # ipt = input('If debug? (y/n): ')
     t = Transformer()
-    if ipt == 'y':
-        t.TRANSFORM_DEBUG = True
+    time.sleep(1)
+    # if ipt == 'y':
+    #     t.TRANSFORM_DEBUG = True
     while not rospy.is_shutdown():
+        t.log()
+
         try: 
             # t.pod_pitch_buffer.output_buffer()
             # t.pod_yaw_buffer.output_buffer()
