@@ -5,7 +5,7 @@ import numpy as np
 
 class DataLogger:
     def __init__(self, filename):
-        self.filename = os.path.join("../../../misc/data", datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S_") + filename)
+        self.filename = os.path.join("", datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S_") + filename)
         self.initialized = False
         self.variable_names = []
         self.values = []
