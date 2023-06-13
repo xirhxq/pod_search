@@ -1,9 +1,8 @@
 #! /usr/bin/env python3
 
 import rospy
-from std_msgs.msg import Float32
+from std_msgs.msg import Float32, Bool
 from time import time
-
 from signal import signal, SIGINT
 
 
@@ -36,9 +35,16 @@ class PodSearch:
         self.max_rate = 20
 
         self.tra = [
-            [90 - 30, -55, 60, 20], [90 - 30, 55, 60, 20],
+            [90 - 30, -55, 60, 10], [90 - 30, 55, 60, 10],
             [90 - 11, 78, 20, 7], [90 - 11, -78, 20, 7],
             [90 - 4, -83, 10, 3], [90 - 4, 83, 10, 3],
+            [90, 0, 60, 20]
+        ]
+
+        # test tra
+        self.tra = [
+            [90 - 30, -55, 60, 10], [90 - 30, 55, 60, 10],
+            [90 - 11, 78, 20, 5], [90 - 11, -78, 20, 5],
             [90, 0, 60, 20]
         ]
         self.traCnt = 0
@@ -57,6 +63,10 @@ class PodSearch:
             '/pod_comm/expected_hfov', Float32, queue_size=10)
         self.max_rate_pub = rospy.Publisher(
             '/pod_comm/max_rate', Float32, queue_size=10)
+
+        self.to_transformer_pub = rospy.Publisher(
+            '/pod_comm/toTransformer', Bool, queue_size=10 
+        )
 
     def pitch_callback(self, data):
         self.pitch = data.data
@@ -92,6 +102,7 @@ class PodSearch:
         self.expected_hfov = 60
         self.max_rate = 20
         self.pubPYZMaxRate()
+        self.to_transformer_pub.publish(Bool(False))
         if self.is_at_target():
             self.toStepSearch()
 
@@ -104,6 +115,7 @@ class PodSearch:
             self.pubPYZMaxRate()
             if self.is_at_target():
                 self.traCnt += 1
+            self.to_transformer_pub.publish(Bool(True))
         else:
             self.toStepAim()
 
@@ -113,6 +125,7 @@ class PodSearch:
         self.expected_hfov = 60
         self.max_rate = 20
         self.pubPYZMaxRate()
+        self.to_transformer_pub.publish(Bool(False))
         pass
 
     def pubPYZMaxRate(self):
