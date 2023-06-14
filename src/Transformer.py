@@ -212,7 +212,7 @@ class Transformer:
             self.clsfy.outputTargets()
 
     def out_of_bound(self, x, y, z):
-        if x > 10:
+        if x > 15:
             return True
         if abs(y) > 5:
             return True
@@ -255,3 +255,5 @@ if __name__ == '__main__':
             pass
         except Exception as e:
             print(e)
+        
+        time.sleep(0.05)
