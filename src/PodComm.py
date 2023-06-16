@@ -86,6 +86,12 @@ class UP_MSG:
         self.order_B = b'\x93'
         return self.msg()
 
+    def change_zoom_level(self, level):
+        self.order_B = b'\xDC'
+        self.order_C = pack('<h', int(level))
+        print(f'change to {level}')
+        return self.msg()
+
     def manual_py_rate(self, prate, yrate):
         self.order_B = b'\x25'
         self.order_C = pack('<h', int(prate))
@@ -114,14 +120,15 @@ class POD_COMM:
         self.expected_pitch = 90.0
         self.expected_yaw = 0.0
         self.expected_zoom = 4.3
+        self.expected_zoom_level = 1
         self.start_time = time()
-        self.control_on = 1
-        self.CONTROL_LOOP_LEN = 12
+        self.lazy_tag = 0
         self.SENSOR_WIDTH = tan(radians(2.3) / 2) * 2 * 129
 
         self.pod_state_0 = 0x00
         self.pod_state_1 = 0x00
         self.pod_f = 4.3
+        self.pod_zoom_level = 1
         self.pod_pitch = 0.0
         self.pod_yaw = 0.0
         self.pod_camera_state = 0x10
@@ -139,6 +146,7 @@ class POD_COMM:
         self.check_sum_wrong_cnt = 0
 
         self.max_rate = 300
+        self.zoom_unit = 4.3
 
         self.down_ser = serial.Serial(
             port=PORT,
@@ -161,6 +169,9 @@ class POD_COMM:
         self.pitch_pub = rospy.Publisher('/pod_comm/pitch', Float32, queue_size=10)
         self.yaw_pub = rospy.Publisher('/pod_comm/yaw', Float32, queue_size=10)
         self.hfov_pub = rospy.Publisher('/pod_comm/hfov', Float32, queue_size=10)
+
+    def loose_zoom_level(self, z):
+        return z
 
     def get_time_now(self):
         return time()
@@ -185,22 +196,31 @@ class POD_COMM:
         if self.init == False:
             up.text_onoff()
             self.init = True
-        elif self.control_on == 0:
+        elif self.lazy_tag <= 15:
             pitch_diff = self.expected_pitch - self.pod_pitch
             yaw_diff = self.round(self.expected_yaw - self.pod_yaw, 180)
-            zoom_diff = self.expected_zoom - self.pod_f
+            abs_zoom_diff = (self.expected_zoom - self.pod_f)
+            rel_zoom_diff = abs_zoom_diff / self.expected_zoom
             py_tol = 0.5
-            z_tol = 0.15
-                
-            if zoom_diff < -z_tol:
-                self.control_on = (self.control_on + 1) % self.CONTROL_LOOP_LEN
+            z_tol = 0.05
+
+
+            if self.expected_zoom_level != self.pod_zoom_level and self.lazy_tag == 0 and abs(rel_zoom_diff) > 0.1:
+                # print(f'change zoom level {self.pod_zoom_level} to {self.expected_zoom_level}')
+                up.change_zoom_level(self.expected_zoom_level)
+                self.lazy_tag = 150
+
+            elif rel_zoom_diff < -z_tol:
                 # print(f'up decrease zoom a bit')
                 up.zoom_down()
+                if self.lazy_tag == 0:
+                    self.lazy_tag = 20
                 
-            elif zoom_diff > z_tol:
-                self.control_on = (self.control_on + 1) % self.CONTROL_LOOP_LEN
+            elif rel_zoom_diff > z_tol:
                 # print(f'up increase zoom a bit')
                 up.zoom_up()
+                if self.lazy_tag == 0:
+                    self.lazy_tag = 20
 
             elif  pitch_diff < -py_tol or pitch_diff > py_tol or yaw_diff < -py_tol or yaw_diff > py_tol:
                 pr_max, yr_max = 300, self.max_rate
@@ -209,11 +229,13 @@ class POD_COMM:
 
                 up.manual_py_rate(prate, yrate)
 
+
+
                 # print(f'up pitch {self.pod_pitch:.2f} -> {self.expected_pitch:.2f} diff: {pitch_diff:.2f} rate: {prate:.2f}')
                 # print(f'up yaw {self.pod_yaw:.2f} -> {self.expected_yaw:.2f} diff: {yaw_diff:.2f} rate: {yrate:.2f}')
-        else:
-            self.control_on = (self.control_on + 1) % self.CONTROL_LOOP_LEN
-            # print('up void msg')
+        if self.lazy_tag > 0:
+            self.lazy_tag -= 1
+        
 
         return up.msg()
 
@@ -222,7 +244,6 @@ class POD_COMM:
     def read_data(self):
         while True:
             data = self.down_ser.read(1)
-
             if data:
                 if self.state == WAITING_DOWN_FRAME_HEAD_1:
                     if data == DOWN_FRAME_HEAD_1:
@@ -232,6 +253,7 @@ class POD_COMM:
                         self.state = READING_DATA
                         data_buf = bytearray()
                 elif self.state == READING_DATA:
+                    # print(f'reading data buffer len {len(data_buf)}')
                     data_buf.append(data[0])
                     if len(data_buf) == FRAME_LEN:
                         # print('down: ', DOWN_FRAME_HEAD.hex(), data_buf[:-2].hex(), data_buf[-2:].hex())
@@ -248,6 +270,7 @@ class POD_COMM:
                             self.pod_f = pod_f_x10 / 10
                             self.pod_pitch = pod_pitch_x100 / 100
                             self.pod_yaw = self.round(pod_yaw_x100 / 100, 180)
+                            self.pod_zoom_level = self.loose_zoom_level(round(self.pod_f / self.zoom_unit))
 
                             current_time = datetime.now()
                             self.pod_yaw_deque.append((current_time, self.pod_yaw))
@@ -270,7 +293,7 @@ class POD_COMM:
                             # print(f'Received state {self.pod_state_0}, camera state {self.pod_camera_state}, zoom {self.pod_f}, pitch {self.pod_pitch}, yaw {self.pod_yaw}')
                         # print(f'down zoom: {self.pod_f:.2f} pitch: {self.pod_pitch:.2f} yaw: {self.pod_yaw:.2f}')
                         self.state = WAITING_DOWN_FRAME_HEAD_1
-                        
+
             if self.state == WAITING_DOWN_FRAME_HEAD_1:
                 data_buf = bytearray()
     
@@ -310,6 +333,7 @@ class POD_COMM:
 
     def hfov_callback(self, msg):
         self.expected_zoom = self.get_f(msg.data)
+        self.expected_zoom_level = self.loose_zoom_level(round(self.expected_zoom / self.zoom_unit))
         # print('Received expected zoom: ', self.expected_zoom)
     
     def max_rate_callback(self, msg):
@@ -321,7 +345,8 @@ class POD_COMM:
         print(f'Pod state: {self.pod_state_0} {self.pod_state_1} Camera state: {self.pod_camera_state}')
         print(f'Pitch {self.pod_pitch:.1f} -> {self.expected_pitch:.1f}')
         print(f'Yaw {self.pod_yaw:.1f} -> {self.expected_yaw:.1f}')
-        print(f'Zoom {self.pod_f:.1f} -> {self.expected_zoom:.1f}')
+        print(f'Zoom {self.pod_f:.1f}({self.pod_zoom_level}) -> {self.expected_zoom:.1f}({self.expected_zoom_level})')
+        print(f'LazyTag {self.lazy_tag}')
         # print(f'Yaw deque: {self.pod_yaw_deque}')"
         # if len(self.pod_yaw_deque) > 1:
         #     print(f'Yaw history data: from {self.pod_yaw_deque[0][0].strftime("%H:%M:%S.%f")} to {self.pod_yaw_deque[-1][0].strftime("%H:%M:%S.%f")}')
