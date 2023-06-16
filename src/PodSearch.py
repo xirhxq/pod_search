@@ -43,15 +43,17 @@ class PodSearch:
 
         # test tra
         self.tra = [
-            [90 - 20, -55, 60, 8], [90 - 20, 55, 60, 8],
-            [90 - 11, 55, 20, 5], [90 - 11, -55, 20, 5],
-            [90 - 5, -40, 10, 1.5], [90 - 5, 40, 10, 1.5],
+            [90 - 20, -55, 50, 20], [90 - 20, 55, 50, 8],
+            [90 - 11, 78, 20, 20], [90 - 11, -78, 20, 5],
+            [90 - 4, -83, 6, 20], [90 - 4, 83, 6, 1.5],
+            [90 - 1, 42, 3, 20], [90 - 1, -42, 3, 1],
             [90, 0, 60, 20]
         ]
         self.traCnt = 0
 
-        self.start_time = time()
         rospy.init_node('pod_search', anonymous=True)
+        self.start_time = rospy.Time.now().to_sec()
+        self.task_time = 0
         self.rate = rospy.Rate(10)
         rospy.Subscriber('/pod_comm/pitch', Float32, self.pitch_callback)
         rospy.Subscriber('/pod_comm/yaw', Float32, self.yaw_callback)
@@ -80,7 +82,7 @@ class PodSearch:
 
     def is_at_target(self):
         tol = 0.5
-        hfov_tol = 1.4
+        hfov_tol = 3
         if abs(self.pitch - self.expected_pitch) < tol and \
                 abs(self.yaw - self.expected_yaw) < tol and \
                 abs(self.hfov - self.expected_hfov) < hfov_tol:
@@ -147,8 +149,9 @@ class PodSearch:
 
     def spin(self):
         while not rospy.is_shutdown():
+            self.task_time = rospy.Time.now().to_sec() - self.start_time
             print('---------------------')
-            print(f'State: {self.state}')
+            print(f'Time {self.task_time:.1f} State: {self.state}')
             print(f'Pitch: {self.pitch:.2f} -> {self.expected_pitch:.2f}')
             print(f'Yaw: {self.yaw:.2f} -> {self.expected_yaw:.2f}')
             print(f'HFov: {self.hfov:.2f} -> {self.expected_hfov:.2f}')
