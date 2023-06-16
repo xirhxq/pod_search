@@ -81,8 +81,10 @@ class Transformer:
         self.TRANSFORM_DEBUG = False
         self.order_from_searcher = False
         self.uav_quat = [0, 0, 0, 1]
-
-        self.self_pos = [0, 0, 1.6]
+        
+        self.h = 1.6
+        self.a = self.h / 100 * 3000
+        self.self_pos = [-self.h / 4, 0, self.h]
 
         self.pod_pitch_buffer = TimeBuffer('Pod Pitch Buffer')
         self.pod_yaw_buffer = TimeBuffer('Pod Yaw Buffer')
@@ -109,6 +111,7 @@ class Transformer:
 
         self.start_time = rospy.Time.now().to_sec()
 
+        self.targets_available = 30
         variable_info = [
             ("rosTime", "double"),
             ("podYaw", "double"),
@@ -117,7 +120,7 @@ class Transformer:
             ("podPitchDelayed", "double"),
             ("targetCnt", "int"),
         ] + [
-            (f'target{i}[3]', "list") for i in range(10)
+            (f'target{i}[3]', "list") for i in range(self.targets_available)
         ]
 
         self.dtlg.initialize(variable_info)
@@ -212,9 +215,9 @@ class Transformer:
             self.clsfy.outputTargets()
 
     def out_of_bound(self, x, y, z):
-        if x > 15:
+        if x < 0 or x > self.a:
             return True
-        if abs(y) > 5:
+        if abs(y) > self.a / 2:
             return True
         return False
 
@@ -226,7 +229,7 @@ class Transformer:
             self.dtlg.log("podPitchDelayed", self.pod_pitch_buffer.get_message(0.5).data)
             t = self.clsfy.targetsList()
             self.dtlg.log("targetCnt", len(t))
-            for i in range(10):
+            for i in range(self.targets_available):
                 if i < len(t):
                     self.dtlg.log(f'target{i}', t[i])
                 else:
