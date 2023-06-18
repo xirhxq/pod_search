@@ -4,6 +4,8 @@ import rospy
 from std_msgs.msg import Float32, Bool
 from time import time
 from signal import signal, SIGINT
+import pyfiglet
+from os import system
 
 
 def signal_handler(sig, frame):
@@ -43,8 +45,8 @@ class PodSearch:
 
         # test tra
         self.tra = [
-            [90 - 20, -55, 50, 20], [90 - 20, 55, 50, 8],
-            [90 - 11, 78, 20, 20], [90 - 11, -78, 20, 5],
+            [90 - 20, -55, 50, 20], [90 - 20, 55, 50, 6],
+            [90 - 11, 78, 20, 20], [90 - 11, -78, 20, 4],
             [90 - 4, -83, 6, 20], [90 - 4, 83, 6, 1.5],
             [90 - 1, 42, 3, 20], [90 - 1, -42, 3, 1],
             [90, 0, 60, 20]
@@ -150,7 +152,9 @@ class PodSearch:
     def spin(self):
         while not rospy.is_shutdown():
             self.task_time = rospy.Time.now().to_sec() - self.start_time
-            print('---------------------')
+            system('clear')
+            print('-' * 20)
+            print(pyfiglet.figlet_format('PodSearch', font='slant'))
             print(f'Time {self.task_time:.1f} State: {self.state}')
             print(f'Pitch: {self.pitch:.2f} -> {self.expected_pitch:.2f}')
             print(f'Yaw: {self.yaw:.2f} -> {self.expected_yaw:.2f}')
