@@ -11,6 +11,7 @@ from std_msgs.msg import String, Float32
 from math import tan, degrees, radians, atan
 from collections import deque
 from datetime import datetime, timedelta
+import pyfiglet
 
 HZ = 50
 
@@ -341,7 +342,9 @@ class POD_COMM:
         # print('Received max rate: ', self.max_rate)
 
     def print_state(self):
+        system('clear')
         print('-' * 20)
+        print(pyfiglet.figlet_format('PodComm', font='slant'))
         print(f'Pod state: {self.pod_state_0} {self.pod_state_1} Camera state: {self.pod_camera_state}')
         print(f'Pitch {self.pod_pitch:.1f} -> {self.expected_pitch:.1f}')
         print(f'Yaw {self.pod_yaw:.1f} -> {self.expected_yaw:.1f}')
@@ -351,14 +354,13 @@ class POD_COMM:
         # if len(self.pod_yaw_deque) > 1:
         #     print(f'Yaw history data: from {self.pod_yaw_deque[0][0].strftime("%H:%M:%S.%f")} to {self.pod_yaw_deque[-1][0].strftime("%H:%M:%S.%f")}')
         print(f'CHECKSUM right/wrong: {self.check_sum_right_cnt}/{self.check_sum_wrong_cnt}')
-        print('-' * 20)
 
     def ros_pub(self):
         self.pitch_pub.publish(self.pod_pitch)
         self.yaw_pub.publish(self.pod_yaw)
         self.hfov_pub.publish(self.get_hfov(self.pod_f))
 
-    @timer(tol=1 / HZ / 2)
+    @timer(tol=5 / HZ)
     def spin_once(self):
         self.print_state()
         self.ros_pub()
