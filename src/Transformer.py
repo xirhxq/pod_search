@@ -22,12 +22,17 @@ from collections import deque
 from Classifier import Classifier
 from DataLogger import DataLogger
 import time
+import argparse
 
 
 class TimeBuffer:
     def __init__(self, name='Buffer'):
         self.buffer = deque()
         self.name = name
+
+    @property
+    def empty(self):
+        return not self.buffer
 
     def add_message(self, msg, max_age=0.5):
         time = rospy.Time.now()
@@ -77,7 +82,7 @@ class TimeBuffer:
             
 
 class Transformer:
-    def __init__(self):
+    def __init__(self, log_on=False):
         self.TRANSFORM_DEBUG = False
         self.order_from_searcher = False
         self.uav_quat = [0, 0, 0, 1]
@@ -107,7 +112,10 @@ class Transformer:
         rospy.Subscriber('/' + self.pod_name + '/toTransformer', Bool, self.order_from_searcher_callback)
 
         self.clsfy = Classifier()
-        self.dtlg = DataLogger("data.csv")
+
+        self.log_on = log_on
+        if self.log_on:
+            self.dtlg = DataLogger("data.csv")
 
         self.start_time = rospy.Time.now().to_sec()
 
@@ -123,7 +131,8 @@ class Transformer:
             (f'target{i}[3]', "list") for i in range(self.targets_available)
         ]
 
-        self.dtlg.initialize(variable_info)
+        if self.log_on:
+            self.dtlg.initialize(variable_info)
         
 
     def order_from_searcher_callback(self, msg):
@@ -240,14 +249,20 @@ class Transformer:
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--log', help='turn on log or not', action="store_true")
+    args, unknown = parser.parse_known_args()
+    
+
     rospy.init_node('Transformer', anonymous=True)
     # ipt = input('If debug? (y/n): ')
-    t = Transformer()
+    t = Transformer(args.log)
     time.sleep(1)
     # if ipt == 'y':
     #     t.TRANSFORM_DEBUG = True
     while not rospy.is_shutdown():
-        t.log()
+        if t.log_on and not t.pod_yaw_buffer.empty and not t.pod_pitch_buffer.empty: 
+            t.log()
 
         try: 
             # t.pod_pitch_buffer.output_buffer()
