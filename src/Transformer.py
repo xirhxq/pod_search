@@ -289,6 +289,7 @@ class Transformer:
             if t is not None:
                 aimPitch, aimYaw = self.untransform(self.clsfy.targets[t])
                 msg = Float64MultiArray(data=[1, aimPitch, aimYaw, t])
+                print(f'Aim @ Target [{t}] Pitch {aimPitch:.2f}, Yaw {aimYaw:.2f}')
                 self.aim_pub.publish(msg)
             else:
                 msg = Float64MultiArray(data=[-1, -1, -1, -1])
@@ -301,7 +302,7 @@ class Transformer:
             tCheck = self.clsfy.targetsCheck
             tReal = self.clsfy.targetsReal
             for i in range(tLen):
-                print(f'Target[{i}] @ {t[i]}, {tCnt[i]}, {tCheck[i]} {tReal[i]}')
+                print(f'Target[{i}] @ {[f"{x:.2f}" for x in t[i]]}, {tCnt[i]}, {tCheck[i]} {tReal[i]}')
 
             time.sleep(0.05)
 
