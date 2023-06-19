@@ -282,8 +282,8 @@ class Transformer:
 
     def spin(self):
         while not rospy.is_shutdown():
-            if t.log_on and not t.pod_yaw_buffer.empty and not t.pod_pitch_buffer.empty:
-                t.log()
+            if self.log_on and not self.pod_yaw_buffer.empty and not self.pod_pitch_buffer.empty:
+                self.log()
 
             t = self.clsfy.firstNotChecked()
             if t is not None:
@@ -315,5 +315,7 @@ if __name__ == '__main__':
     # ipt = input('If debug? (y/n): ')
     t = Transformer(args.log)
     time.sleep(1)
+
+    t.spin()
     # if ipt == 'y':
     #     t.TRANSFORM_DEBUG = True
