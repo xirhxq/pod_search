@@ -186,6 +186,8 @@ class PodSearch:
             self.stepSearch()
         elif self.state == State.AIM:
             self.stepAim()
+        elif self.state == State.END:
+            exit(0)
         else:
             print("Invalid state")
 
