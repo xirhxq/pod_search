@@ -1,11 +1,11 @@
 #! /usr/bin/env python3
 
-import rospy
-from std_msgs.msg import Float32, Bool
-from time import time
-from signal import signal, SIGINT
-import pyfiglet
 from os import system
+from signal import signal, SIGINT
+
+import pyfiglet
+import rospy
+from std_msgs.msg import Float32, Bool, Int16
 
 
 def signal_handler(sig, frame):
@@ -21,6 +21,7 @@ class State:
     INIT = 0
     SEARCH = 1
     AIM = 2
+    END = 3
 
 
 class PodSearch:
@@ -54,7 +55,7 @@ class PodSearch:
         self.traCnt = 0
 
         rospy.init_node('pod_search', anonymous=True)
-        self.start_time = rospy.Time.now().to_sec()
+        self.start_time = self.getTimeNow()
         self.task_time = 0
         self.rate = rospy.Rate(10)
         rospy.Subscriber('/pod_comm/pitch', Float32, self.pitch_callback)
@@ -70,8 +71,27 @@ class PodSearch:
             '/pod_comm/max_rate', Float32, queue_size=10)
 
         self.to_transformer_pub = rospy.Publisher(
-            '/pod_comm/toTransformer', Bool, queue_size=10 
+            '/pod_comm/toTransformer', Bool, queue_size=10
         )
+
+        rospy.Subscriber('/pod_comm/aim', Bool, self.aim_callback)
+        self.aimFailPub = rospy.Publisher('/pod_comm/aimFail', Int16, queue_size=10)
+        self.aimPitch = 0
+        self.aimYaw = 0
+        self.aimOn = False
+        self.aimIndex = -1
+
+        self.thisAimIndex = -1
+        self.thisAimStartTime = 0
+
+    def aim_callback(self, data):
+        if data.msg[0] > 0:
+            self.aimOn = True
+            self.aimPitch = data.msg[1]
+            self.aimYaw = data.msg[2]
+            self.aimIndex = data.msg[3]
+        else:
+            self.aimOn = False
 
     def pitch_callback(self, data):
         self.pitch = data.data
@@ -81,6 +101,9 @@ class PodSearch:
 
     def hfov_callback(self, data):
         self.hfov = data.data
+
+    def getTimeNow(self):
+        return rospy.Time.now().to_sec()
 
     def is_at_target(self):
         tol = 0.5
@@ -100,6 +123,11 @@ class PodSearch:
 
     def toStepAim(self):
         self.state = State.AIM
+        self.thisAimIndex = self.aimIndex
+        self.thisAimStartTime = self.getTimeNow()
+
+    def toStepEnd(self):
+        self.state = State.END
 
     def stepInit(self):
         self.expected_pitch = 90
@@ -112,26 +140,37 @@ class PodSearch:
             self.toStepSearch()
 
     def stepSearch(self):
-        if self.traCnt < len(self.tra):
-            self.expected_pitch = self.tra[self.traCnt][0]
-            self.expected_yaw = self.tra[self.traCnt][1]
-            self.expected_hfov = self.tra[self.traCnt][2]
-            self.max_rate = self.tra[self.traCnt][3]
-            self.pubPYZMaxRate()
-            if self.is_at_target():
-                self.traCnt += 1
-            self.to_transformer_pub.publish(Bool(True))
-        else:
+        print('==> StepSearch <==')
+        self.expected_pitch = self.tra[self.traCnt][0]
+        self.expected_yaw = self.tra[self.traCnt][1]
+        self.expected_hfov = self.tra[self.traCnt][2]
+        self.max_rate = self.tra[self.traCnt][3]
+        self.pubPYZMaxRate()
+        if self.is_at_target():
+            self.traCnt += 1
+        self.to_transformer_pub.publish(Bool(True))
+        if self.traCnt == len(self.tra):
+            self.toStepEnd()
+        if self.aimOn:
             self.toStepAim()
 
     def stepAim(self):
-        self.expected_pitch = 90
-        self.expected_yaw = 0
-        self.expected_hfov = 60
+        print(f'==> StepAim @ Target {self.thisAimIndex}<==')
+        if not self.is_at_target():
+            self.thisAimStartTime = self.getTimeNow()
+        self.expected_pitch = self.aimPitch
+        self.expected_yaw = self.aimYaw
+        self.expected_hfov = 10
         self.max_rate = 20
         self.pubPYZMaxRate()
-        self.to_transformer_pub.publish(Bool(False))
-        pass
+        self.to_transformer_pub.publish(Bool(True))
+        if self.getTimeNow() - self.thisAimStartTime >= 10.0:
+            self.aimFailPub.publish(Int16(self.thisAimIndex))
+            self.toStepSearch()
+        if not self.aimOn:
+            self.toStepSearch()
+        if self.aimIndex != self.thisAimIndex:
+            self.toStepSearch()
 
     def pubPYZMaxRate(self):
         self.pitch_pub.publish(self.expected_pitch)
@@ -151,7 +190,7 @@ class PodSearch:
 
     def spin(self):
         while not rospy.is_shutdown():
-            self.task_time = rospy.Time.now().to_sec() - self.start_time
+            self.task_time = self.getTimeNow() - self.start_time
             system('clear')
             print('-' * 20)
             print(pyfiglet.figlet_format('PodSearch', font='slant'))
@@ -160,6 +199,8 @@ class PodSearch:
             print(f'Yaw: {self.yaw:.2f} -> {self.expected_yaw:.2f}')
             print(f'HFov: {self.hfov:.2f} -> {self.expected_hfov:.2f}')
             print(f'Is at target: {self.is_at_target()}')
+            print(f'Aim on: {self.aimOn}')
+            print(f'Aim index: {self.aimIndex}')
             self.controlStateMachine()
             self.rate.sleep()
 
