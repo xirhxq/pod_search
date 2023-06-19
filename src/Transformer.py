@@ -9,20 +9,31 @@
 
 # get pod pitch and yaw by subscribe to '/pod_comm/pitch' and '/pod_comm/yaw' topic, std_msgs/Float32 type
 
-import rospy
-from sensor_msgs.msg import Imu
-from std_msgs.msg import Float32, Bool
-from scipy.spatial.transform import Rotation as R
-import numpy as np
-from math import atan, tan, degrees, radians
-from nav_msgs.msg import Odometry
-from ShowBar import ShowBar
-from spirecv_msgs.msg import TargetsInFrame, Target, ROI
+import argparse
+import time
 from collections import deque
+from math import degrees, radians
+from signal import signal, SIGINT
+
+import numpy as np
+import rospy
+from nav_msgs.msg import Odometry
+from scipy.spatial.transform import Rotation as R
+from sensor_msgs.msg import Imu
+from spirecv_msgs.msg import TargetsInFrame
+from std_msgs.msg import Float32, Bool, Float64MultiArray, Int16
+
 from Classifier import Classifier
 from DataLogger import DataLogger
-import time
-import argparse
+from ShowBar import ShowBar
+
+
+def signal_handler(sig, frame):
+    print('You pressed Ctrl+C!')
+    exit(0)
+
+
+signal(SIGINT, signal_handler)
 
 
 class TimeBuffer:
@@ -46,27 +57,27 @@ class TimeBuffer:
     def get_message(self, time):
         if not self.buffer:
             return None
-        
+
         current_time = rospy.Time.now()
         target_time = current_time - rospy.Duration.from_sec(time)
 
         return self.buffer[0][1]
-        closet_time_diff = float('inf')
-        closet_msg = None
+        closest_time_diff = float('inf')
+        closest_msg = None
 
         for b in self.buffer:
             time_diff = abs((b[0] - target_time).to_sec())
-            if time_diff < closet_time_diff:
-                closet_time_diff = time_diff
-                closet_msg = b[1]
+            if time_diff < closest_time_diff:
+                closest_time_diff = time_diff
+                closest_msg = b[1]
 
-        closet_msg = None
+        closest_msg = None
 
         for b in self.buffer:
             time_diff = abs((b[0] - target_time).to_sec())
-            if time_diff < closet_time_diff:
-                closet_time_diff = time_dif
-        return closet_msg
+            if time_diff < closest_time_diff:
+                closest_time_diff = time_dif
+        return closest_msg
 
     def get_message_no_delay(self):
         if not self.buffer:
@@ -79,14 +90,14 @@ class TimeBuffer:
         for b in self.buffer:
             print('-', (t - b[0]).to_sec(), b[1])
         print(']')
-            
+
 
 class Transformer:
     def __init__(self, log_on=False):
         self.TRANSFORM_DEBUG = False
         self.order_from_searcher = False
         self.uav_quat = [0, 0, 0, 1]
-        
+
         self.h = 1.6
         self.a = self.h / 100 * 3000
         self.self_pos = [-self.h / 4, 0, self.h]
@@ -121,19 +132,25 @@ class Transformer:
 
         self.targets_available = 30
         variable_info = [
-            ("rosTime", "double"),
-            ("podYaw", "double"),
-            ("podPitch", "double"),
-            ("podYawDelayed", "double"),
-            ("podPitchDelayed", "double"),
-            ("targetCnt", "int"),
-        ] + [
-            (f'target{i}[3]', "list") for i in range(self.targets_available)
-        ]
+                            ("rosTime", "double"),
+                            ("podYaw", "double"),
+                            ("podPitch", "double"),
+                            ("podYawDelayed", "double"),
+                            ("podPitchDelayed", "double"),
+                            ("targetCnt", "int"),
+                        ] + [
+                            (f'target{i}[3]', "list") for i in range(self.targets_available)
+                        ]
 
         if self.log_on:
             self.dtlg.initialize(variable_info)
-        
+
+        self.aim_pub = rospy.Publisher('/' + self.pod_name + '/aim', Float64MultiArray, queue_size=1)
+        self.aimFailSub = rospy.Subscriber('/' + self.pod_name + '/aimFail', Int16, self.aim_fail_callback, queue_size=1)
+
+    def aim_fail_callback(self, msg):
+        self.clsfy.targetsCheck[msg.data] = True
+        self.clsfy.targetsReal[msg.data] = False
 
     def order_from_searcher_callback(self, msg):
         self.order_from_searcher = msg.data
@@ -174,7 +191,8 @@ class Transformer:
         try:
             pod_hfov = self.pod_hfov_buffer.get_message(time_diff).data
             pod_vfov = degrees(2 * np.arctan(np.tan(radians(pod_hfov) / 2) * 9 / 16))
-            pod_yaw, pod_pitch = self.pod_yaw_buffer.get_message(time_diff).data, self.pod_pitch_buffer.get_message(time_diff).data
+            pod_yaw = self.pod_yaw_buffer.get_message(time_diff).data
+            pod_pitch = self.pod_pitch_buffer.get_message(time_diff).data
         except Exception as e:
             print(e)
             return
@@ -208,20 +226,37 @@ class Transformer:
         # print(f'real_target_rel: {real_target_rel}')
 
         real_target_abs = real_target_rel + self.self_pos
-        print((
-            f'XY: ({pixel_x:.2f}, {pixel_y:.2f}) '
-            f'cYP: ({cameraYaw:.2f}, {cameraPitch:.2f}) '
-            f'pYP: ({pod_yaw:.2f}, {pod_pitch:.2f}) '
-            f'Target @ {real_target_abs[0]:.2f}, {real_target_abs[1]:.2f}, {real_target_abs[2]:.2f} '
-            f'Score {score:.2f}'
-        ))
+        # print((
+        #     f'XY: ({pixel_x:.2f}, {pixel_y:.2f}) '
+        #     f'cYP: ({cameraYaw:.2f}, {cameraPitch:.2f}) '
+        #     f'pYP: ({pod_yaw:.2f}, {pod_pitch:.2f}) '
+        #     f'Target @ {real_target_abs[0]:.2f}, {real_target_abs[1]:.2f}, {real_target_abs[2]:.2f} '
+        #     f'Score {score:.2f}'
+        # ))
 
         if self.TRANSFORM_DEBUG:
             print(f'-' * 20)
-        
+
         if not self.out_of_bound(*real_target_abs):
             self.clsfy.newPos(*real_target_abs)
-            self.clsfy.outputTargets()
+            # self.clsfy.outputTargets()
+
+    def untransform(self, pos):
+        # from pos and self.pos and self.uav_quat
+        # cal the pod pitch and yaw to aim at pos
+        # return pod_pitch, pod_yaw
+        rUAV = R.from_quat(self.uav_quat)
+        rUAV_inv = rUAV.inv()
+        pos_rel = pos - self.self_pos
+        target_body = rUAV_inv.apply(pos_rel)
+
+        podPitch = np.arctan2(-target_body[2], np.sqrt(target_body[0] ** 2 + target_body[1] ** 2))
+        podYaw = -np.arctan2(target_body[1], target_body[0])
+
+        podPitch = 90 - np.degrees(podPitch)
+        podYaw = np.degrees(podYaw)
+
+        return podPitch, podYaw
 
     def out_of_bound(self, x, y, z):
         if x < 0 or x > self.a:
@@ -231,28 +266,50 @@ class Transformer:
         return False
 
     def log(self):
-            self.dtlg.log("rosTime", rospy.Time.now().to_sec() - self.start_time)
-            self.dtlg.log("podYaw", self.pod_yaw_buffer.get_message_no_delay().data)
-            self.dtlg.log("podPitch", self.pod_pitch_buffer.get_message_no_delay().data)
-            self.dtlg.log("podYawDelayed", self.pod_yaw_buffer.get_message(0.5).data)
-            self.dtlg.log("podPitchDelayed", self.pod_pitch_buffer.get_message(0.5).data)
-            t = self.clsfy.targetsList()
-            self.dtlg.log("targetCnt", len(t))
-            for i in range(self.targets_available):
-                if i < len(t):
-                    self.dtlg.log(f'target{i}', t[i])
-                else:
-                    self.dtlg.log(f'target{i}', [-1, -1, -1])
-            self.dtlg.newline()
+        self.dtlg.log("rosTime", rospy.Time.now().to_sec() - self.start_time)
+        self.dtlg.log("podYaw", self.pod_yaw_buffer.get_message_no_delay().data)
+        self.dtlg.log("podPitch", self.pod_pitch_buffer.get_message_no_delay().data)
+        self.dtlg.log("podYawDelayed", self.pod_yaw_buffer.get_message(0.5).data)
+        self.dtlg.log("podPitchDelayed", self.pod_pitch_buffer.get_message(0.5).data)
+        t = self.clsfy.targetsList()
+        self.dtlg.log("targetCnt", len(t))
+        for i in range(self.targets_available):
+            if i < len(t):
+                self.dtlg.log(f'target{i}', t[i])
+            else:
+                self.dtlg.log(f'target{i}', [-1, -1, -1])
+        self.dtlg.newline()
 
+    def spin(self):
+        while not rospy.is_shutdown():
+            if t.log_on and not t.pod_yaw_buffer.empty and not t.pod_pitch_buffer.empty:
+                t.log()
 
+            t = self.clsfy.firstNotChecked()
+            if t is not None:
+                aimPitch, aimYaw = self.untransform(self.clsfy.targets[t])
+                msg = Float64MultiArray([1, aimPitch, aimYaw, t])
+                self.aim_pub.publish(msg)
+            else:
+                msg = Float64MultiArray([-1, -1, -1, -1])
+                self.aim_pub.publish(msg)
+
+            print('-' * 20)
+            t = self.clsfy.targets
+            tLen = len(t)
+            tCnt = self.clsfy.targetsCnt
+            tCheck = self.clsfy.targetsCheck
+            tReal = self.clsfy.targetsReal
+            for i in range(tLen):
+                print(f'Target[{i}] @ {t[i]}, {tCnt[i]}, {tCheck[i]} {tReal[i]}')
+
+            time.sleep(0.05)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--log', help='turn on log or not', action="store_true")
     args, unknown = parser.parse_known_args()
-    
 
     rospy.init_node('Transformer', anonymous=True)
     # ipt = input('If debug? (y/n): ')
@@ -260,18 +317,3 @@ if __name__ == '__main__':
     time.sleep(1)
     # if ipt == 'y':
     #     t.TRANSFORM_DEBUG = True
-    while not rospy.is_shutdown():
-        if t.log_on and not t.pod_yaw_buffer.empty and not t.pod_pitch_buffer.empty: 
-            t.log()
-
-        try: 
-            # t.pod_pitch_buffer.output_buffer()
-            # t.pod_yaw_buffer.output_buffer()
-            # t.pod_hfov_buffer.output_buffer()
-            #x, y = map(float, input('input pixel x and y: ').split())
-            #t.transform(x, y)
-            pass
-        except Exception as e:
-            print(e)
-        
-        time.sleep(0.05)
