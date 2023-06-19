@@ -26,6 +26,8 @@ class Classifier:
             self.targetsReal[ind] = True
 
     def firstNotChecked(self):
+        if False not in self.targetsCheck:
+            return None
         return self.targetsCheck.index(False)
 
     def newPos(self, x, y, z):
