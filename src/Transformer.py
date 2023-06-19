@@ -100,7 +100,7 @@ class Transformer:
 
         self.h = 1.6
         self.a = self.h / 100 * 3000
-        self.self_pos = [-self.h / 4, 0, self.h]
+        self.self_pos = np.array([-self.h / 4, 0, self.h])
 
         self.pod_pitch_buffer = TimeBuffer('Pod Pitch Buffer')
         self.pod_yaw_buffer = TimeBuffer('Pod Yaw Buffer')
@@ -288,10 +288,10 @@ class Transformer:
             t = self.clsfy.firstNotChecked()
             if t is not None:
                 aimPitch, aimYaw = self.untransform(self.clsfy.targets[t])
-                msg = Float64MultiArray([1, aimPitch, aimYaw, t])
+                msg = Float64MultiArray(data=[1, aimPitch, aimYaw, t])
                 self.aim_pub.publish(msg)
             else:
-                msg = Float64MultiArray([-1, -1, -1, -1])
+                msg = Float64MultiArray(data=[-1, -1, -1, -1])
                 self.aim_pub.publish(msg)
 
             print('-' * 20)

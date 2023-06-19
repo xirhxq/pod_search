@@ -5,7 +5,7 @@ from signal import signal, SIGINT
 
 import pyfiglet
 import rospy
-from std_msgs.msg import Float32, Bool, Int16
+from std_msgs.msg import Float32, Bool, Int16, Float64MultiArray
 
 
 def signal_handler(sig, frame):
@@ -74,7 +74,7 @@ class PodSearch:
             '/pod_comm/toTransformer', Bool, queue_size=10
         )
 
-        rospy.Subscriber('/pod_comm/aim', Bool, self.aim_callback)
+        rospy.Subscriber('/pod_comm/aim', Float64MultiArray, self.aim_callback)
         self.aimFailPub = rospy.Publisher('/pod_comm/aimFail', Int16, queue_size=10)
         self.aimPitch = 0
         self.aimYaw = 0
@@ -85,11 +85,11 @@ class PodSearch:
         self.thisAimStartTime = 0
 
     def aim_callback(self, data):
-        if data.msg[0] > 0:
+        if data.data[0] > 0:
             self.aimOn = True
-            self.aimPitch = data.msg[1]
-            self.aimYaw = data.msg[2]
-            self.aimIndex = data.msg[3]
+            self.aimPitch = data.data[1]
+            self.aimYaw = data.data[2]
+            self.aimIndex = int(data.data[3])
         else:
             self.aimOn = False
 
@@ -155,12 +155,13 @@ class PodSearch:
             self.toStepAim()
 
     def stepAim(self):
-        print(f'==> StepAim @ Target {self.thisAimIndex}<==')
-        if not self.is_at_target():
-            self.thisAimStartTime = self.getTimeNow()
+        print(f'==> StepAim @ Target {self.thisAimIndex} <==')
+        print(f'Time: {self.getTimeNow() - self.thisAimStartTime}')
+        #if not self.is_at_target():
+        #    self.thisAimStartTime = self.getTimeNow()
         self.expected_pitch = self.aimPitch
         self.expected_yaw = self.aimYaw
-        self.expected_hfov = 10
+        self.expected_hfov = 20
         self.max_rate = 20
         self.pubPYZMaxRate()
         self.to_transformer_pub.publish(Bool(True))
