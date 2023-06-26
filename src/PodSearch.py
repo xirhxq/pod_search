@@ -33,10 +33,10 @@ class PodSearch:
         self.yaw = 0.0
         self.hfov = 0.0
 
-        self.expected_pitch = 90
-        self.expected_yaw = 0
-        self.expected_hfov = 60
-        self.max_rate = 20
+        self.expectedPitch = 90
+        self.expectedYaw = 0
+        self.expectedHfov = 60
+        self.maxRate = 20
 
         self.tra = [
             [90 - 30, -55, 60, 10], [90 - 30, 55, 60, 10],
@@ -56,20 +56,20 @@ class PodSearch:
         self.traCnt = 0
 
         rospy.init_node('pod_search', anonymous=True)
-        self.start_time = self.getTimeNow()
-        self.task_time = 0
+        self.startTime = self.getTimeNow()
+        self.taskTime = 0
         self.rate = rospy.Rate(10)
-        rospy.Subscriber('/pod_comm/pitch', Float32, self.pitch_callback)
-        rospy.Subscriber('/pod_comm/yaw', Float32, self.yaw_callback)
-        rospy.Subscriber('/pod_comm/hfov', Float32, self.hfov_callback)
-        self.pitch_pub = rospy.Publisher(
-            '/pod_comm/expected_pitch', Float32, queue_size=10)
-        self.yaw_pub = rospy.Publisher(
-            '/pod_comm/expected_yaw', Float32, queue_size=10)
-        self.hfov_pub = rospy.Publisher(
-            '/pod_comm/expected_hfov', Float32, queue_size=10)
-        self.max_rate_pub = rospy.Publisher(
-            '/pod_comm/max_rate', Float32, queue_size=10)
+        rospy.Subscriber('/pod_comm/pitch', Float32, self.pitchCallback)
+        rospy.Subscriber('/pod_comm/yaw', Float32, self.yawCallback)
+        rospy.Subscriber('/pod_comm/hfov', Float32, self.hfovCallback)
+        self.pitchPub = rospy.Publisher(
+            '/pod_comm/expectedPitch', Float32, queue_size=10)
+        self.yawPub = rospy.Publisher(
+            '/pod_comm/expectedYaw', Float32, queue_size=10)
+        self.hfovPub = rospy.Publisher(
+            '/pod_comm/expectedHfov', Float32, queue_size=10)
+        self.maxRatePub = rospy.Publisher(
+            '/pod_comm/maxRate', Float32, queue_size=10)
 
         rospy.Subscriber('/pod_comm/pAtTarget', Bool, lambda msg: setattr(self, 'pAtTarget', msg.data))
         rospy.Subscriber('/pod_comm/yAtTarget', Bool, lambda msg: setattr(self, 'yAtTarget', msg.data))
@@ -85,11 +85,11 @@ class PodSearch:
         rospy.Subscriber('/pod_comm/yFeedback', Float32, lambda msg: setattr(self, 'yFeedback', msg.data))
         rospy.Subscriber('/pod_comm/fFeedback', Float32, lambda msg: setattr(self, 'fFeedback', msg.data))
 
-        self.to_transformer_pub = rospy.Publisher(
+        self.toTransformerPub = rospy.Publisher(
             '/pod_comm/toTransformer', Bool, queue_size=10
         )
 
-        rospy.Subscriber('/pod_comm/aim', Float64MultiArray, self.aim_callback)
+        rospy.Subscriber('/pod_comm/aim', Float64MultiArray, self.aimCallback)
         self.aimFailPub = rospy.Publisher('/pod_comm/aimFail', Int16, queue_size=10)
         self.aimPitch = 0
         self.aimYaw = 0
@@ -100,7 +100,7 @@ class PodSearch:
         self.thisAimStartTime = 0
 
 
-    def aim_callback(self, data):
+    def aimCallback(self, data):
         if data.data[0] > 0:
             self.aimOn = True
             self.aimPitch = data.data[1]
@@ -109,26 +109,26 @@ class PodSearch:
         else:
             self.aimOn = False
 
-    def pitch_callback(self, data):
+    def pitchCallback(self, data):
         self.pitch = data.data
 
-    def yaw_callback(self, data):
+    def yawCallback(self, data):
         self.yaw = data.data
 
-    def hfov_callback(self, data):
+    def hfovCallback(self, data):
         self.hfov = data.data
 
     def getTimeNow(self):
         return rospy.Time.now().to_sec()
 
-    def is_at_target(self):
+    def isAtTarget(self):
         return (
             self.pAtTarget and 
             self.yAtTarget and 
             self.fAtTarget and 
-            self.pFeedback == self.expected_pitch and
-            self.yFeedback == self.expected_yaw and
-            self.fFeedback == self.expected_hfov
+            self.pFeedback == self.expectedPitch and
+            self.yFeedback == self.expectedYaw and
+            self.fFeedback == self.expectedHfov
         )
 
     def toStepInit(self):
@@ -146,25 +146,25 @@ class PodSearch:
         self.state = State.END
 
     def stepInit(self):
-        self.expected_pitch = 90
-        self.expected_yaw = 0
-        self.expected_hfov = 60
-        self.max_rate = 20
+        self.expectedPitch = 90
+        self.expectedYaw = 0
+        self.expectedHfov = 60
+        self.maxRate = 20
         self.pubPYZMaxRate()
-        self.to_transformer_pub.publish(Bool(False))
-        if self.is_at_target():
+        self.toTransformerPub.publish(Bool(False))
+        if self.isAtTarget():
             self.toStepSearch()
 
     def stepSearch(self):
         print(f'{GREEN}==> StepSearch @ {self.traCnt} <=={RESET}')
-        self.expected_pitch = self.tra[self.traCnt][0]
-        self.expected_yaw = self.tra[self.traCnt][1]
-        self.expected_hfov = self.tra[self.traCnt][2]
-        self.max_rate = self.tra[self.traCnt][3]
+        self.expectedPitch = self.tra[self.traCnt][0]
+        self.expectedYaw = self.tra[self.traCnt][1]
+        self.expectedHfov = self.tra[self.traCnt][2]
+        self.maxRate = self.tra[self.traCnt][3]
         self.pubPYZMaxRate()
-        if self.is_at_target():
+        if self.isAtTarget():
             self.traCnt += 1
-        self.to_transformer_pub.publish(Bool(True))
+        self.toTransformerPub.publish(Bool(True))
         if self.traCnt == len(self.tra):
             self.toStepEnd()
         if self.aimOn:
@@ -173,14 +173,14 @@ class PodSearch:
     def stepAim(self):
         print(f'{RED}==> StepAim @ Target {self.thisAimIndex} <=={RESET}')
         print(f'Time: {self.getTimeNow() - self.thisAimStartTime}')
-        #if not self.is_at_target():
+        #if not self.isAtTarget():
         #    self.thisAimStartTime = self.getTimeNow()
-        self.expected_pitch = self.aimPitch
-        self.expected_yaw = self.aimYaw
-        self.expected_hfov = 20
-        self.max_rate = 20
+        self.expectedPitch = self.aimPitch
+        self.expectedYaw = self.aimYaw
+        self.expectedHfov = 20
+        self.maxRate = 20
         self.pubPYZMaxRate()
-        self.to_transformer_pub.publish(Bool(True))
+        self.toTransformerPub.publish(Bool(True))
         if self.getTimeNow() - self.thisAimStartTime >= 10.0:
             self.aimFailPub.publish(Int16(self.thisAimIndex))
             self.toStepSearch()
@@ -190,10 +190,10 @@ class PodSearch:
             self.toStepSearch()
 
     def pubPYZMaxRate(self):
-        self.pitch_pub.publish(self.expected_pitch)
-        self.yaw_pub.publish(self.expected_yaw)
-        self.hfov_pub.publish(self.expected_hfov)
-        self.max_rate_pub.publish(self.max_rate)
+        self.pitchPub.publish(self.expectedPitch)
+        self.yawPub.publish(self.expectedYaw)
+        self.hfovPub.publish(self.expectedHfov)
+        self.maxRatePub.publish(self.maxRate)
 
     def controlStateMachine(self):
         if self.state == State.INIT:
@@ -209,18 +209,18 @@ class PodSearch:
 
     def spin(self):
         while not rospy.is_shutdown():
-            self.task_time = self.getTimeNow() - self.start_time
+            self.taskTime = self.getTimeNow() - self.startTime
             system('clear')
             print('-' * 20)
             print(pyfiglet.figlet_format('PodSearch', font='slant'))
-            print(f'Time {self.task_time:.1f} State: {self.state}')
+            print(f'Time {self.taskTime:.1f} State: {self.state}')
             print(GREEN if self.pAtTarget else RED, end='')
-            print(f'Pitch: {self.pitch:.2f} -> {self.expected_pitch:.2f} == {self.pFeedback}{RESET}')
+            print(f'Pitch: {self.pitch:.2f} -> {self.expectedPitch:.2f} == {self.pFeedback}{RESET}')
             print(GREEN if self.yAtTarget else RED, end='')
-            print(f'Yaw: {self.yaw:.2f} -> {self.expected_yaw:.2f} == {self.yFeedback}{RESET}')
+            print(f'Yaw: {self.yaw:.2f} -> {self.expectedYaw:.2f} == {self.yFeedback}{RESET}')
             print(GREEN if self.fAtTarget else RED, end='')
-            print(f'HFov: {self.hfov:.2f} -> {self.expected_hfov:.2f} == {self.fFeedback} {RESET}')
-            print(f'Is at target: {self.is_at_target()}')
+            print(f'HFov: {self.hfov:.2f} -> {self.expectedHfov:.2f} == {self.fFeedback} {RESET}')
+            print(f'Is at target: {self.isAtTarget()}')
             print(f'Aim on: {self.aimOn}')
             print(f'Aim index: {self.aimIndex}')
             self.controlStateMachine()
@@ -228,5 +228,5 @@ class PodSearch:
 
 
 if __name__ == '__main__':
-    pod_search = PodSearch()
-    pod_search.spin()
+    podSearch = PodSearch()
+    podSearch.spin()
