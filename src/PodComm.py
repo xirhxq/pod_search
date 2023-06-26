@@ -176,6 +176,9 @@ class POD_COMM:
         self.pAtTargetPub = rospy.Publisher('/pod_comm/pAtTarget', Bool, queue_size=1)
         self.yAtTargetPub = rospy.Publisher('/pod_comm/yAtTarget', Bool, queue_size=1)
         self.fAtTargetPub = rospy.Publisher('/pod_comm/fAtTarget', Bool, queue_size=1)
+        self.pFeedbackPub = rospy.Publisher('/pod_comm/pFeedback', Float32, queue_size=1)
+        self.yFeedbackPub = rospy.Publisher('/pod_comm/yFeedback', Float32, queue_size=1)
+        self.fFeedbackPub = rospy.Publisher('/pod_comm/fFeedback', Float32, queue_size=1)
 
     def loose_zoom_level(self, z):
         return z
@@ -219,13 +222,13 @@ class POD_COMM:
                 # print(f'up decrease zoom a bit')
                 up.zoom_down()
                 if self.lazy_tag == 0:
-                    self.lazy_tag = 30
+                    self.lazy_tag = 12
                 
             elif rel_zoom_diff > self.z_tol:
                 # print(f'up increase zoom a bit')
                 up.zoom_up()
                 if self.lazy_tag == 0:
-                    self.lazy_tag = 30
+                    self.lazy_tag = 12
 
             elif abs(pitch_diff) > self.py_tol or abs(yaw_diff) > self.py_tol:
                 pr_max, yr_max = 300, self.max_rate
@@ -329,11 +332,7 @@ class POD_COMM:
         # print('Received expected pitch: ', self.expected_pitch)
 
     def y_callback(self, msg):
-        while msg.data < 0:
-            msg.data += 360
-        while msg.data > 360:
-            msg.data -= 360
-        self.expected_yaw = msg.data
+        self.expected_yaw = self.round(msg.data, 180)
         # print('Received expected yaw: ', self.expected_yaw)
 
     def hfov_callback(self, msg):
@@ -370,6 +369,10 @@ class POD_COMM:
         self.pAtTargetPub.publish(Bool(abs(self.pod_pitch - self.expected_pitch) < self.py_tol))
         self.yAtTargetPub.publish(Bool(abs(self.round(self.pod_yaw - self.expected_yaw, 180)) < self.py_tol))
         self.fAtTargetPub.publish(Bool(abs(self.pod_f - self.expected_zoom) / self.expected_zoom < self.z_tol))
+        
+        self.pFeedbackPub.publish(self.expected_pitch)
+        self.yFeedbackPub.publish(self.round(self.expected_yaw, 180))
+        self.fFeedbackPub.publish(self.get_hfov(self.expected_zoom))
 
     @timer(tol=5 / HZ)
     def spin_once(self):

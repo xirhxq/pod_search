@@ -78,6 +78,13 @@ class PodSearch:
         self.yAtTarget = False
         self.fAtTarget = False
 
+        self.pFeedback = 0.0
+        self.yFeedback = 0.0
+        self.fFeedback = 0.0
+        rospy.Subscriber('/pod_comm/pFeedback', Float32, lambda msg: setattr(self, 'pFeedback', msg.data))
+        rospy.Subscriber('/pod_comm/yFeedback', Float32, lambda msg: setattr(self, 'yFeedback', msg.data))
+        rospy.Subscriber('/pod_comm/fFeedback', Float32, lambda msg: setattr(self, 'fFeedback', msg.data))
+
         self.to_transformer_pub = rospy.Publisher(
             '/pod_comm/toTransformer', Bool, queue_size=10
         )
@@ -124,7 +131,14 @@ class PodSearch:
         return rospy.Time.now().to_sec()
 
     def is_at_target(self):
-        return self.pAtTarget and self.yAtTarget and self.fAtTarget
+        return (
+            self.pAtTarget and 
+            self.yAtTarget and 
+            self.fAtTarget and 
+            self.pFeedback == self.expected_pitch and
+            self.yFeedback == self.expected_yaw and
+            self.fFeedback == self.expected_hfov
+        )
 
     def toStepInit(self):
         self.state = State.INIT
@@ -210,11 +224,11 @@ class PodSearch:
             print(pyfiglet.figlet_format('PodSearch', font='slant'))
             print(f'Time {self.task_time:.1f} State: {self.state}')
             print(GREEN if self.pAtTarget else RED, end='')
-            print(f'Pitch: {self.pitch:.2f} -> {self.expected_pitch:.2f}{RESET}')
+            print(f'Pitch: {self.pitch:.2f} -> {self.expected_pitch:.2f} == {self.pFeedback}{RESET}')
             print(GREEN if self.yAtTarget else RED, end='')
-            print(f'Yaw: {self.yaw:.2f} -> {self.expected_yaw:.2f}{RESET}')
+            print(f'Yaw: {self.yaw:.2f} -> {self.expected_yaw:.2f} == {self.yFeedback}{RESET}')
             print(GREEN if self.fAtTarget else RED, end='')
-            print(f'HFov: {self.hfov:.2f} -> {self.expected_hfov:.2f}{RESET}')
+            print(f'HFov: {self.hfov:.2f} -> {self.expected_hfov:.2f} == {self.fFeedback} {RESET}')
             print(f'Is at target: {self.is_at_target()}')
             print(f'Aim on: {self.aimOn}')
             print(f'Aim index: {self.aimIndex}')
