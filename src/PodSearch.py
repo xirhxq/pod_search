@@ -7,6 +7,7 @@ import pyfiglet
 import rospy
 from std_msgs.msg import Float32, Bool, Int16, Float64MultiArray
 
+from Utils import *
 
 def signal_handler(sig, frame):
     print('You pressed Ctrl+C!')
@@ -70,6 +71,13 @@ class PodSearch:
         self.max_rate_pub = rospy.Publisher(
             '/pod_comm/max_rate', Float32, queue_size=10)
 
+        rospy.Subscriber('/pod_comm/pAtTarget', Bool, self.pAtTargetCallback)
+        rospy.Subscriber('/pod_comm/yAtTarget', Bool, self.yAtTargetCallback)
+        rospy.Subscriber('/pod_comm/fAtTarget', Bool, self.fAtTargetCallback)
+        self.pAtTarget = False
+        self.yAtTarget = False
+        self.fAtTarget = False
+
         self.to_transformer_pub = rospy.Publisher(
             '/pod_comm/toTransformer', Bool, queue_size=10
         )
@@ -83,6 +91,16 @@ class PodSearch:
 
         self.thisAimIndex = -1
         self.thisAimStartTime = 0
+
+    def pAtTargetCallback(self, data):
+        self.pAtTarget = data.data
+
+    def yAtTargetCallback(self, data):
+        self.yAtTarget = data.data
+
+    def fAtTargetCallback(self, data):
+        self.fAtTarget = data.data
+
 
     def aim_callback(self, data):
         if data.data[0] > 0:
@@ -106,14 +124,7 @@ class PodSearch:
         return rospy.Time.now().to_sec()
 
     def is_at_target(self):
-        tol = 0.5
-        hfov_tol = 3
-        if abs(self.pitch - self.expected_pitch) < tol and \
-                abs(self.yaw - self.expected_yaw) < tol and \
-                abs(self.hfov - self.expected_hfov) < hfov_tol:
-            return True
-        else:
-            return False
+        return self.pAtTarget and self.yAtTarget and self.fAtTarget
 
     def toStepInit(self):
         self.state = State.INIT
@@ -140,7 +151,7 @@ class PodSearch:
             self.toStepSearch()
 
     def stepSearch(self):
-        print('==> StepSearch <==')
+        print(f'{GREEN}==> StepSearch @ {self.traCnt} <=={RESET}')
         self.expected_pitch = self.tra[self.traCnt][0]
         self.expected_yaw = self.tra[self.traCnt][1]
         self.expected_hfov = self.tra[self.traCnt][2]
@@ -155,7 +166,7 @@ class PodSearch:
             self.toStepAim()
 
     def stepAim(self):
-        print(f'==> StepAim @ Target {self.thisAimIndex} <==')
+        print(f'{RED}==> StepAim @ Target {self.thisAimIndex} <=={RESET}')
         print(f'Time: {self.getTimeNow() - self.thisAimStartTime}')
         #if not self.is_at_target():
         #    self.thisAimStartTime = self.getTimeNow()
@@ -198,9 +209,12 @@ class PodSearch:
             print('-' * 20)
             print(pyfiglet.figlet_format('PodSearch', font='slant'))
             print(f'Time {self.task_time:.1f} State: {self.state}')
-            print(f'Pitch: {self.pitch:.2f} -> {self.expected_pitch:.2f}')
-            print(f'Yaw: {self.yaw:.2f} -> {self.expected_yaw:.2f}')
-            print(f'HFov: {self.hfov:.2f} -> {self.expected_hfov:.2f}')
+            print(GREEN if self.pAtTarget else RED, end='')
+            print(f'Pitch: {self.pitch:.2f} -> {self.expected_pitch:.2f}{RESET}')
+            print(GREEN if self.yAtTarget else RED, end='')
+            print(f'Yaw: {self.yaw:.2f} -> {self.expected_yaw:.2f}{RESET}')
+            print(GREEN if self.fAtTarget else RED, end='')
+            print(f'HFov: {self.hfov:.2f} -> {self.expected_hfov:.2f}{RESET}')
             print(f'Is at target: {self.is_at_target()}')
             print(f'Aim on: {self.aimOn}')
             print(f'Aim index: {self.aimIndex}')

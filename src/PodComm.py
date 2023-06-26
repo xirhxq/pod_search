@@ -7,11 +7,12 @@ from struct import pack, unpack
 from sys import platform, exit
 from os import system
 import rospy
-from std_msgs.msg import String, Float32
+from std_msgs.msg import String, Float32, Bool
 from math import tan, degrees, radians, atan
 from collections import deque
 from datetime import datetime, timedelta
 import pyfiglet
+from Utils import *
 
 HZ = 50
 
@@ -148,6 +149,8 @@ class POD_COMM:
 
         self.max_rate = 300
         self.zoom_unit = 4.3
+        self.py_tol = 0.5
+        self.z_tol = 0.05
 
         self.down_ser = serial.Serial(
             port=PORT,
@@ -170,6 +173,9 @@ class POD_COMM:
         self.pitch_pub = rospy.Publisher('/pod_comm/pitch', Float32, queue_size=10)
         self.yaw_pub = rospy.Publisher('/pod_comm/yaw', Float32, queue_size=10)
         self.hfov_pub = rospy.Publisher('/pod_comm/hfov', Float32, queue_size=10)
+        self.pAtTargetPub = rospy.Publisher('/pod_comm/pAtTarget', Bool, queue_size=1)
+        self.yAtTargetPub = rospy.Publisher('/pod_comm/yAtTarget', Bool, queue_size=1)
+        self.fAtTargetPub = rospy.Publisher('/pod_comm/fAtTarget', Bool, queue_size=1)
 
     def loose_zoom_level(self, z):
         return z
@@ -202,8 +208,6 @@ class POD_COMM:
             yaw_diff = self.round(self.expected_yaw - self.pod_yaw, 180)
             abs_zoom_diff = (self.expected_zoom - self.pod_f)
             rel_zoom_diff = abs_zoom_diff / self.expected_zoom
-            py_tol = 0.5
-            z_tol = 0.05
 
 
             if self.expected_zoom_level != self.pod_zoom_level and self.lazy_tag == 0 and abs(rel_zoom_diff) > 0.1:
@@ -211,19 +215,19 @@ class POD_COMM:
                 up.change_zoom_level(self.expected_zoom_level)
                 self.lazy_tag = 150
 
-            elif rel_zoom_diff < -z_tol:
+            elif rel_zoom_diff < -self.z_tol:
                 # print(f'up decrease zoom a bit')
                 up.zoom_down()
                 if self.lazy_tag == 0:
-                    self.lazy_tag = 20
+                    self.lazy_tag = 30
                 
-            elif rel_zoom_diff > z_tol:
+            elif rel_zoom_diff > self.z_tol:
                 # print(f'up increase zoom a bit')
                 up.zoom_up()
                 if self.lazy_tag == 0:
-                    self.lazy_tag = 20
+                    self.lazy_tag = 30
 
-            elif  pitch_diff < -py_tol or pitch_diff > py_tol or yaw_diff < -py_tol or yaw_diff > py_tol:
+            elif abs(pitch_diff) > self.py_tol or abs(yaw_diff) > self.py_tol:
                 pr_max, yr_max = 300, self.max_rate
                 prate = max(-pr_max, min(pr_max, pitch_diff * 200))
                 yrate = max(-yr_max, min(yr_max, yaw_diff * 300))
@@ -346,9 +350,12 @@ class POD_COMM:
         print('-' * 20)
         print(pyfiglet.figlet_format('PodComm', font='slant'))
         print(f'Pod state: {self.pod_state_0} {self.pod_state_1} Camera state: {self.pod_camera_state}')
-        print(f'Pitch {self.pod_pitch:.1f} -> {self.expected_pitch:.1f}')
-        print(f'Yaw {self.pod_yaw:.1f} -> {self.expected_yaw:.1f}')
-        print(f'Zoom {self.pod_f:.1f}({self.pod_zoom_level}) -> {self.expected_zoom:.1f}({self.expected_zoom_level})')
+        print(RED if abs(self.pod_pitch - self.expected_pitch) > self.py_tol else GREEN, end='')
+        print(f'Pitch {self.pod_pitch:.1f} -> {self.expected_pitch:.1f}{RESET}')
+        print(RED if abs(self.pod_yaw - self.expected_yaw) > self.py_tol else GREEN, end='')
+        print(f'Yaw {self.pod_yaw:.1f} -> {self.expected_yaw:.1f}{RESET}')
+        print(RED if abs(self.pod_f - self.expected_zoom) / self.expected_zoom > self.z_tol else GREEN, end='')
+        print(f'Zoom {self.pod_f:.1f}({self.pod_zoom_level}) -> {self.expected_zoom:.1f}({self.expected_zoom_level}){RESET}')
         print(f'LazyTag {self.lazy_tag}')
         # print(f'Yaw deque: {self.pod_yaw_deque}')"
         # if len(self.pod_yaw_deque) > 1:
@@ -359,6 +366,10 @@ class POD_COMM:
         self.pitch_pub.publish(self.pod_pitch)
         self.yaw_pub.publish(self.pod_yaw)
         self.hfov_pub.publish(self.get_hfov(self.pod_f))
+
+        self.pAtTargetPub.publish(Bool(abs(self.pod_pitch - self.expected_pitch) < self.py_tol))
+        self.yAtTargetPub.publish(Bool(abs(self.round(self.pod_yaw - self.expected_yaw, 180)) < self.py_tol))
+        self.fAtTargetPub.publish(Bool(abs(self.pod_f - self.expected_zoom) / self.expected_zoom < self.z_tol))
 
     @timer(tol=5 / HZ)
     def spin_once(self):
