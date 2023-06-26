@@ -71,9 +71,9 @@ class PodSearch:
         self.max_rate_pub = rospy.Publisher(
             '/pod_comm/max_rate', Float32, queue_size=10)
 
-        rospy.Subscriber('/pod_comm/pAtTarget', Bool, self.pAtTargetCallback)
-        rospy.Subscriber('/pod_comm/yAtTarget', Bool, self.yAtTargetCallback)
-        rospy.Subscriber('/pod_comm/fAtTarget', Bool, self.fAtTargetCallback)
+        rospy.Subscriber('/pod_comm/pAtTarget', Bool, lambda msg: setattr(self, 'pAtTarget', msg.data))
+        rospy.Subscriber('/pod_comm/yAtTarget', Bool, lambda msg: setattr(self, 'yAtTarget', msg.data))
+        rospy.Subscriber('/pod_comm/fAtTarget', Bool, lambda msg: setattr(self, 'fAtTarget', msg.data))
         self.pAtTarget = False
         self.yAtTarget = False
         self.fAtTarget = False
@@ -98,15 +98,6 @@ class PodSearch:
 
         self.thisAimIndex = -1
         self.thisAimStartTime = 0
-
-    def pAtTargetCallback(self, data):
-        self.pAtTarget = data.data
-
-    def yAtTargetCallback(self, data):
-        self.yAtTarget = data.data
-
-    def fAtTargetCallback(self, data):
-        self.fAtTarget = data.data
 
 
     def aim_callback(self, data):
