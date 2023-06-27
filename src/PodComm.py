@@ -121,8 +121,8 @@ class POD_COMM:
         self.state = WAITING_DOWN_FRAME_HEAD_1
         self.expectedPitch = 90.0
         self.expectedYaw = 0.0
-        self.expectedZoom = 129
-        self.expectedZoomLevel = 30
+        self.expectedZoom = 21
+        self.expectedZoomLevel = 5
         
         self.pAtTarget = False
         self.yAtTarget = False
