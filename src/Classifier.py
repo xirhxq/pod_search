@@ -12,6 +12,9 @@ class Classifier:
         self.targetsReal = []
         self.threshold = 1
 
+        self.checkThreshold = 10
+        self.targetThreshold = 50
+
     def newTarget(self, pos):
         self.targets.append(pos)
         self.targetsCnt.append(1)
@@ -21,11 +24,17 @@ class Classifier:
     def updateTarget(self, ind, pos):
         self.targets[ind] = pos
         self.targetsCnt[ind] += 1
-        if self.targetsCnt[ind] > 50:
+        if self.targetsCnt[ind] > self.targetThreshold:
             self.targetsCheck[ind] = True
             self.targetsReal[ind] = True
 
     def firstNotChecked(self):
+        tC = self.targetsCheck
+        for ind, value in enumerate(tC):
+            if not value and self.targetsCnt[ind] >= self.checkThreshold:
+                return ind
+        return None
+
         if False not in self.targetsCheck:
             return None
         return self.targetsCheck.index(False)
