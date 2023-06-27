@@ -26,6 +26,7 @@ from std_msgs.msg import Float32, Bool, Float64MultiArray, Int16
 from Classifier import Classifier
 from DataLogger import DataLogger
 from ShowBar import ShowBar
+from Utils import *
 
 
 def signal_handler(sig, frame):
@@ -276,27 +277,33 @@ class Transformer:
 
     def spin(self):
         while not rospy.is_shutdown():
+            print('-' * 20)
             if self.logOn and not self.podYawBuffer.empty and not self.podPitchBuffer.empty:
                 self.log()
-
-            t = self.clsfy.firstNotChecked()
-            if t is not None:
-                aimPitch, aimYaw = self.untransform(self.clsfy.targets[t])
-                msg = Float64MultiArray(data=[1, aimPitch, aimYaw, t])
-                print(f'Aim @ Target [{t}] Pitch {aimPitch:.2f}, Yaw {aimYaw:.2f}')
-                self.aimPub.publish(msg)
-            else:
-                msg = Float64MultiArray(data=[-1, -1, -1, -1])
-                self.aimPub.publish(msg)
-
-            print('-' * 20)
+            
             t = self.clsfy.targets
             tLen = len(t)
             tCnt = self.clsfy.targetsCnt
             tCheck = self.clsfy.targetsCheck
             tReal = self.clsfy.targetsReal
             for i in range(tLen):
-                print(f'Target[{i}] @ {[f"{x:.2f}" for x in t[i]]}, {tCnt[i]}, {tCheck[i]} {tReal[i]}')
+                print(
+                    f'Target[{i}] @ {", ".join([f"{x:.2f}" for x in t[i]])}, {tCnt[i]} Frames, ' 
+                    f'{("" if tCheck[i] else (YELLOW + "Not Checked")) if tCnt[i] >= self.clsfy.checkThreshold else "Not enough"}' 
+                    f'{((GREEN + "is a target") if tReal[i] else (RED + "not a target")) if tCheck[i] else ""}'
+                    f'{RESET}'
+                )
+
+
+            tInd = self.clsfy.firstNotChecked()
+            if tInd is not None:
+                aimPitch, aimYaw = self.untransform(self.clsfy.targets[tInd])
+                msg = Float64MultiArray(data=[1, aimPitch, aimYaw, tInd])
+                print(f'{RED}==> Aiming @ Target [{tInd}] <== {RESET}p{aimPitch:.2f}, y{aimYaw:.2f}')
+                self.aimPub.publish(msg)
+            else:
+                msg = Float64MultiArray(data=[-1, -1, -1, -1])
+                self.aimPub.publish(msg)
 
             time.sleep(0.05)
 
