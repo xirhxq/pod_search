@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 import math
+
 import numpy as np
 
 
@@ -45,7 +46,7 @@ class Classifier:
         else:
             distances = []
             for target in self.targets:
-                distances.append(math.sqrt((x - target[0])**2 + (y - target[1])**2 + (z - target[2])**2))
+                distances.append(math.sqrt((x - target[0]) ** 2 + (y - target[1]) ** 2 + (z - target[2]) ** 2))
             distances = np.array(distances)
             if np.any(distances < self.threshold):
                 index = np.argmin(distances)

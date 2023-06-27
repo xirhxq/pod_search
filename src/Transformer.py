@@ -71,7 +71,7 @@ class TimeBuffer:
             if timeDiff < closestTimeDiff:
                 closestTimeDiff = timeDiff
                 closestMsg = b[1]
-        
+
         return closestMsg
 
     def getMessageNoDelay(self):
@@ -280,7 +280,7 @@ class Transformer:
             print('-' * 20)
             if self.logOn and not self.podYawBuffer.empty and not self.podPitchBuffer.empty:
                 self.log()
-            
+
             t = self.clsfy.targets
             tLen = len(t)
             tCnt = self.clsfy.targetsCnt
@@ -288,12 +288,11 @@ class Transformer:
             tReal = self.clsfy.targetsReal
             for i in range(tLen):
                 print(
-                    f'Target[{i}] @ {", ".join([f"{x:.2f}" for x in t[i]])}, {tCnt[i]} Frames, ' 
-                    f'{("" if tCheck[i] else (YELLOW + "Not Checked")) if tCnt[i] >= self.clsfy.checkThreshold else "Not enough"}' 
+                    f'Target[{i}] @ {", ".join([f"{x:.2f}" for x in t[i]])}, {tCnt[i]} Frames, '
+                    f'{("" if tCheck[i] else (YELLOW + "Not Checked")) if tCnt[i] >= self.clsfy.checkThreshold else "Not enough"}'
                     f'{((GREEN + "is a target") if tReal[i] else (RED + "not a target")) if tCheck[i] else ""}'
                     f'{RESET}'
                 )
-
 
             tInd = self.clsfy.firstNotChecked()
             if tInd is not None:

@@ -1,17 +1,19 @@
 #! /usr/bin/env python3
 
-import serial
 import threading
-from time import time, sleep
-from struct import pack, unpack
-from sys import platform, exit
-from os import system
-import rospy
-from std_msgs.msg import String, Float32, Bool
-from math import tan, degrees, radians, atan
 from collections import deque
 from datetime import datetime, timedelta
+from math import tan, degrees, radians, atan
+from os import system
+from struct import pack, unpack
+from sys import exit
+from time import time, sleep
+
 import pyfiglet
+import rospy
+import serial
+from std_msgs.msg import Float32, Bool
+
 from Utils import *
 
 HZ = 50
@@ -22,7 +24,7 @@ DOWN_FRAME_HEAD = DOWN_FRAME_HEAD_1 + DOWN_FRAME_HEAD_2
 UP_FRAME_HEAD = b'\xEB\x90'
 FRAME_LEN = 48
 
-bAny, bS8, bU8, bS16, bU16, bS32, bU32, bF = 'x', 'b', 'B', 'h', 'H', 'i', 'I', 'f' 
+bAny, bS8, bU8, bS16, bU16, bS32, bU32, bF = 'x', 'b', 'B', 'h', 'H', 'i', 'I', 'f'
 DOWN_PROTO = '<' + bU8 * 2 + bU16 + bS16 + bU16 + bAny * 29 + bU8 + bAny * 2 + bU16 + bU8 + bAny * 2 + bU8 + bU8 * 2
 
 WAITING_DOWN_FRAME_HEAD_1 = 1
@@ -30,13 +32,16 @@ WAITING_DOWN_FRAME_HEAD_2 = 2
 READING_DATA = 3
 
 from glob import glob
+
 PORT = glob('/dev/ttyUSB[0-9]*')[0]
 
 from signal import signal, SIGINT
 
+
 def signal_handler(sig, frame):
     print('You pressed Ctrl+C!')
     exit(0)
+
 
 signal(SIGINT, signal_handler)
 
@@ -44,23 +49,25 @@ SECRET_DICT = {
     1: 140, 2: 160, 3: 180, 5: 220, 7: 250, 10: 290, 20: 355
 }
 
-def secretInterp(x, data=SECRET_DICT): 
+
+def secretInterp(x, data=SECRET_DICT):
     sortedData = sorted(data.items())
     xVal, yVal = zip(*sortedData)
     if x <= xVal[0]:
         return yVal[0]
     if x >= xVal[-1]:
         return yVal[-1]
-    
+
     index = 0
     while x > xVal[index]:
         index += 1
-    
+
     x1, y1 = xVal[index - 1], yVal[index - 1]
     x2, y2 = xVal[index], yVal[index]
 
     y = y1 + (x - x1) * (y2 - y1) / (x2 - x1)
     return y
+
 
 class UP_MSG:
     def __init__(self):
@@ -69,17 +76,17 @@ class UP_MSG:
         self.orderC = b'\x00\x00'
         self.orderD = b'\x00\x00\x00\x00'
         self.orderE = b'\x00' * 45
-    
+
     def msg(self):
         msg = self.orderA + self.orderB + self.orderC + self.orderD + self.orderE
         assert len(msg) == 54
         checkSum = sum(msg) & 0xFF
         return msg + pack('<B', checkSum)
-    
+
     def zoomDown(self):
         self.orderB = b'\x48'
         return self.msg()
-    
+
     def zoomUp(self):
         self.orderB = b'\x44'
         return self.msg()
@@ -112,8 +119,11 @@ def timer(tol=1):
                 sleep(tol - endTime + startTime)
             # print(f'Ended')
             return result
+
         return wrapper
+
     return decorator
+
 
 class POD_COMM:
     def __init__(self):
@@ -123,7 +133,7 @@ class POD_COMM:
         self.expectedYaw = 0.0
         self.expectedZoom = 21
         self.expectedZoomLevel = 5
-        
+
         self.pAtTarget = False
         self.yAtTarget = False
         self.fAtTarget = False
@@ -169,17 +179,17 @@ class POD_COMM:
 
         rospy.init_node('pod_comm', anonymous=True)
         rospy.Rate(10)
-        rospy.Subscriber('/pod_comm/expectedPitch', Float32, lambda msg: ( 
+        rospy.Subscriber('/pod_comm/expectedPitch', Float32, lambda msg: (
             setattr(self, 'expectedPitch', msg.data)
         ))
-        rospy.Subscriber('/pod_comm/expectedYaw', Float32, lambda msg: ( 
+        rospy.Subscriber('/pod_comm/expectedYaw', Float32, lambda msg: (
             setattr(self, 'expectedYaw', self.round(msg.data, 180))
         ))
-        rospy.Subscriber('/pod_comm/expectedHfov', Float32, lambda msg: ( 
+        rospy.Subscriber('/pod_comm/expectedHfov', Float32, lambda msg: (
             setattr(self, 'expectedZoom', self.getF(msg.data)),
             setattr(
-                self, 
-                'expectedZoomLevel', 
+                self,
+                'expectedZoomLevel',
                 self.looseZoomLevel(
                     round(self.expectedZoom / self.zoomUnit)
                 )
@@ -217,7 +227,7 @@ class POD_COMM:
             return val + base * 2
         else:
             return val
-    
+
     def genUpMsg(self):
         up = UP_MSG()
 
@@ -229,7 +239,7 @@ class POD_COMM:
             yawDiff = self.round(self.expectedYaw - self.podYaw, 180)
             absZoomDiff = (self.expectedZoom - self.podF)
             relZoomDiff = absZoomDiff / self.expectedZoom
-            
+
             self.updateAtTarget()
 
             if not self.fAtTarget:
@@ -240,17 +250,17 @@ class POD_COMM:
                 elif self.lazyTag == 10:
                     self.podF = self.zoomUnit * self.expectedZoomLevel
 
-#            elif relZoomDiff < -self.zTol:
-#                # print(f'up decrease zoom a bit')
-#                up.zoomDown()
-#                if self.lazyTag == 0:
-#                    self.lazyTag = 12
-                
-#            elif relZoomDiff > self.zTol:
-#                # print(f'up increase zoom a bit')
-#                up.zoomUp()
-#                if self.lazyTag == 0:
-#                    self.lazyTag = 12
+            # elif relZoomDiff < -self.zTol:
+            #     # print(f'up decrease zoom a bit')
+            #     up.zoomDown()
+            #     if self.lazyTag == 0:
+            #         self.lazyTag = 12
+            #
+            # elif relZoomDiff > self.zTol:
+            #     # print(f'up increase zoom a bit')
+            #     up.zoomUp()
+            #     if self.lazyTag == 0:
+            #         self.lazyTag = 12
 
             elif not self.pAtTarget or not self.yAtTarget:
                 prMax, yrMax = 300, self.maxRate
@@ -259,17 +269,12 @@ class POD_COMM:
 
                 up.manualPYRate(prate, yrate)
 
-
-
                 # print(f'up pitch {self.podPitch:.2f} -> {self.expectedPitch:.2f} diff: {pitchDiff:.2f} rate: {prate:.2f}')
                 # print(f'up yaw {self.podYaw:.2f} -> {self.expectedYaw:.2f} diff: {yawDiff:.2f} rate: {yrate:.2f}')
         if self.lazyTag > 0:
             self.lazyTag -= 1
-        
 
         return up.msg()
-
-
 
     def readData(self):
         while True:
@@ -296,8 +301,11 @@ class POD_COMM:
                             # raise AssertionError
                         else:
                             self.checkSumRightCnt += 1
-                            self.podState0, self.podState1, podFx10, podPitchx100, podYawx100, self.podCameraState, self.podLaserRes, self.podElecZoom, self.podOrder = downData[:-2]
-                            #self.podF = podFx10 / 10
+                            (self.podState0, self.podState1,
+                             podFx10, podPitchx100, podYawx100,
+                             self.podCameraState, self.podLaserRes,
+                             self.podElecZoom, self.podOrder) = downData[:-2]
+                            # self.podF = podFx10 / 10
                             self.podPitch = podPitchx100 / 100
                             self.podYaw = self.round(podYawx100 / 100, 180)
                             self.podZoomLevel = self.looseZoomLevel(round(self.podF / self.zoomUnit))
@@ -306,19 +314,30 @@ class POD_COMM:
                             self.podYawDeque.append((currentTime, self.podYaw))
                             self.podPitchDeque.append((currentTime, self.podPitch))
 
-                            while len(self.podYawDeque) > 0 and self.podYawDeque[0][0] < currentTime - self.timeInterval:
+                            while (
+                                    len(self.podYawDeque) > 0 and
+                                    self.podYawDeque[0][0] < currentTime - self.timeInterval
+                            ):
                                 # print(f'pop {self.podYawDeque[0]}')
                                 self.podYawDeque.popleft()
 
-                            while len(self.podPitchDeque) > 0 and self.podPitchDeque[0][0] < currentTime - self.timeInterval:
+                            while (
+                                    len(self.podPitchDeque) > 0 and
+                                    self.podPitchDeque[0][0] < currentTime - self.timeInterval
+                            ):
                                 self.podPitchDeque.popleft()
 
                             if len(self.podYawDeque) > 1:
-                                self.podYawV = self.round(self.podYawDeque[-1][1] - self.podYawDeque[0][1], 180) / (self.podYawDeque[-1][0] - self.podYawDeque[0][0]).total_seconds()
+                                self.podYawV = (
+                                        self.round(self.podYawDeque[-1][1] - self.podYawDeque[0][1], 180) /
+                                        (self.podYawDeque[-1][0] - self.podYawDeque[0][0]).total_seconds()
+                                )
 
                             if len(self.podPitchDeque) > 1:
-                                self.podPitchV = (self.podPitchDeque[-1][1] - self.podPitchDeque[0][1])/ (self.podPitchDeque[-1][0] - self.podPitchDeque[0][0]).total_seconds()
-
+                                self.podPitchV = (
+                                        (self.podPitchDeque[-1][1] - self.podPitchDeque[0][1]) /
+                                        (self.podPitchDeque[-1][0] - self.podPitchDeque[0][0]).total_seconds()
+                                )
 
                             # print(f'Received state {self.podState0}, camera state {self.podCameraState}, zoom {self.podF}, pitch {self.podPitch}, yaw {self.podYaw}')
                         # print(f'down zoom: {self.podF:.2f} pitch: {self.podPitch:.2f} yaw: {self.podYaw:.2f}')
@@ -326,7 +345,7 @@ class POD_COMM:
 
             if self.state == WAITING_DOWN_FRAME_HEAD_1:
                 dataBuf = bytearray()
-    
+
     def startRead(self):
         tRead = threading.Thread(target=self.readData)
         tRead.start()
@@ -336,11 +355,11 @@ class POD_COMM:
         upMsg = self.genUpMsg()
         # print('------------------------------')
         self.downSer.write(upMsg)
-    
+
     def writeData(self):
         while True:
             self.writeOnce()
-            
+
     def startWrite(self):
         tWrite = threading.Thread(target=self.writeData)
         tWrite.start()
@@ -371,7 +390,7 @@ class POD_COMM:
         self.pAtTargetPub.publish(self.pAtTarget)
         self.yAtTargetPub.publish(self.yAtTarget)
         self.fAtTargetPub.publish(self.fAtTarget)
-        
+
         self.pFeedbackPub.publish(self.expectedPitch)
         self.yFeedbackPub.publish(self.round(self.expectedYaw, 180))
         self.fFeedbackPub.publish(self.getHfov(self.expectedZoom))
@@ -385,7 +404,7 @@ class POD_COMM:
     def spinOnce(self):
         self.printState()
         self.rosPub()
-    
+
     def spin(self):
         self.startRead()
         self.startWrite()

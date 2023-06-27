@@ -9,6 +9,7 @@ from std_msgs.msg import Float32, Bool, Int16, Float64MultiArray
 
 from Utils import *
 
+
 def signal_handler(sig, frame):
     print('You pressed Ctrl+C!')
     exit(0)
@@ -59,7 +60,7 @@ class PodSearch:
         self.rate = rospy.Rate(10)
         rospy.Subscriber('/pod_comm/pitch', Float32, lambda msg: setattr(self, 'pitch', msg.data))
         rospy.Subscriber('/pod_comm/yaw', Float32, lambda msg: setattr(self, 'yaw', msg.data))
-        rospy.Subscriber('/pod_comm/hfov', Float32, lambda msg: setattr(self, 'hfov', msg.data)) 
+        rospy.Subscriber('/pod_comm/hfov', Float32, lambda msg: setattr(self, 'hfov', msg.data))
         self.pitchPub = rospy.Publisher(
             '/pod_comm/expectedPitch', Float32, queue_size=10)
         self.yawPub = rospy.Publisher(
@@ -97,7 +98,6 @@ class PodSearch:
         self.thisAimIndex = -1
         self.thisAimStartTime = 0
 
-
     def aimCallback(self, msg):
         if msg.data[0] > 0:
             self.aimOn = True
@@ -112,12 +112,12 @@ class PodSearch:
 
     def isAtTarget(self):
         return (
-            self.pAtTarget and 
-            self.yAtTarget and 
-            self.fAtTarget and 
-            self.pFeedback == self.expectedPitch and
-            self.yFeedback == self.expectedYaw and
-            self.fFeedback == self.expectedHfov
+                self.pAtTarget and
+                self.yAtTarget and
+                self.fAtTarget and
+                self.pFeedback == self.expectedPitch and
+                self.yFeedback == self.expectedYaw and
+                self.fFeedback == self.expectedHfov
         )
 
     def toStepInit(self):
@@ -162,7 +162,7 @@ class PodSearch:
     def stepAim(self):
         print(f'{RED}==> StepAim @ Target {self.thisAimIndex} <=={RESET}')
         print(f'Time: {self.getTimeNow() - self.thisAimStartTime}')
-        #if not self.isAtTarget():
+        # if not self.isAtTarget():
         #    self.thisAimStartTime = self.getTimeNow()
         self.expectedPitch = self.aimPitch
         self.expectedYaw = self.aimYaw
