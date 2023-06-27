@@ -10,7 +10,7 @@ class Classifier:
         self.targetsCnt = []
         self.targetsCheck = []
         self.targetsReal = []
-        self.threshold = 0.5
+        self.threshold = 1
 
     def newTarget(self, pos):
         self.targets.append(pos)
