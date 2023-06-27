@@ -167,7 +167,7 @@ class PodSearch:
         #    self.thisAimStartTime = self.getTimeNow()
         self.expectedPitch = self.aimPitch
         self.expectedYaw = self.aimYaw
-        self.expectedHfov = 20
+        self.expectedHfov = 90 - self.aimPitch
         self.maxRate = 20
         self.pubPYZMaxRate()
         self.toTransformerPub.publish(Bool(True))
