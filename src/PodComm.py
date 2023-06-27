@@ -121,8 +121,13 @@ class POD_COMM:
         self.state = WAITING_DOWN_FRAME_HEAD_1
         self.expectedPitch = 90.0
         self.expectedYaw = 0.0
-        self.expectedZoom = 4.3
-        self.expectedZoomLevel = 1
+        self.expectedZoom = 129
+        self.expectedZoomLevel = 30
+        
+        self.pAtTarget = False
+        self.yAtTarget = False
+        self.fAtTarget = False
+
         self.startTime = time()
         self.lazyTag = 0
         self.SENSOR_WIDTH = tan(radians(2.3) / 2) * 2 * 129
@@ -224,26 +229,30 @@ class POD_COMM:
             yawDiff = self.round(self.expectedYaw - self.podYaw, 180)
             absZoomDiff = (self.expectedZoom - self.podF)
             relZoomDiff = absZoomDiff / self.expectedZoom
+            
+            self.updateAtTarget()
 
-
-            if self.expectedZoomLevel != self.podZoomLevel and self.lazyTag == 0 and abs(relZoomDiff) > 0.1:
-                # print(f'change zoom level {self.podZoomLevel} to {self.expectedZoomLevel}')
-                up.changeZoomLevel(self.expectedZoomLevel)
-                self.lazyTag = 150
-
-            elif relZoomDiff < -self.zTol:
-                # print(f'up decrease zoom a bit')
-                up.zoomDown()
+            if not self.fAtTarget:
                 if self.lazyTag == 0:
-                    self.lazyTag = 12
+                    # print(f'change zoom level {self.podZoomLevel} to {self.expectedZoomLevel}')
+                    up.changeZoomLevel(self.expectedZoomLevel)
+                    self.lazyTag = 200 if abs(self.expectedZoomLevel - self.podZoomLevel) > 15 else 100
+                elif self.lazyTag == 10:
+                    self.podF = self.zoomUnit * self.expectedZoomLevel
+
+#            elif relZoomDiff < -self.zTol:
+#                # print(f'up decrease zoom a bit')
+#                up.zoomDown()
+#                if self.lazyTag == 0:
+#                    self.lazyTag = 12
                 
-            elif relZoomDiff > self.zTol:
-                # print(f'up increase zoom a bit')
-                up.zoomUp()
-                if self.lazyTag == 0:
-                    self.lazyTag = 12
+#            elif relZoomDiff > self.zTol:
+#                # print(f'up increase zoom a bit')
+#                up.zoomUp()
+#                if self.lazyTag == 0:
+#                    self.lazyTag = 12
 
-            elif abs(pitchDiff) > self.pyTol or abs(yawDiff) > self.pyTol:
+            elif not self.pAtTarget or not self.yAtTarget:
                 prMax, yrMax = 300, self.maxRate
                 prate = max(-prMax, min(prMax, pitchDiff * 200))
                 yrate = max(-yrMax, min(yrMax, yawDiff * 300))
@@ -288,7 +297,7 @@ class POD_COMM:
                         else:
                             self.checkSumRightCnt += 1
                             self.podState0, self.podState1, podFx10, podPitchx100, podYawx100, self.podCameraState, self.podLaserRes, self.podElecZoom, self.podOrder = downData[:-2]
-                            self.podF = podFx10 / 10
+                            #self.podF = podFx10 / 10
                             self.podPitch = podPitchx100 / 100
                             self.podYaw = self.round(podYawx100 / 100, 180)
                             self.podZoomLevel = self.looseZoomLevel(round(self.podF / self.zoomUnit))
@@ -341,11 +350,11 @@ class POD_COMM:
         print('-' * 20)
         print(pyfiglet.figlet_format('PodComm', font='slant'))
         print(f'Pod state: {self.podState0} {self.podState1} Camera state: {self.podCameraState}')
-        print(RED if abs(self.podPitch - self.expectedPitch) > self.pyTol else GREEN, end='')
+        print(GREEN if self.pAtTarget else RED, end='')
         print(f'Pitch {self.podPitch:.1f} -> {self.expectedPitch:.1f}{RESET}')
-        print(RED if abs(self.podYaw - self.expectedYaw) > self.pyTol else GREEN, end='')
+        print(GREEN if self.yAtTarget else RED, end='')
         print(f'Yaw {self.podYaw:.1f} -> {self.expectedYaw:.1f}{RESET}')
-        print(RED if abs(self.podF - self.expectedZoom) / self.expectedZoom > self.zTol else GREEN, end='')
+        print(GREEN if self.fAtTarget else RED, end='')
         print(f'Zoom {self.podF:.1f}({self.podZoomLevel}) -> {self.expectedZoom:.1f}({self.expectedZoomLevel}){RESET}')
         print(f'Hfov {self.getHfov(self.podF):.2f} -> {self.getHfov(self.expectedZoom):2f}')
         print(f'LazyTag {self.lazyTag}')
@@ -359,13 +368,18 @@ class POD_COMM:
         self.yawPub.publish(self.podYaw)
         self.hfovPub.publish(self.getHfov(self.podF))
 
-        self.pAtTargetPub.publish(Bool(abs(self.podPitch - self.expectedPitch) < self.pyTol))
-        self.yAtTargetPub.publish(Bool(abs(self.round(self.podYaw - self.expectedYaw, 180)) < self.pyTol))
-        self.fAtTargetPub.publish(Bool(abs(self.podF - self.expectedZoom) / self.expectedZoom < self.zTol))
+        self.pAtTargetPub.publish(self.pAtTarget)
+        self.yAtTargetPub.publish(self.yAtTarget)
+        self.fAtTargetPub.publish(self.fAtTarget)
         
         self.pFeedbackPub.publish(self.expectedPitch)
         self.yFeedbackPub.publish(self.round(self.expectedYaw, 180))
         self.fFeedbackPub.publish(self.getHfov(self.expectedZoom))
+
+    def updateAtTarget(self):
+        self.pAtTarget = (abs(self.podPitch - self.expectedPitch) < self.pyTol)
+        self.yAtTarget = (abs(self.round(self.podYaw - self.expectedYaw, 180)) < self.pyTol)
+        self.fAtTarget = (self.expectedZoomLevel == self.podZoomLevel)
 
     @timer(tol=5 / HZ)
     def spinOnce(self):
