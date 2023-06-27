@@ -17,7 +17,6 @@ def signal_handler(sig, frame):
 signal(SIGINT, signal_handler)
 
 
-# a state enum class
 class State:
     INIT = 0
     SEARCH = 1
@@ -59,9 +58,9 @@ class PodSearch:
         self.startTime = self.getTimeNow()
         self.taskTime = 0
         self.rate = rospy.Rate(10)
-        rospy.Subscriber('/pod_comm/pitch', Float32, self.pitchCallback)
-        rospy.Subscriber('/pod_comm/yaw', Float32, self.yawCallback)
-        rospy.Subscriber('/pod_comm/hfov', Float32, self.hfovCallback)
+        rospy.Subscriber('/pod_comm/pitch', Float32, lambda msg: setattr(self, 'pitch', msg.data))
+        rospy.Subscriber('/pod_comm/yaw', Float32, lambda msg: setattr(self, 'yaw', msg.data))
+        rospy.Subscriber('/pod_comm/hfov', Float32, lambda msg: setattr(self, 'hfov', msg.data)) 
         self.pitchPub = rospy.Publisher(
             '/pod_comm/expectedPitch', Float32, queue_size=10)
         self.yawPub = rospy.Publisher(
@@ -100,23 +99,14 @@ class PodSearch:
         self.thisAimStartTime = 0
 
 
-    def aimCallback(self, data):
-        if data.data[0] > 0:
+    def aimCallback(self, msg):
+        if msg.data[0] > 0:
             self.aimOn = True
-            self.aimPitch = data.data[1]
-            self.aimYaw = data.data[2]
-            self.aimIndex = int(data.data[3])
+            self.aimPitch = msg.data[1]
+            self.aimYaw = msg.data[2]
+            self.aimIndex = int(msg.data[3])
         else:
             self.aimOn = False
-
-    def pitchCallback(self, data):
-        self.pitch = data.data
-
-    def yawCallback(self, data):
-        self.yaw = data.data
-
-    def hfovCallback(self, data):
-        self.hfov = data.data
 
     def getTimeNow(self):
         return rospy.Time.now().to_sec()
@@ -215,11 +205,11 @@ class PodSearch:
             print(pyfiglet.figlet_format('PodSearch', font='slant'))
             print(f'Time {self.taskTime:.1f} State: {self.state}')
             print(GREEN if self.pAtTarget else RED, end='')
-            print(f'Pitch: {self.pitch:.2f} -> {self.expectedPitch:.2f} == {self.pFeedback}{RESET}')
+            print(f'Pitch: {self.pitch:.2f} -> {self.expectedPitch:.2f} == {self.pFeedback:.2f}{RESET}')
             print(GREEN if self.yAtTarget else RED, end='')
-            print(f'Yaw: {self.yaw:.2f} -> {self.expectedYaw:.2f} == {self.yFeedback}{RESET}')
+            print(f'Yaw: {self.yaw:.2f} -> {self.expectedYaw:.2f} == {self.yFeedback:.2f}{RESET}')
             print(GREEN if self.fAtTarget else RED, end='')
-            print(f'HFov: {self.hfov:.2f} -> {self.expectedHfov:.2f} == {self.fFeedback} {RESET}')
+            print(f'HFov: {self.hfov:.2f} -> {self.expectedHfov:.2f} == {self.fFeedback:.2f} {RESET}')
             print(f'Is at target: {self.isAtTarget()}')
             print(f'Aim on: {self.aimOn}')
             print(f'Aim index: {self.aimIndex}')

@@ -162,14 +162,27 @@ class POD_COMM:
         )
         self.dataBuf = bytearray()
 
-        # subscribe to rostopic '/pod_comm/expectedPitchYaw'
         rospy.init_node('pod_comm', anonymous=True)
         rospy.Rate(10)
-        rospy.Subscriber('/pod_comm/expectedPitch', Float32, self.pCallback)
-        rospy.Subscriber('/pod_comm/expectedYaw', Float32, self.yCallback)
-        rospy.Subscriber('/pod_comm/expectedHfov', Float32, self.hfovCallback)
-        rospy.Subscriber('/pod_comm/expectedPitchYaw', String, self.pyCallback)
-        rospy.Subscriber('/pod_comm/maxRate', Float32, self.maxRateCallback)
+        rospy.Subscriber('/pod_comm/expectedPitch', Float32, lambda msg: ( 
+            setattr(self, 'expectedPitch', msg.data)
+        ))
+        rospy.Subscriber('/pod_comm/expectedYaw', Float32, lambda msg: ( 
+            setattr(self, 'expectedYaw', self.round(msg.data, 180))
+        ))
+        rospy.Subscriber('/pod_comm/expectedHfov', Float32, lambda msg: ( 
+            setattr(self, 'expectedZoom', self.getF(msg.data)),
+            setattr(
+                self, 
+                'expectedZoomLevel', 
+                self.looseZoomLevel(
+                    round(self.expectedZoom / self.zoomUnit)
+                )
+            )
+        ))
+        rospy.Subscriber('/pod_comm/maxRate', Float32, lambda msg: (
+            setattr(self, 'maxRate', secretInterp(msg.data))
+        ))
         self.pitchPub = rospy.Publisher('/pod_comm/pitch', Float32, queue_size=10)
         self.yawPub = rospy.Publisher('/pod_comm/yaw', Float32, queue_size=10)
         self.hfovPub = rospy.Publisher('/pod_comm/hfov', Float32, queue_size=10)
@@ -323,27 +336,6 @@ class POD_COMM:
         tWrite = threading.Thread(target=self.writeData)
         tWrite.start()
 
-    def pyCallback(self, msg):
-        self.expectedPitch, self.expectedYaw = list(map(float, msg.data.split()))
-        # print('Received expected pitch and yaw: ', self.expectedPitch, self.expectedYaw)
-
-    def pCallback(self, msg):
-        self.expectedPitch = msg.data
-        # print('Received expected pitch: ', self.expectedPitch)
-
-    def yCallback(self, msg):
-        self.expectedYaw = self.round(msg.data, 180)
-        # print('Received expected yaw: ', self.expectedYaw)
-
-    def hfovCallback(self, msg):
-        self.expectedZoom = self.getF(msg.data)
-        self.expectedZoomLevel = self.looseZoomLevel(round(self.expectedZoom / self.zoomUnit))
-        # print('Received expected zoom: ', self.expectedZoom)
-    
-    def maxRateCallback(self, msg):
-        self.maxRate = secretInterp(msg.data)
-        # print('Received max rate: ', self.maxRate)
-
     def printState(self):
         system('clear')
         print('-' * 20)
@@ -355,6 +347,7 @@ class POD_COMM:
         print(f'Yaw {self.podYaw:.1f} -> {self.expectedYaw:.1f}{RESET}')
         print(RED if abs(self.podF - self.expectedZoom) / self.expectedZoom > self.zTol else GREEN, end='')
         print(f'Zoom {self.podF:.1f}({self.podZoomLevel}) -> {self.expectedZoom:.1f}({self.expectedZoomLevel}){RESET}')
+        print(f'Hfov {self.getHfov(self.podF):.2f} -> {self.getHfov(self.expectedZoom):2f}')
         print(f'LazyTag {self.lazyTag}')
         # print(f'Yaw deque: {self.podYawDeque}')"
         # if len(self.podYawDeque) > 1:
