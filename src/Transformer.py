@@ -4,7 +4,7 @@
 # using the onboard pod pitch, yaw, zoom and UAV pitch, yaw, roll
 # assume the UAV is at (0, 0, h)
 
-# get UAV orientation by subscribe to uav_name + '/imu' topic, sensor_msgs/Imu type
+# get UAV orientation by subscribe to uavName + '/imu' topic, sensor_msgs/Imu type
 # and calculate by the quaternion to euler angles
 
 # get pod pitch and yaw by subscribe to '/pod_comm/pitch' and '/pod_comm/yaw' topic, std_msgs/Float32 type
@@ -45,46 +45,40 @@ class TimeBuffer:
     def empty(self):
         return not self.buffer
 
-    def add_message(self, msg, max_age=0.5):
+    def addMessage(self, msg, maxAge=0.5):
         time = rospy.Time.now()
         self.buffer.append((time, msg))
 
-        oldest_time = time - rospy.Duration.from_sec(max_age)
+        oldestTime = time - rospy.Duration.from_sec(maxAge)
 
-        while self.buffer and self.buffer[0][0] < oldest_time:
+        while self.buffer and self.buffer[0][0] < oldestTime:
             self.buffer.popleft()
 
-    def get_message(self, time):
+    def getMessage(self, time):
         if not self.buffer:
             return None
 
-        current_time = rospy.Time.now()
-        target_time = current_time - rospy.Duration.from_sec(time)
+        currentTime = rospy.Time.now()
+        targetTime = currentTime - rospy.Duration.from_sec(time)
 
         return self.buffer[0][1]
-        closest_time_diff = float('inf')
-        closest_msg = None
+        closestTimeDiff = float('inf')
+        closestMsg = None
 
         for b in self.buffer:
-            time_diff = abs((b[0] - target_time).to_sec())
-            if time_diff < closest_time_diff:
-                closest_time_diff = time_diff
-                closest_msg = b[1]
+            timeDiff = abs((b[0] - targetTime).to_sec())
+            if timeDiff < closestTimeDiff:
+                closestTimeDiff = timeDiff
+                closestMsg = b[1]
+        
+        return closestMsg
 
-        closest_msg = None
-
-        for b in self.buffer:
-            time_diff = abs((b[0] - target_time).to_sec())
-            if time_diff < closest_time_diff:
-                closest_time_diff = time_dif
-        return closest_msg
-
-    def get_message_no_delay(self):
+    def getMessageNoDelay(self):
         if not self.buffer:
             return None
         return self.buffer[-1][1]
 
-    def output_buffer(self):
+    def outputBuffer(self):
         print(self.name + ': [')
         t = rospy.Time.now()
         for b in self.buffer:
@@ -93,44 +87,44 @@ class TimeBuffer:
 
 
 class Transformer:
-    def __init__(self, log_on=False):
+    def __init__(self, logOn=False):
         self.TRANSFORM_DEBUG = False
-        self.order_from_searcher = False
-        self.uav_quat = [0, 0, 0, 1]
+        self.orderFromSearcher = False
+        self.uavQuat = [0, 0, 0, 1]
 
         self.h = 1.6
         self.a = self.h / 100 * 3000
-        self.self_pos = np.array([-self.h / 4, 0, self.h])
+        self.selfPos = np.array([-self.h / 4, 0, self.h])
 
-        self.pod_pitch_buffer = TimeBuffer('Pod Pitch Buffer')
-        self.pod_yaw_buffer = TimeBuffer('Pod Yaw Buffer')
+        self.podPitchBuffer = TimeBuffer('Pod Pitch Buffer')
+        self.podYawBuffer = TimeBuffer('Pod Yaw Buffer')
 
-        self.pod_hfov_buffer = TimeBuffer('Pod HFov Buffer')
+        self.podHfovBuffer = TimeBuffer('Pod HFov Buffer')
 
-        self.uav_name = 'M300'
-        self.pod_name = 'pod_comm'
+        self.uavName = 'M300'
+        self.podName = 'pod_comm'
 
-        rospy.Subscriber('/' + self.uav_name + '/imu', Imu, self.imu_callback)
-        rospy.Subscriber('/' + self.uav_name + '/pos', Odometry, self.pos_callback)
-        rospy.Subscriber('/' + self.uav_name + '/height', Float32, self.h_callback)
+        rospy.Subscriber('/' + self.uavName + '/imu', Imu, self.imuCallback)
+        rospy.Subscriber('/' + self.uavName + '/pos', Odometry, self.posCallback)
+        rospy.Subscriber('/' + self.uavName + '/height', Float32, self.hCallback)
 
-        rospy.Subscriber('/' + self.pod_name + '/pitch', Float32, self.pitch_callback)
-        rospy.Subscriber('/' + self.pod_name + '/yaw', Float32, self.yaw_callback)
-        rospy.Subscriber('/' + self.pod_name + '/hfov', Float32, self.hfov_callback)
+        rospy.Subscriber('/' + self.podName + '/pitch', Float32, self.pitchCallback)
+        rospy.Subscriber('/' + self.podName + '/yaw', Float32, self.yawCallback)
+        rospy.Subscriber('/' + self.podName + '/hfov', Float32, self.hfovCallback)
 
-        rospy.Subscriber('/uav1/spirecv/common_object_detection', TargetsInFrame, self.targets_callback, queue_size=1)
+        rospy.Subscriber('/uav1/spirecv/common_object_detection', TargetsInFrame, self.targetsCallback, queue_size=1)
 
-        rospy.Subscriber('/' + self.pod_name + '/toTransformer', Bool, self.order_from_searcher_callback)
+        rospy.Subscriber('/' + self.podName + '/toTransformer', Bool, self.orderFromSearcherCallback)
 
         self.clsfy = Classifier()
 
-        self.log_on = log_on
-        if self.log_on:
+        self.logOn = logOn
+        if self.logOn:
             self.dtlg = DataLogger("data.csv")
 
-        self.start_time = rospy.Time.now().to_sec()
+        self.startTime = rospy.Time.now().to_sec()
 
-        self.targets_available = 30
+        self.targetsAvailable = 30
         variable_info = [
                             ("rosTime", "double"),
                             ("podYaw", "double"),
@@ -139,44 +133,44 @@ class Transformer:
                             ("podPitchDelayed", "double"),
                             ("targetCnt", "int"),
                         ] + [
-                            (f'target{i}[3]', "list") for i in range(self.targets_available)
+                            (f'target{i}[3]', "list") for i in range(self.targetsAvailable)
                         ]
 
-        if self.log_on:
+        if self.logOn:
             self.dtlg.initialize(variable_info)
 
-        self.aim_pub = rospy.Publisher('/' + self.pod_name + '/aim', Float64MultiArray, queue_size=1)
-        self.aimFailSub = rospy.Subscriber('/' + self.pod_name + '/aimFail', Int16, self.aim_fail_callback, queue_size=1)
+        self.aimPub = rospy.Publisher('/' + self.podName + '/aim', Float64MultiArray, queue_size=1)
+        self.aimFailSub = rospy.Subscriber('/' + self.podName + '/aimFail', Int16, self.aimFailCallback, queue_size=1)
 
-    def aim_fail_callback(self, msg):
+    def aimFailCallback(self, msg):
         self.clsfy.targetsCheck[msg.data] = True
         self.clsfy.targetsReal[msg.data] = False
 
-    def order_from_searcher_callback(self, msg):
-        self.order_from_searcher = msg.data
+    def orderFromSearcherCallback(self, msg):
+        self.orderFromSearcher = msg.data
 
-    def pos_callback(self, msg):
-        self.self_pos[0] = msg.pose.pose.position.x
-        self.self_pos[1] = msg.pose.pose.position.y
+    def posCallback(self, msg):
+        self.selfPos[0] = msg.pose.pose.position.x
+        self.selfPos[1] = msg.pose.pose.position.y
 
-    def imu_callback(self, msg):
+    def imuCallback(self, msg):
         orientation = msg.orientation
-        self.uav_quat = [orientation.x, orientation.y, orientation.z, orientation.w]
+        self.uavQuat = [orientation.x, orientation.y, orientation.z, orientation.w]
 
-    def pitch_callback(self, msg):
+    def pitchCallback(self, msg):
         msg.data = 90 - msg.data
-        self.pod_pitch_buffer.add_message(msg)
+        self.podPitchBuffer.addMessage(msg)
 
-    def yaw_callback(self, msg):
-        self.pod_yaw_buffer.add_message(msg)
+    def yawCallback(self, msg):
+        self.podYawBuffer.addMessage(msg)
 
-    def hfov_callback(self, msg):
-        self.pod_hfov_buffer.add_message(msg)
+    def hfovCallback(self, msg):
+        self.podHfovBuffer.addMessage(msg)
 
-    def h_callback(self, msg):
-        self.self_pos[2] = msg.data
+    def hCallback(self, msg):
+        self.selfPos[2] = msg.data
 
-    def targets_callback(self, msg):
+    def targetsCallback(self, msg):
         # tic = rospy.Time.now().to_sec()
         for target in msg.targets:
             if target.category == 'car':
@@ -184,81 +178,81 @@ class Transformer:
         # toc = rospy.Time.now().to_sec()
         # print(f'Callback time {toc - tic}')
 
-    def transform(self, pixel_x, pixel_y, score=1):
-        if not self.order_from_searcher:
+    def transform(self, pixelX, pixelY, score=1):
+        if not self.orderFromSearcher:
             return
-        time_diff = 0.4
+        timeDiff = 0.4
         try:
-            pod_hfov = self.pod_hfov_buffer.get_message(time_diff).data
-            pod_vfov = degrees(2 * np.arctan(np.tan(radians(pod_hfov) / 2) * 9 / 16))
-            pod_yaw = self.pod_yaw_buffer.get_message(time_diff).data
-            pod_pitch = self.pod_pitch_buffer.get_message(time_diff).data
+            podHfov = self.podHfovBuffer.getMessage(timeDiff).data
+            podVfov = degrees(2 * np.arctan(np.tan(radians(podHfov) / 2) * 9 / 16))
+            podYaw = self.podYawBuffer.getMessage(timeDiff).data
+            podPitch = self.podPitchBuffer.getMessage(timeDiff).data
         except Exception as e:
             print(e)
             return
 
-        pixel_x = (pixel_x - 0.5) * 2
-        pixel_y = (pixel_y - 0.5) * 2
+        pixelX = (pixelX - 0.5) * 2
+        pixelY = (pixelY - 0.5) * 2
         if self.TRANSFORM_DEBUG:
-            ShowBar(-1, 1).show(pixel_x, str='PixelX')
-            ShowBar(-1, 1).show(pixel_y, str='PixelY')
-        cameraYaw = pixel_x * pod_hfov / 2
-        cameraPitch = pixel_y * pod_vfov / 2
+            ShowBar(-1, 1).show(pixelX, str='PixelX')
+            ShowBar(-1, 1).show(pixelY, str='PixelY')
+        cameraYaw = pixelX * podHfov / 2
+        cameraPitch = pixelY * podVfov / 2
         if self.TRANSFORM_DEBUG:
-            ShowBar(-pod_hfov / 2, pod_hfov / 2).show(cameraYaw, str='CameraYaw')
-            ShowBar(-pod_vfov / 2, pod_vfov / 2).show(cameraPitch, str='CameraPitch')
+            ShowBar(-podHfov / 2, podHfov / 2).show(cameraYaw, str='CameraYaw')
+            ShowBar(-podVfov / 2, podVfov / 2).show(cameraPitch, str='CameraPitch')
         rCameraYaw = R.from_euler('z', -cameraYaw, degrees=True)
         rCameraPitch = R.from_euler('y', cameraPitch, degrees=True)
         rCamera = rCameraPitch * rCameraYaw
-        rPodYaw = R.from_euler('z', -pod_yaw, degrees=True)
-        rPodPitch = R.from_euler('y', pod_pitch, degrees=True)
+        rPodYaw = R.from_euler('z', -podYaw, degrees=True)
+        rPodPitch = R.from_euler('y', podPitch, degrees=True)
         if self.TRANSFORM_DEBUG:
-            ShowBar(-90, 90).show(pod_yaw, str='PodYaw')
-            ShowBar(0, 90).show(pod_pitch, str='PodPitch')
+            ShowBar(-90, 90).show(podYaw, str='PodYaw')
+            ShowBar(0, 90).show(podPitch, str='PodPitch')
 
-        rUAV = R.from_quat(self.uav_quat)
+        rUAV = R.from_quat(self.uavQuat)
 
-        img_target = [1000, 0, 0]
-        img_target_rel = (rUAV * rPodYaw * rPodPitch * rCamera).apply(img_target)
-        # print(f'img_target: {img_target_rel}')
+        imgTarget = [1000, 0, 0]
+        imgTargetRel = (rUAV * rPodYaw * rPodPitch * rCamera).apply(imgTarget)
+        # print(f'imgTarget: {imgTargetRel}')
 
-        real_target_rel = img_target_rel * self.self_pos[2] / (-img_target_rel[2])
-        # print(f'real_target_rel: {real_target_rel}')
+        realTargetRel = imgTargetRel * self.selfPos[2] / (-imgTargetRel[2])
+        # print(f'realTargetRel: {realTargetRel}')
 
-        real_target_abs = real_target_rel + self.self_pos
+        realTargetAbs = realTargetRel + self.selfPos
         # print((
-        #     f'XY: ({pixel_x:.2f}, {pixel_y:.2f}) '
+        #     f'XY: ({pixelX:.2f}, {pixelY:.2f}) '
         #     f'cYP: ({cameraYaw:.2f}, {cameraPitch:.2f}) '
-        #     f'pYP: ({pod_yaw:.2f}, {pod_pitch:.2f}) '
-        #     f'Target @ {real_target_abs[0]:.2f}, {real_target_abs[1]:.2f}, {real_target_abs[2]:.2f} '
+        #     f'pYP: ({podYaw:.2f}, {podPitch:.2f}) '
+        #     f'Target @ {realTargetAbs[0]:.2f}, {realTargetAbs[1]:.2f}, {realTargetAbs[2]:.2f} '
         #     f'Score {score:.2f}'
         # ))
 
         if self.TRANSFORM_DEBUG:
             print(f'-' * 20)
 
-        if not self.out_of_bound(*real_target_abs):
-            self.clsfy.newPos(*real_target_abs)
+        if not self.outOfBound(*realTargetAbs):
+            self.clsfy.newPos(*realTargetAbs)
             # self.clsfy.outputTargets()
 
     def untransform(self, pos):
-        # from pos and self.pos and self.uav_quat
+        # from pos and self.pos and self.uavQuat
         # cal the pod pitch and yaw to aim at pos
-        # return pod_pitch, pod_yaw
-        rUAV = R.from_quat(self.uav_quat)
-        rUAV_inv = rUAV.inv()
-        pos_rel = pos - self.self_pos
-        target_body = rUAV_inv.apply(pos_rel)
+        # return podPitch, podYaw
+        rUAV = R.from_quat(self.uavQuat)
+        rUAVInv = rUAV.inv()
+        posRel = pos - self.selfPos
+        targetBody = rUAVInv.apply(posRel)
 
-        podPitch = np.arctan2(-target_body[2], np.sqrt(target_body[0] ** 2 + target_body[1] ** 2))
-        podYaw = -np.arctan2(target_body[1], target_body[0])
+        podPitch = np.arctan2(-targetBody[2], np.sqrt(targetBody[0] ** 2 + targetBody[1] ** 2))
+        podYaw = -np.arctan2(targetBody[1], targetBody[0])
 
         podPitch = 90 - np.degrees(podPitch)
         podYaw = np.degrees(podYaw)
 
         return podPitch, podYaw
 
-    def out_of_bound(self, x, y, z):
+    def outOfBound(self, x, y, z):
         if x < 0 or x > self.a:
             return True
         if abs(y) > self.a / 2:
@@ -266,14 +260,14 @@ class Transformer:
         return False
 
     def log(self):
-        self.dtlg.log("rosTime", rospy.Time.now().to_sec() - self.start_time)
-        self.dtlg.log("podYaw", self.pod_yaw_buffer.get_message_no_delay().data)
-        self.dtlg.log("podPitch", self.pod_pitch_buffer.get_message_no_delay().data)
-        self.dtlg.log("podYawDelayed", self.pod_yaw_buffer.get_message(0.5).data)
-        self.dtlg.log("podPitchDelayed", self.pod_pitch_buffer.get_message(0.5).data)
+        self.dtlg.log("rosTime", rospy.Time.now().to_sec() - self.startTime)
+        self.dtlg.log("podYaw", self.podYawBuffer.getMessageNoDelay().data)
+        self.dtlg.log("podPitch", self.podPitchBuffer.getMessageNoDelay().data)
+        self.dtlg.log("podYawDelayed", self.podYawBuffer.getMessage(0.5).data)
+        self.dtlg.log("podPitchDelayed", self.podPitchBuffer.getMessage(0.5).data)
         t = self.clsfy.targetsList()
         self.dtlg.log("targetCnt", len(t))
-        for i in range(self.targets_available):
+        for i in range(self.targetsAvailable):
             if i < len(t):
                 self.dtlg.log(f'target{i}', t[i])
             else:
@@ -282,7 +276,7 @@ class Transformer:
 
     def spin(self):
         while not rospy.is_shutdown():
-            if self.log_on and not self.pod_yaw_buffer.empty and not self.pod_pitch_buffer.empty:
+            if self.logOn and not self.podYawBuffer.empty and not self.podPitchBuffer.empty:
                 self.log()
 
             t = self.clsfy.firstNotChecked()
@@ -290,10 +284,10 @@ class Transformer:
                 aimPitch, aimYaw = self.untransform(self.clsfy.targets[t])
                 msg = Float64MultiArray(data=[1, aimPitch, aimYaw, t])
                 print(f'Aim @ Target [{t}] Pitch {aimPitch:.2f}, Yaw {aimYaw:.2f}')
-                self.aim_pub.publish(msg)
+                self.aimPub.publish(msg)
             else:
                 msg = Float64MultiArray(data=[-1, -1, -1, -1])
-                self.aim_pub.publish(msg)
+                self.aimPub.publish(msg)
 
             print('-' * 20)
             t = self.clsfy.targets
