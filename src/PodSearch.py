@@ -47,9 +47,9 @@ class PodSearch:
         ]
 
         self.tra = [
-            [90 - 20, -55, 50, 20], [90 - 20, 55, 50, 6],
+            [90 - 30, -55, 50, 20], [90 - 30, 55, 50, 6],
             [90 - 11, 50, 20, 20], [90 - 11, -50, 20, 2],
-            [90 - 4, -45, 6, 20], [90 - 4, 45, 6, 1],
+            [90 - 4, -25, 6, 20], [90 - 4, 25, 6, 0.6],
             [90, 0, 60, 20]
         ]
         self.traCnt = 0
@@ -95,6 +95,8 @@ class PodSearch:
         self.aimOn = False
         self.aimIndex = -1
 
+        self.aimTimeThreshold = 10.0
+
         self.thisAimIndex = -1
         self.thisAimStartTime = 0
 
@@ -115,9 +117,9 @@ class PodSearch:
                 self.pAtTarget and
                 self.yAtTarget and
                 self.fAtTarget and
-                self.pFeedback == self.expectedPitch and
-                self.yFeedback == self.expectedYaw and
-                self.fFeedback == self.expectedHfov
+                abs(self.pFeedback - self.expectedPitch) < 0.001 and
+                abs(self.yFeedback - self.expectedYaw) < 0.001 and
+                abs(self.fFeedback - self.expectedHfov) < 0.001
         )
 
     def toStepInit(self):
@@ -130,6 +132,7 @@ class PodSearch:
         self.state = State.AIM
         self.thisAimIndex = self.aimIndex
         self.thisAimStartTime = self.getTimeNow()
+        self.thisAimFinish = False
 
     def toStepEnd(self):
         self.state = State.END
@@ -160,23 +163,31 @@ class PodSearch:
             self.toStepAim()
 
     def stepAim(self):
-        print(f'{RED}==> StepAim @ Target {self.thisAimIndex} <=={RESET}')
-        print(f'Time: {self.getTimeNow() - self.thisAimStartTime}')
-        # if not self.isAtTarget():
-        #    self.thisAimStartTime = self.getTimeNow()
+        aimTime = self.getTimeNow() - self.thisAimStartTime
+        if self.getTimeNow() - self.thisAimStartTime >= self.aimTimeThreshold and not self.thisAimFinish:
+            self.aimFailPub.publish(Int16(self.thisAimIndex))
+            self.thisAimFinish = True
+
+        if not self.aimOn or self.aimIndex != self.thisAimIndex:
+            self.thisAimFinish = True
+
+        if self.thisAimFinish and self.isAtTarget():
+            self.toStepSearch()
+        
         self.expectedPitch = self.aimPitch
         self.expectedYaw = self.aimYaw
-        self.expectedHfov = 90 - self.aimPitch
+        self.expectedHfov = self.tra[self.traCnt][2] if self.thisAimFinish else 90 - self.aimPitch
         self.maxRate = 90 - self.aimPitch
         self.pubPYZMaxRate()
         self.toTransformerPub.publish(Bool(True))
-        if self.getTimeNow() - self.thisAimStartTime >= 10.0:
-            self.aimFailPub.publish(Int16(self.thisAimIndex))
-            self.toStepSearch()
-        if not self.aimOn:
-            self.toStepSearch()
-        if self.aimIndex != self.thisAimIndex:
-            self.toStepSearch()
+        
+        print(f'{RED}==> StepAim @ Target {self.thisAimIndex} <=={RESET}')
+        print(f'Time: {aimTime:.2f}',
+              (RED + "Finished" + RESET) if self.thisAimFinish else "",
+              (GREEN + "At Target" + RESET) if self.isAtTarget() else ""
+        )
+        
+
 
     def pubPYZMaxRate(self):
         self.pitchPub.publish(self.expectedPitch)
@@ -199,17 +210,21 @@ class PodSearch:
     def spin(self):
         while not rospy.is_shutdown():
             self.taskTime = self.getTimeNow() - self.startTime
+            self.controlStateMachine()
             system('clear')
             print('-' * 20)
             print(pyfiglet.figlet_format('PodSearch', font='slant'))
-            print(f'Time {self.taskTime:.1f} State: {self.state}')
+            print(
+                f'Time {self.taskTime:.1f}',
+                f'State: {self.state}',
+                (GREEN + "At Target" + RESET) if self.isAtTarget() else (RED + "Not at Target" + RESET)
+            )
             print(GREEN if self.pAtTarget else RED, end='')
             print(f'Pitch: {self.pitch:.2f} -> {self.expectedPitch:.2f} == {self.pFeedback:.2f}{RESET}')
             print(GREEN if self.yAtTarget else RED, end='')
             print(f'Yaw: {self.yaw:.2f} -> {self.expectedYaw:.2f} == {self.yFeedback:.2f}{RESET}')
             print(GREEN if self.fAtTarget else RED, end='')
             print(f'HFov: {self.hfov:.2f} -> {self.expectedHfov:.2f} == {self.fFeedback:.2f} {RESET}')
-            self.controlStateMachine()
             self.rate.sleep()
 
 
