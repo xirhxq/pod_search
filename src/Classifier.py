@@ -25,7 +25,7 @@ class Classifier:
     def updateTarget(self, ind, pos):
         self.targets[ind] = pos
         self.targetsCnt[ind] += 1
-        if self.targetsCnt[ind] > self.targetThreshold:
+        if self.targetsCnt[ind] > self.targetThreshold and not self.targetsCheck[ind]:
             self.targetsCheck[ind] = True
             self.targetsReal[ind] = True
 
