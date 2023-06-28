@@ -99,8 +99,8 @@ class Transformer:
 
         self.podPitchBuffer = TimeBuffer('Pod Pitch Buffer')
         self.podYawBuffer = TimeBuffer('Pod Yaw Buffer')
-
         self.podHfovBuffer = TimeBuffer('Pod HFov Buffer')
+        self.podDelay = 0.4
 
         self.uavName = 'M300'
         self.podName = 'pod_comm'
@@ -129,13 +129,19 @@ class Transformer:
         variable_info = [
                             ("rosTime", "double"),
                             ("podYaw", "double"),
-                            ("podPitch", "double"),
                             ("podYawDelayed", "double"),
+                            ("podPitch", "double"),
                             ("podPitchDelayed", "double"),
-                            ("targetCnt", "int"),
-                        ] + [
-                            (f'target{i}[3]', "list") for i in range(self.targetsAvailable)
-                        ]
+                            ("podHfov", "double"),
+                            ("podHfovDelayed", "double"),
+                            ("podVfov", "double"),
+                            ("podVfovDelayed", "double"),
+                        ] 
+        for i in range(self.targetsAvailable):
+            variable_info.append((f'target{i}[3]', "list"))
+            variable_info.append((f'targetCnt{i}', 'int'))
+            variable_info.append((f'targetCheck{i}', 'bool'))
+            variable_info.append((f'targetReal{i}', 'bool'))
 
         if self.logOn:
             self.dtlg.initialize(variable_info)
@@ -182,7 +188,7 @@ class Transformer:
     def transform(self, pixelX, pixelY, score=1):
         if not self.orderFromSearcher:
             return
-        timeDiff = 0.4
+        timeDiff = self.podDelay
         try:
             podHfov = self.podHfovBuffer.getMessage(timeDiff).data
             podVfov = degrees(2 * np.arctan(np.tan(radians(podHfov) / 2) * 9 / 16))
@@ -263,16 +269,35 @@ class Transformer:
     def log(self):
         self.dtlg.log("rosTime", rospy.Time.now().to_sec() - self.startTime)
         self.dtlg.log("podYaw", self.podYawBuffer.getMessageNoDelay().data)
+        self.dtlg.log("podYawDelayed", self.podYawBuffer.getMessage(self.podDelay).data)
         self.dtlg.log("podPitch", self.podPitchBuffer.getMessageNoDelay().data)
-        self.dtlg.log("podYawDelayed", self.podYawBuffer.getMessage(0.5).data)
-        self.dtlg.log("podPitchDelayed", self.podPitchBuffer.getMessage(0.5).data)
-        t = self.clsfy.targetsList()
-        self.dtlg.log("targetCnt", len(t))
+        self.dtlg.log("podPitchDelayed", self.podPitchBuffer.getMessage(self.podDelay).data)
+        hFov = self.podHfovBuffer.getMessageNoDelay().data 
+        hFovDelayed = self.podHfovBuffer.getMessage(self.podDelay).data 
+        self.dtlg.log("podHfov", hFov)
+        self.dtlg.log("podHfovDelayed", hFovDelayed)
+        vFov = degrees(2 * np.arctan(np.tan(radians(hFov) / 2) * 9 / 16))
+        vFovDelayed = degrees(2 * np.arctan(np.tan(radians(hFovDelayed) / 2) * 9 / 16))
+        self.dtlg.log('podVfov', vFov)
+        self.dtlg.log('podVfovDelayed', vFovDelayed)
+
+        t = self.clsfy.targets
+        tLen = len(t)
+        tCnt = self.clsfy.targetsCnt
+        tCheck = self.clsfy.targetsCheck
+        tReal = self.clsfy.targetsReal
         for i in range(self.targetsAvailable):
             if i < len(t):
                 self.dtlg.log(f'target{i}', t[i])
+                self.dtlg.log(f'targetCnt{i}', tCnt[i])
+                self.dtlg.log(f'targetCheck{i}', tCheck[i])
+                self.dtlg.log(f'targetReal{i}', tReal[i])
             else:
                 self.dtlg.log(f'target{i}', [-1, -1, -1])
+                self.dtlg.log(f'targetCnt{i}', 0)
+                self.dtlg.log(f'targetCheck{i}', False)
+                self.dtlg.log(f'targetReal{i}', False)
+
         self.dtlg.newline()
 
     def spin(self):
