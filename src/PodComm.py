@@ -46,7 +46,7 @@ def signal_handler(sig, frame):
 signal(SIGINT, signal_handler)
 
 SECRET_DICT = {
-    1: 140, 2: 160, 3: 180, 5: 220, 7: 250, 10: 290, 20: 355
+    0: 100, 1: 140, 2: 160, 3: 180, 5: 220, 7: 250, 10: 290, 20: 355
 }
 
 
@@ -233,6 +233,7 @@ class POD_COMM:
 
         if self.init == False:
             up.textOnOff()
+            self.lazyTag = 10
             self.init = True
         elif self.lazyTag <= 15:
             pitchDiff = self.expectedPitch - self.podPitch
@@ -242,12 +243,20 @@ class POD_COMM:
 
             self.updateAtTarget()
 
-            if not self.fAtTarget:
+            if (not self.pAtTarget or not self.yAtTarget) and self.lazyTag == 0:
+                prMax, yrMax = 300, self.maxRate
+                prate = max(-prMax, min(prMax, pitchDiff * 200))
+                yrate = max(-yrMax, min(yrMax, yawDiff * 300))
+
+                up.manualPYRate(prate, yrate)
+
+                # print(f'up pitch {self.podPitch:.2f} -> {self.expectedPitch:.2f} diff: {pitchDiff:.2f} rate: {prate:.2f}')
+                # print(f'up yaw {self.podYaw:.2f} -> {self.expectedYaw:.2f} diff: {yawDiff:.2f} rate: {yrate:.2f}')
+            elif not self.fAtTarget:
                 if self.lazyTag == 0:
                     # print(f'change zoom level {self.podZoomLevel} to {self.expectedZoomLevel}')
                     up.changeZoomLevel(self.expectedZoomLevel)
                     self.lazyTag = 200 if abs(self.expectedZoomLevel - self.podZoomLevel) > 15 else 100
-                elif self.lazyTag == 10:
                     self.podF = self.zoomUnit * self.expectedZoomLevel
 
             # elif relZoomDiff < -self.zTol:
@@ -262,15 +271,6 @@ class POD_COMM:
             #     if self.lazyTag == 0:
             #         self.lazyTag = 12
 
-            elif not self.pAtTarget or not self.yAtTarget:
-                prMax, yrMax = 300, self.maxRate
-                prate = max(-prMax, min(prMax, pitchDiff * 200))
-                yrate = max(-yrMax, min(yrMax, yawDiff * 300))
-
-                up.manualPYRate(prate, yrate)
-
-                # print(f'up pitch {self.podPitch:.2f} -> {self.expectedPitch:.2f} diff: {pitchDiff:.2f} rate: {prate:.2f}')
-                # print(f'up yaw {self.podYaw:.2f} -> {self.expectedYaw:.2f} diff: {yawDiff:.2f} rate: {yrate:.2f}')
         if self.lazyTag > 0:
             self.lazyTag -= 1
 
@@ -402,6 +402,7 @@ class POD_COMM:
 
     @timer(tol=5 / HZ)
     def spinOnce(self):
+        self.updateAtTarget()
         self.printState()
         self.rosPub()
 
