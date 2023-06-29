@@ -48,13 +48,13 @@ class DataLogger:
         if self.initialized:
             if not all(self.value_updated):
                 print("Some value has not been updated!!!")
-            timestamp = datetime.datetime.now().strftime("%Y, %m, %d, %H, %M, %S, %f")[:-3]
+            timestamp = datetime.datetime.now().strftime("%Y,%m,%d,%H,%M,%S,%f")[:-3]
             line = f"{timestamp}"
             for value, updated in zip(self.values, self.value_updated):
                 if not updated:
                     print("Some value has not been updated!!!")
                     break
-                line += f", {value}"
+                line += f",{value}"
             line += "\n"
 
             with open(self.filename, "a") as file:
