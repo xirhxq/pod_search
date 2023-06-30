@@ -113,7 +113,7 @@ class Transformer:
         rospy.Subscriber('/' + self.podName + '/yaw', Float32, self.yawCallback)
         rospy.Subscriber('/' + self.podName + '/hfov', Float32, self.hfovCallback)
 
-        rospy.Subscriber('/uav1/spirecv/common_object_detection', TargetsInFrame, self.targetsCallback, queue_size=1)
+        rospy.Subscriber('/uav1/car_detection', TargetsInFrame, self.targetsCallback, queue_size=1)
 
         rospy.Subscriber('/' + self.podName + '/toTransformer', Bool, self.orderFromSearcherCallback)
 
