@@ -11,7 +11,7 @@ class Classifier:
         self.targetsCnt = []
         self.targetsCheck = []
         self.targetsReal = []
-        self.threshold = 1
+        self.threshold = 2
 
         self.checkThreshold = 10
         self.targetThreshold = 50
