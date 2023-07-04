@@ -117,6 +117,9 @@ class PodSearch:
                 self.pAtTarget and
                 self.yAtTarget and
                 self.fAtTarget and
+                abs(self.pitch - self.expectedPitch) < 5 and
+                abs(self.yaw - self.expectedYaw) < 5 and
+                abs(self.hfov - self.expectedHfov) / self.expectedHfov < 0.3 and
                 abs(self.pFeedback - self.expectedPitch) < 0.001 and
                 abs(self.yFeedback - self.expectedYaw) < 0.001 and
                 abs(self.fFeedback - self.expectedHfov) < 0.001

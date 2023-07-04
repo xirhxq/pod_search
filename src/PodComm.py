@@ -134,10 +134,6 @@ class POD_COMM:
         self.expectedZoom = 21
         self.expectedZoomLevel = 5
 
-        self.pAtTarget = False
-        self.yAtTarget = False
-        self.fAtTarget = False
-
         self.startTime = time()
         self.lazyTag = 0
         self.SENSOR_WIDTH = tan(radians(2.3) / 2) * 2 * 129
@@ -198,9 +194,9 @@ class POD_COMM:
         rospy.Subscriber('/pod_comm/maxRate', Float32, lambda msg: (
             setattr(self, 'maxRate', secretInterp(msg.data))
         ))
-        self.pitchPub = rospy.Publisher('/pod_comm/pitch', Float32, queue_size=10)
-        self.yawPub = rospy.Publisher('/pod_comm/yaw', Float32, queue_size=10)
-        self.hfovPub = rospy.Publisher('/pod_comm/hfov', Float32, queue_size=10)
+        self.pitchPub = rospy.Publisher('/pod_comm/pitch', Float32, queue_size=1)
+        self.yawPub = rospy.Publisher('/pod_comm/yaw', Float32, queue_size=1)
+        self.hfovPub = rospy.Publisher('/pod_comm/hfov', Float32, queue_size=1)
         self.pAtTargetPub = rospy.Publisher('/pod_comm/pAtTarget', Bool, queue_size=1)
         self.yAtTargetPub = rospy.Publisher('/pod_comm/yAtTarget', Bool, queue_size=1)
         self.fAtTargetPub = rospy.Publisher('/pod_comm/fAtTarget', Bool, queue_size=1)
@@ -240,8 +236,6 @@ class POD_COMM:
             yawDiff = self.round(self.expectedYaw - self.podYaw, 180)
             absZoomDiff = (self.expectedZoom - self.podF)
             relZoomDiff = absZoomDiff / self.expectedZoom
-
-            self.updateAtTarget()
 
             if (not self.pAtTarget or not self.yAtTarget) and self.lazyTag == 0:
                 prMax, yrMax = 300, self.maxRate
@@ -395,14 +389,20 @@ class POD_COMM:
         self.yFeedbackPub.publish(self.round(self.expectedYaw, 180))
         self.fFeedbackPub.publish(self.getHfov(self.expectedZoom))
 
-    def updateAtTarget(self):
-        self.pAtTarget = (abs(self.podPitch - self.expectedPitch) < self.pyTol)
-        self.yAtTarget = (abs(self.round(self.podYaw - self.expectedYaw, 180)) < self.pyTol)
-        self.fAtTarget = (self.expectedZoomLevel == self.podZoomLevel)
+    @property
+    def pAtTarget(self):
+        return (abs(self.podPitch - self.expectedPitch) < self.pyTol)
+
+    @property
+    def yAtTarget(self):
+        return (abs(self.round(self.podYaw - self.expectedYaw, 180)) < self.pyTol)
+
+    @property
+    def fAtTarget(self):
+        return (self.expectedZoomLevel == self.podZoomLevel)
 
     @timer(tol=5 / HZ)
     def spinOnce(self):
-        self.updateAtTarget()
         self.printState()
         self.rosPub()
 
