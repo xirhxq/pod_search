@@ -52,6 +52,12 @@ class PodSearch:
             [90 - 4, -35, 6, 20], [90 - 4, 10, 6, 1],
             [90, 0, 60, 20]
         ]
+
+        self.tra = [
+            [90 - 20, -60, 30, 20], [90 - 20, 50, 30, 2],
+            [90, 0, 60, 20]
+        ]
+
         self.traCnt = 0
 
         rospy.init_node('pod_search', anonymous=True)
