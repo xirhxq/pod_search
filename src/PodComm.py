@@ -4,7 +4,7 @@ import threading
 from collections import deque
 from datetime import datetime, timedelta
 from math import tan, degrees, radians, atan
-from os import system
+from os import system, path, readlink
 from struct import pack, unpack
 from sys import exit
 from time import time, sleep
@@ -34,6 +34,7 @@ READING_DATA = 3
 from glob import glob
 
 PORT = glob('/dev/ttyUSB[0-9]*')[0]
+PORT = path.join('/dev', readlink(glob('/dev/serial/by-path/*usb-0:2.4:1.0*')[0]).split('/')[-1])
 
 from signal import signal, SIGINT
 
