@@ -16,13 +16,15 @@ class Classifier:
         self.checkThreshold = 10
         self.targetThreshold = 50
 
-    def newTarget(self, pos):
+    def newTarget(self, pos=[0, 0, 0]):
         self.targets.append(pos)
         self.targetsCnt.append(1)
         self.targetsCheck.append(False)
         self.targetsReal.append(False)
 
     def updateTarget(self, ind, pos):
+        while len(self.targets) < ind + 1:
+            self.newTarget()
         self.targets[ind] = pos
         self.targetsCnt[ind] += 1
         if self.targetsCnt[ind] > self.targetThreshold and not self.targetsCheck[ind]:

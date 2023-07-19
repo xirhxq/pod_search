@@ -180,12 +180,12 @@ class Transformer:
     def targetsCallback(self, msg):
         # tic = rospy.Time.now().to_sec()
         for target in msg.targets:
-            if target.category == 'car':
-                self.transform(target.cx, target.cy, score=target.score)
+            if target.category == 'car' and target.category_id != 100:
+                self.transform(target.cx, target.cy, target.category_id)
         # toc = rospy.Time.now().to_sec()
         # print(f'Callback time {toc - tic}')
 
-    def transform(self, pixelX, pixelY, score=1):
+    def transform(self, pixelX, pixelY, category):
         if not self.orderFromSearcher:
             return
         timeDiff = self.podDelay
@@ -232,14 +232,14 @@ class Transformer:
         #     f'cYP: ({cameraYaw:.2f}, {cameraPitch:.2f}) '
         #     f'pYP: ({podYaw:.2f}, {podPitch:.2f}) '
         #     f'Target @ {realTargetAbs[0]:.2f}, {realTargetAbs[1]:.2f}, {realTargetAbs[2]:.2f} '
-        #     f'Score {score:.2f}'
         # ))
 
         if self.TRANSFORM_DEBUG:
             print(f'-' * 20)
 
         if not self.outOfBound(*realTargetAbs):
-            self.clsfy.newPos(*realTargetAbs)
+            # self.clsfy.newPos(*realTargetAbs)
+            self.clsfy.updateTarget(category, list(realTargetAbs))
             # self.clsfy.outputTargets()
 
     def untransform(self, pos):
