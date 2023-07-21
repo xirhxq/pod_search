@@ -5,7 +5,7 @@ from signal import signal, SIGINT
 
 import pyfiglet
 import rospy
-from std_msgs.msg import Float32, Bool, Int16, Float64MultiArray
+from std_msgs.msg import Float32, Bool, Int16, Float64MultiArray, Empty
 
 from Utils import *
 
@@ -106,6 +106,8 @@ class PodSearch:
         self.thisAimIndex = -1
         self.thisAimStartTime = 0
 
+        self.classifierClearPub = rospy.Publisher('/suav/classifierClear', Empty, queue_size=10)
+
     def aimCallback(self, msg):
         if msg.data[0] > 0:
             self.aimOn = True
@@ -123,9 +125,9 @@ class PodSearch:
                 self.pAtTarget and
                 self.yAtTarget and
                 self.fAtTarget and
-                abs(self.pitch - self.expectedPitch) < 5 and
-                abs(self.yaw - self.expectedYaw) < 5 and
-                abs(self.hfov - self.expectedHfov) / self.expectedHfov < 0.3 and
+               # abs(self.pitch - self.expectedPitch) < 5 and
+               # abs(self.yaw - self.expectedYaw) < 5 and
+               # abs(self.hfov - self.expectedHfov) / self.expectedHfov < 0.25 and
                 abs(self.pFeedback - self.expectedPitch) < 0.001 and
                 abs(self.yFeedback - self.expectedYaw) < 0.001 and
                 abs(self.fFeedback - self.expectedHfov) < 0.001
@@ -153,6 +155,7 @@ class PodSearch:
         self.maxRate = 20
         self.pubPYZMaxRate()
         self.toTransformerPub.publish(Bool(False))
+        self.classifierClearPub.publish(Empty())
         if self.isAtTarget():
             self.toStepSearch()
 
@@ -187,6 +190,7 @@ class PodSearch:
         self.expectedYaw = self.aimYaw
         self.expectedHfov = self.tra[self.traCnt][2] if self.thisAimFinish else 90 - self.aimPitch
         self.maxRate = 90 - self.aimPitch
+        self.maxRate = 2
         self.pubPYZMaxRate()
         self.toTransformerPub.publish(Bool(True))
         

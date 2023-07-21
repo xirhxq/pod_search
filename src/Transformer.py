@@ -21,7 +21,7 @@ from nav_msgs.msg import Odometry
 from scipy.spatial.transform import Rotation as R
 from sensor_msgs.msg import Imu
 from spirecv_msgs.msg import TargetsInFrame
-from std_msgs.msg import Float32, Bool, Float64MultiArray, Int16
+from std_msgs.msg import Float32, Bool, Float64MultiArray, Int16, Empty
 
 from Classifier import Classifier
 from DataLogger import DataLogger
@@ -147,7 +147,12 @@ class Transformer:
             self.dtlg.initialize(variable_info)
 
         self.aimPub = rospy.Publisher('/' + self.podName + '/aim', Float64MultiArray, queue_size=1)
-        self.aimFailSub = rospy.Subscriber('/' + self.podName + '/aimFail', Int16, self.aimFailCallback, queue_size=1)
+        rospy.Subscriber('/' + self.podName + '/aimFail', Int16, self.aimFailCallback, queue_size=1)
+        rospy.Subscriber('/suav/classifierClear', Empty, self.clear, queue_size=1)
+
+    def clear(self, msg):
+        self.clsfy.clear()
+
 
     def aimFailCallback(self, msg):
         self.clsfy.targetsCheck[msg.data] = True

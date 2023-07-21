@@ -63,3 +63,9 @@ class Classifier:
         outputT = self.targets
         for ind, t in enumerate(outputT):
             print(f'[{ind + 1}] [{self.targetsCnt[ind]}] @ {t[0]:.2f}, {t[1]:.2f}, {t[2]:.2f}')
+
+    def clear(self):
+        self.targets.clear()
+        self.targetsCnt.clear()
+        self.targetsCheck.clear()
+        self.targetsReal.clear()

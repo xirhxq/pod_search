@@ -198,6 +198,11 @@ class POD_COMM:
         self.pitchPub = rospy.Publisher('/pod_comm/pitch', Float32, queue_size=1)
         self.yawPub = rospy.Publisher('/pod_comm/yaw', Float32, queue_size=1)
         self.hfovPub = rospy.Publisher('/pod_comm/hfov', Float32, queue_size=1)
+        
+        self.pNotAtTargetTime = self.getTimeNow()
+        self.yNotAtTargetTime = self.getTimeNow()
+        self.fNotAtTargetTime = self.getTimeNow()
+        
         self.pAtTargetPub = rospy.Publisher('/pod_comm/pAtTarget', Bool, queue_size=1)
         self.yAtTargetPub = rospy.Publisher('/pod_comm/yAtTarget', Bool, queue_size=1)
         self.fAtTargetPub = rospy.Publisher('/pod_comm/fAtTarget', Bool, queue_size=1)
@@ -208,7 +213,7 @@ class POD_COMM:
     def looseZoomLevel(self, z):
         return z
 
-    def getTime_now(self):
+    def getTimeNow(self):
         return time()
 
     def getF(self, halfAngle):
@@ -392,15 +397,21 @@ class POD_COMM:
 
     @property
     def pAtTarget(self):
-        return (abs(self.podPitch - self.expectedPitch) < self.pyTol)
+        if not (abs(self.podPitch - self.expectedPitch) < self.pyTol):
+            self.pNotAtTargetTime = self.getTimeNow()
+        return self.getTimeNow() - self.pNotAtTargetTime > 0.5
 
     @property
     def yAtTarget(self):
-        return (abs(self.round(self.podYaw - self.expectedYaw, 180)) < self.pyTol)
+        if not (abs(self.round(self.podYaw - self.expectedYaw, 180)) < self.pyTol):
+            self.yNotAtTargetTime = self.getTimeNow()
+        return self.getTimeNow() - self.yNotAtTargetTime > 0.5
 
     @property
     def fAtTarget(self):
-        return (self.expectedZoomLevel == self.podZoomLevel)
+        if not (self.expectedZoomLevel == self.podZoomLevel):
+            self.fNotAtTargetTime = self.getTimeNow()
+        return self.getTimeNow() - self.fNotAtTargetTime > 0.5
 
     @timer(tol=5 / HZ)
     def spinOnce(self):
