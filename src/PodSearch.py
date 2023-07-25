@@ -60,25 +60,28 @@ class PodSearch:
 
         self.traCnt = 0
 
+        self.uavName = 'suav'
+        self.deviceName = 'pod'
+
         rospy.init_node('pod_search', anonymous=True)
         self.startTime = self.getTimeNow()
         self.taskTime = 0
         self.rate = rospy.Rate(10)
-        rospy.Subscriber('/pod_comm/pitch', Float32, lambda msg: setattr(self, 'pitch', msg.data))
-        rospy.Subscriber('/pod_comm/yaw', Float32, lambda msg: setattr(self, 'yaw', msg.data))
-        rospy.Subscriber('/pod_comm/hfov', Float32, lambda msg: setattr(self, 'hfov', msg.data))
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/pitch', Float32, lambda msg: setattr(self, 'pitch', msg.data))
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/yaw', Float32, lambda msg: setattr(self, 'yaw', msg.data))
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/hfov', Float32, lambda msg: setattr(self, 'hfov', msg.data))
         self.pitchPub = rospy.Publisher(
-            '/pod_comm/expectedPitch', Float32, queue_size=10)
+            self.uavName + '/' + self.deviceName + '/expectedPitch', Float32, queue_size=10)
         self.yawPub = rospy.Publisher(
-            '/pod_comm/expectedYaw', Float32, queue_size=10)
+            self.uavName + '/' + self.deviceName + '/expectedYaw', Float32, queue_size=10)
         self.hfovPub = rospy.Publisher(
-            '/pod_comm/expectedHfov', Float32, queue_size=10)
+            self.uavName + '/' + self.deviceName + '/expectedHfov', Float32, queue_size=10)
         self.maxRatePub = rospy.Publisher(
-            '/pod_comm/maxRate', Float32, queue_size=10)
+            self.uavName + '/' + self.deviceName + '/maxRate', Float32, queue_size=10)
 
-        rospy.Subscriber('/pod_comm/pAtTarget', Bool, lambda msg: setattr(self, 'pAtTarget', msg.data))
-        rospy.Subscriber('/pod_comm/yAtTarget', Bool, lambda msg: setattr(self, 'yAtTarget', msg.data))
-        rospy.Subscriber('/pod_comm/fAtTarget', Bool, lambda msg: setattr(self, 'fAtTarget', msg.data))
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/pAtTarget', Bool, lambda msg: setattr(self, 'pAtTarget', msg.data))
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/yAtTarget', Bool, lambda msg: setattr(self, 'yAtTarget', msg.data))
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/fAtTarget', Bool, lambda msg: setattr(self, 'fAtTarget', msg.data))
         self.pAtTarget = False
         self.yAtTarget = False
         self.fAtTarget = False
@@ -86,16 +89,16 @@ class PodSearch:
         self.pFeedback = 0.0
         self.yFeedback = 0.0
         self.fFeedback = 0.0
-        rospy.Subscriber('/pod_comm/pFeedback', Float32, lambda msg: setattr(self, 'pFeedback', msg.data))
-        rospy.Subscriber('/pod_comm/yFeedback', Float32, lambda msg: setattr(self, 'yFeedback', msg.data))
-        rospy.Subscriber('/pod_comm/fFeedback', Float32, lambda msg: setattr(self, 'fFeedback', msg.data))
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/pFeedback', Float32, lambda msg: setattr(self, 'pFeedback', msg.data))
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/yFeedback', Float32, lambda msg: setattr(self, 'yFeedback', msg.data))
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/fFeedback', Float32, lambda msg: setattr(self, 'fFeedback', msg.data))
 
         self.toTransformerPub = rospy.Publisher(
-            '/pod_comm/toTransformer', Bool, queue_size=10
+            self.uavName + '/' + self.deviceName + '/toTransformer', Bool, queue_size=10
         )
 
-        rospy.Subscriber('/pod_comm/aim', Float64MultiArray, self.aimCallback)
-        self.aimFailPub = rospy.Publisher('/pod_comm/aimFail', Int16, queue_size=10)
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/aim', Float64MultiArray, self.aimCallback)
+        self.aimFailPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/aimFail', Int16, queue_size=10)
         self.aimPitch = 0
         self.aimYaw = 0
         self.aimOn = False
@@ -106,7 +109,7 @@ class PodSearch:
         self.thisAimIndex = -1
         self.thisAimStartTime = 0
 
-        self.classifierClearPub = rospy.Publisher('/suav/classifierClear', Empty, queue_size=10)
+        self.classifierClearPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/classifierClear', Empty, queue_size=10)
 
     def aimCallback(self, msg):
         if msg.data[0] > 0:

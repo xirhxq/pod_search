@@ -4,11 +4,6 @@
 # using the onboard pod pitch, yaw, zoom and UAV pitch, yaw, roll
 # assume the UAV is at (0, 0, h)
 
-# get UAV orientation by subscribe to uavName + '/imu' topic, sensor_msgs/Imu type
-# and calculate by the quaternion to euler angles
-
-# get pod pitch and yaw by subscribe to '/pod_comm/pitch' and '/pod_comm/yaw' topic, std_msgs/Float32 type
-
 import argparse
 import time
 from collections import deque
@@ -102,20 +97,23 @@ class Transformer:
         self.podHfovBuffer = TimeBuffer('Pod HFov Buffer')
         self.podDelay = 0.4
 
-        self.uavName = 'M300'
-        self.podName = 'pod_comm'
+        self.uavName = 'suav'
+        self.podName = 'pod'
+        self.osdkName = 'dji_osdk_ros'
+        self.uwbName = 'uwb'
+        self.heightSensorName = 'height_sensor'
 
-        rospy.Subscriber('/' + self.uavName + '/imu', Imu, self.imuCallback)
-        rospy.Subscriber('/' + self.uavName + '/pos', Odometry, self.posCallback)
-        rospy.Subscriber('/' + self.uavName + '/height', Float32, self.hCallback)
+        rospy.Subscriber(self.uavName + '/' + self.osdkName + '/imu', Imu, self.imuCallback)
+        rospy.Subscriber(self.uavName + '/' + self.uwbName + '/filter/odom', Odometry, self.posCallback)
+        rospy.Subscriber(self.uavName + '/' + self.heightSensorName + '/height', Float32, self.hCallback)
 
-        rospy.Subscriber('/' + self.podName + '/pitch', Float32, self.pitchCallback)
-        rospy.Subscriber('/' + self.podName + '/yaw', Float32, self.yawCallback)
-        rospy.Subscriber('/' + self.podName + '/hfov', Float32, self.hfovCallback)
+        rospy.Subscriber(self.uavName + '/' + self.podName + '/pitch', Float32, self.pitchCallback)
+        rospy.Subscriber(self.uavName + '/' + self.podName + '/yaw', Float32, self.yawCallback)
+        rospy.Subscriber(self.uavName + '/' + self.podName + '/hfov', Float32, self.hfovCallback)
 
-        rospy.Subscriber('/uav1/car_detection', TargetsInFrame, self.targetsCallback, queue_size=1)
+        rospy.Subscriber(self.uavName + '/' + self.podName + '/car_detection', TargetsInFrame, self.targetsCallback, queue_size=1)
 
-        rospy.Subscriber('/' + self.podName + '/toTransformer', Bool, self.orderFromSearcherCallback)
+        rospy.Subscriber(self.uavName + '/' + self.podName + '/toTransformer', Bool, self.orderFromSearcherCallback)
 
         self.clsfy = Classifier()
 
@@ -127,16 +125,16 @@ class Transformer:
 
         self.targetsAvailable = 30
         variable_info = [
-                            ("rosTime", "double"),
-                            ("podYaw", "double"),
-                            ("podYawDelayed", "double"),
-                            ("podPitch", "double"),
-                            ("podPitchDelayed", "double"),
-                            ("podHfov", "double"),
-                            ("podHfovDelayed", "double"),
-                            ("podVfov", "double"),
-                            ("podVfovDelayed", "double"),
-                        ] 
+            ("rosTime", "double"),
+            ("podYaw", "double"),
+            ("podYawDelayed", "double"),
+            ("podPitch", "double"),
+            ("podPitchDelayed", "double"),
+            ("podHfov", "double"),
+            ("podHfovDelayed", "double"),
+            ("podVfov", "double"),
+            ("podVfovDelayed", "double"),
+        ] 
         for i in range(self.targetsAvailable):
             variable_info.append((f'target{i}[3]', "list"))
             variable_info.append((f'targetCnt{i}', 'int'))
@@ -146,9 +144,9 @@ class Transformer:
         if self.logOn:
             self.dtlg.initialize(variable_info)
 
-        self.aimPub = rospy.Publisher('/' + self.podName + '/aim', Float64MultiArray, queue_size=1)
-        rospy.Subscriber('/' + self.podName + '/aimFail', Int16, self.aimFailCallback, queue_size=1)
-        rospy.Subscriber('/suav/classifierClear', Empty, self.clear, queue_size=1)
+        self.aimPub = rospy.Publisher(self.uavName + '/' + self.podName + '/aim', Float64MultiArray, queue_size=1)
+        rospy.Subscriber(self.uavName + '/' + self.podName + '/aimFail', Int16, self.aimFailCallback, queue_size=1)
+        rospy.Subscriber(self.uavName + '/' + self.podName + '/classifierClear', Empty, self.clear, queue_size=1)
 
     def clear(self, msg):
         self.clsfy.clear()

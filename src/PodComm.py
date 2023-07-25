@@ -173,16 +173,19 @@ class POD_COMM:
             timeout=0.5
         )
         self.dataBuf = bytearray()
+        
+        self.uavName = 'suav'
+        self.deviceName = 'pod'
 
         rospy.init_node('pod_comm', anonymous=True)
         rospy.Rate(10)
-        rospy.Subscriber('/pod_comm/expectedPitch', Float32, lambda msg: (
+        rospy.Subscriber(self.uavName + '/' + self.deviceName +  '/expectedPitch', Float32, lambda msg: (
             setattr(self, 'expectedPitch', msg.data)
         ))
-        rospy.Subscriber('/pod_comm/expectedYaw', Float32, lambda msg: (
+        rospy.Subscriber(self.uavName + '/' + self.deviceName +  '/expectedYaw', Float32, lambda msg: (
             setattr(self, 'expectedYaw', self.round(msg.data, 180))
         ))
-        rospy.Subscriber('/pod_comm/expectedHfov', Float32, lambda msg: (
+        rospy.Subscriber(self.uavName + '/' + self.deviceName +  '/expectedHfov', Float32, lambda msg: (
             setattr(self, 'expectedZoom', self.getF(msg.data)),
             setattr(
                 self,
@@ -192,23 +195,23 @@ class POD_COMM:
                 )
             )
         ))
-        rospy.Subscriber('/pod_comm/maxRate', Float32, lambda msg: (
+        rospy.Subscriber(self.uavName + '/' + self.deviceName +  '/maxRate', Float32, lambda msg: (
             setattr(self, 'maxRate', secretInterp(msg.data))
         ))
-        self.pitchPub = rospy.Publisher('/pod_comm/pitch', Float32, queue_size=1)
-        self.yawPub = rospy.Publisher('/pod_comm/yaw', Float32, queue_size=1)
-        self.hfovPub = rospy.Publisher('/pod_comm/hfov', Float32, queue_size=1)
+        self.pitchPub = rospy.Publisher(self.uavName + '/' + self.deviceName +  '/pitch', Float32, queue_size=1)
+        self.yawPub = rospy.Publisher(self.uavName + '/' + self.deviceName +  '/yaw', Float32, queue_size=1)
+        self.hfovPub = rospy.Publisher(self.uavName + '/' + self.deviceName +  '/hfov', Float32, queue_size=1)
         
         self.pNotAtTargetTime = self.getTimeNow()
         self.yNotAtTargetTime = self.getTimeNow()
         self.fNotAtTargetTime = self.getTimeNow()
         
-        self.pAtTargetPub = rospy.Publisher('/pod_comm/pAtTarget', Bool, queue_size=1)
-        self.yAtTargetPub = rospy.Publisher('/pod_comm/yAtTarget', Bool, queue_size=1)
-        self.fAtTargetPub = rospy.Publisher('/pod_comm/fAtTarget', Bool, queue_size=1)
-        self.pFeedbackPub = rospy.Publisher('/pod_comm/pFeedback', Float32, queue_size=1)
-        self.yFeedbackPub = rospy.Publisher('/pod_comm/yFeedback', Float32, queue_size=1)
-        self.fFeedbackPub = rospy.Publisher('/pod_comm/fFeedback', Float32, queue_size=1)
+        self.pAtTargetPub = rospy.Publisher(self.uavName + '/' + self.deviceName +  '/pAtTarget', Bool, queue_size=1)
+        self.yAtTargetPub = rospy.Publisher(self.uavName + '/' + self.deviceName +  '/yAtTarget', Bool, queue_size=1)
+        self.fAtTargetPub = rospy.Publisher(self.uavName + '/' + self.deviceName +  '/fAtTarget', Bool, queue_size=1)
+        self.pFeedbackPub = rospy.Publisher(self.uavName + '/' + self.deviceName +  '/pFeedback', Float32, queue_size=1)
+        self.yFeedbackPub = rospy.Publisher(self.uavName + '/' + self.deviceName +  '/yFeedback', Float32, queue_size=1)
+        self.fFeedbackPub = rospy.Publisher(self.uavName + '/' + self.deviceName +  '/fFeedback', Float32, queue_size=1)
 
     def looseZoomLevel(self, z):
         return z
