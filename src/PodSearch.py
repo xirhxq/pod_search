@@ -111,6 +111,13 @@ class PodSearch:
 
         self.classifierClearPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/classifierClear', Empty, queue_size=10)
 
+        self.searchOverPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/searchOver', Empty, queue_size=10)
+        self.uavReady = False
+        rospy.Subscriber(self.uavName + '/uavReady', Empty, lambda msg: setattr(self, 'uavReady', True))
+
+        self.endBeginTime = None
+
+
     def aimCallback(self, msg):
         if msg.data[0] > 0:
             self.aimOn = True
@@ -150,6 +157,7 @@ class PodSearch:
 
     def toStepEnd(self):
         self.state = State.END
+        self.endBeginTime = self.getTimeNow()
 
     def stepInit(self):
         self.expectedPitch = 90 - 20
@@ -159,7 +167,7 @@ class PodSearch:
         self.pubPYZMaxRate()
         self.toTransformerPub.publish(Bool(False))
         self.classifierClearPub.publish(Empty())
-        if self.isAtTarget():
+        if self.isAtTarget() and self.uavReady:
             self.toStepSearch()
 
     def stepSearch(self):
@@ -203,6 +211,12 @@ class PodSearch:
               (GREEN + "At Target" + RESET) if self.isAtTarget() else ""
         )
         
+    def stepEnd(self):
+        self.searchOverPub.publish(Empty())
+        endTime = self.getTimeNow() - self.endBeginTime
+        print(f'StepEnd with {endTime} seconds')
+        if endTime >= 3.0:
+            exit(0)
 
 
     def pubPYZMaxRate(self):
@@ -219,7 +233,7 @@ class PodSearch:
         elif self.state == State.AIM:
             self.stepAim()
         elif self.state == State.END:
-            exit(0)
+            self.stepEnd()
         else:
             print("Invalid state")
 
@@ -233,6 +247,7 @@ class PodSearch:
             print(
                 f'Time {self.taskTime:.1f}',
                 f'State: {self.state}',
+                f'UAV Ready: {self.uavReady}',
                 (GREEN + "At Target" + RESET) if self.isAtTarget() else (RED + "Not at Target" + RESET)
             )
             print(GREEN if self.pAtTarget else RED, end='')
