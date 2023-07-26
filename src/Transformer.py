@@ -17,6 +17,7 @@ from scipy.spatial.transform import Rotation as R
 from sensor_msgs.msg import Imu
 from spirecv_msgs.msg import TargetsInFrame
 from std_msgs.msg import Float32, Bool, Float64MultiArray, Int16, Empty
+from geometry_msgs.msg import Vector3Stamped
 
 from Classifier import Classifier
 from DataLogger import DataLogger
@@ -105,7 +106,7 @@ class Transformer:
 
         rospy.Subscriber(self.uavName + '/' + self.osdkName + '/imu', Imu, self.imuCallback)
         rospy.Subscriber(self.uavName + '/' + self.uwbName + '/filter/odom', Odometry, self.posCallback)
-        rospy.Subscriber(self.uavName + '/' + self.heightSensorName + '/height', Float32, self.hCallback)
+        rospy.Subscriber(self.uavName + '/' + self.heightSensorName + '/data', Vector3Stamped, self.hCallback)
 
         rospy.Subscriber(self.uavName + '/' + self.podName + '/pitch', Float32, self.pitchCallback)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/yaw', Float32, self.yawCallback)
@@ -178,7 +179,7 @@ class Transformer:
         self.podHfovBuffer.addMessage(msg)
 
     def hCallback(self, msg):
-        self.selfPos[2] = msg.data
+        self.selfPos[2] = msg.vector.y
 
     def targetsCallback(self, msg):
         # tic = rospy.Time.now().to_sec()
