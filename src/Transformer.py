@@ -104,7 +104,7 @@ class Transformer:
         self.uwbName = 'uwb'
         self.heightSensorName = 'height_sensor'
 
-        rospy.Subscriber(self.uavName + '/' + self.osdkName + '/imu', Imu, self.imuCallback)
+        rospy.Subscriber(self.uavName + '/' + self.osdkName + '/imuuu', Imu, self.imuCallback)
         rospy.Subscriber(self.uavName + '/' + self.uwbName + '/filter/odom', Odometry, self.posCallback)
         rospy.Subscriber(self.uavName + '/' + self.heightSensorName + '/data', Vector3Stamped, self.hCallback)
 
