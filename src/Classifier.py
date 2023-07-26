@@ -14,7 +14,7 @@ class Classifier:
         self.threshold = 2
 
         self.checkThreshold = 10
-        self.targetThreshold = 100
+        self.targetThreshold = 60
 
     def newTarget(self, pos=[0, 0, 0]):
         self.targets.append(pos)
