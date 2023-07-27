@@ -55,7 +55,12 @@ class PodSearch:
         ]
 
         self.tra = [
-            [90 - 20, -40, 30, 20], [90 - 20, 50, 30, 2],
+            [90 - 18, -80, 20, 20], [90 - 18, 50, 20, 2],
+            [90, 0, 60, 20]
+        ]
+
+        self.tra = [
+            [90 - 5, -80, 15, 20], [90 - 5, 50, 15, 2],
             [90, 0, 60, 20]
         ]
 
@@ -161,10 +166,10 @@ class PodSearch:
         self.endBeginTime = self.getTimeNow()
 
     def stepInit(self):
-        self.expectedPitch = 90 - 20
-        self.expectedYaw = -90
-        self.expectedHfov = 55
-        self.maxRate = 20
+        self.expectedPitch = self.tra[0][0]
+        self.expectedYaw = self.tra[0][1]
+        self.expectedHfov = self.tra[0][2]
+        self.maxRate = self.tra[0][3]
         self.pubPYZMaxRate()
         self.toTransformerPub.publish(Bool(False))
         self.classifierClearPub.publish(Empty())
