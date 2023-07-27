@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 
+import argparse
 from os import system
 from signal import signal, SIGINT
 
@@ -260,5 +261,22 @@ class PodSearch:
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--takeoff', help='takeoff', action="store_true")
+    parser.add_argument('--test', help='on ground test', action='store_true')
+    args, unknown = parser.parse_known_args()
+    
     podSearch = PodSearch()
+
+    print(f'--takeoff: {args.takeoff} --test: {args.test}')
+
+    if not args.takeoff and not args.test:
+        raise AssertionError("Please add --takeoff or --test arg")
+    if args.takeoff and args.test:
+        raise AssertionError("Not two args at the same time!")
+    if args.test:
+        podSearch.uavReady = True
+        print('Set uavReady to True')
+    elif args.takeoff:
+        print('WILL TAKE OFF!!!')
     podSearch.spin()
