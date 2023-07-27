@@ -33,8 +33,27 @@ READING_DATA = 3
 
 from glob import glob
 
-PORT = glob('/dev/ttyUSB[0-9]*')[0]
 PORT = path.join('/dev', readlink(glob('/dev/serial/by-path/*usb-0:2.4:1.0*')[0]).split('/')[-1])
+
+def open_serial_port():
+    try:
+        port_by_path = glob('/dev/serial/by-path/*usb-0:2.4:1.0*')[0]
+        port_name = path.join('/dev', readlink(port_by_path).split('/')[-1])
+
+        with open(port_name, 'r+') as serial_port:
+            print(f"Successfully opened port: {port_name}")
+
+    except IndexError:
+        print("No USB serial port found. Retrying...")
+        sleep(1)
+        open_serial_port()
+    except OSError as e:
+        print(f"Error occurred while opening port: {port_name}")
+        print(f"Error details: {e}")
+        sleep(1)
+        open_serial_port()
+
+# open_serial_port()
 
 from signal import signal, SIGINT
 
