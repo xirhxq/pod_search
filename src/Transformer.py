@@ -89,7 +89,7 @@ class Transformer:
         self.orderFromSearcher = False
         self.uavQuat = [0, 0, 0, 1]
 
-        self.h = 1.6
+        self.h = 1.2
         self.a = self.h / 100 * 3000
         self.selfPos = np.array([-self.h / 4, 0, self.h])
 
@@ -104,7 +104,7 @@ class Transformer:
         self.uwbName = 'uwb'
         self.heightSensorName = 'height_sensor'
 
-        rospy.Subscriber(self.uavName + '/' + self.osdkName + '/imuuu', Imu, self.imuCallback)
+        rospy.Subscriber(self.uavName + '/' + self.osdkName + '/imuRel', Imu, self.imuCallback)
         rospy.Subscriber(self.uavName + '/' + self.uwbName + '/filter/odom', Odometry, self.posCallback)
         rospy.Subscriber(self.uavName + '/' + self.heightSensorName + '/data', Vector3Stamped, self.hCallback)
 
@@ -120,7 +120,9 @@ class Transformer:
 
         self.logOn = logOn
         if self.logOn:
-            self.dtlg = DataLogger("data.csv")
+            import rospkg
+            pre = rospkg.RosPack().get_path('pod_search')
+            self.dtlg = DataLogger(pre, "data.csv")
 
         self.startTime = rospy.Time.now().to_sec()
 
@@ -161,8 +163,8 @@ class Transformer:
         self.orderFromSearcher = msg.data
 
     def posCallback(self, msg):
-        self.selfPos[0] = msg.pose.pose.position.x
-        self.selfPos[1] = msg.pose.pose.position.y
+        self.selfPos[0] = msg.pose.pose.position.x + 0.3
+        self.selfPos[1] = msg.pose.pose.position.y - 0.2
 
     def imuCallback(self, msg):
         orientation = msg.orientation
@@ -307,6 +309,11 @@ class Transformer:
     def spin(self):
         while not rospy.is_shutdown():
             print('-' * 20)
+            np.set_printoptions(precision=2)
+            print(f'My pos: {self.selfPos}')
+            print(f'RelImu: {R.from_quat(self.uavQuat).as_euler("zyx", degrees=True)}')
+
+
             if self.logOn and not self.podYawBuffer.empty and not self.podPitchBuffer.empty:
                 self.log()
 
@@ -343,9 +350,9 @@ if __name__ == '__main__':
 
     rospy.init_node('Transformer', anonymous=True)
     # ipt = input('If debug? (y/n): ')
+    # if ipt == 'y':
+    #     t.TRANSFORM_DEBUG = True
     t = Transformer(args.log)
     time.sleep(1)
 
     t.spin()
-    # if ipt == 'y':
-    #     t.TRANSFORM_DEBUG = True
