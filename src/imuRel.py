@@ -5,18 +5,26 @@ from sensor_msgs.msg import Imu
 from time import sleep
 
 from scipy.spatial.transform import Rotation as R
+import scipy.spatial.transform as st
 
 class IMUREL:
     def __init__(self):
         rospy.init_node('imuRel', anonymous=True)
         self.name = 'suav'
+        self.djiName = '/dji_osdk_ros'
         self.q0 = None
         self.q = None
         self.qRel = None
 
-        rospy.Subscriber('/imu/data', Imu, self.imuCallback)
+        self.r0 = None
+        self.r = None
+        self.rRel = None
 
-        self.imuRelPub = rospy.Publisher('/' + self.name + '/imuRel', Imu, queue_size=1)
+        self.ypr0 = None
+
+        rospy.Subscriber(self.name + self.djiName + '/imu', Imu, self.imuCallback, queue_size=1)
+
+        self.imuRelPub = rospy.Publisher(self.name + self.djiName + '/imuRel', Imu, queue_size=1)
 
     
     def imuCallback(self, msg):
@@ -30,15 +38,29 @@ class IMUREL:
         if self.q0 is None:
             self.q0 = self.q
             print(f'q0 is {self.q0}')
+            self.r0 = R.from_quat(self.q0)
+            self.ypr0 = self.r0.as_euler('zyx', degrees=True)
         else: 
-            r0 = R.from_quat(self.q0)
-            r = R.from_quat(self.q)
+            self.r = R.from_quat(self.q)
 
-            rRel = r0.inv() * r
+            self.rRel = self.r0.inv() * self.r
 
-            qRel = rRel.as_quat()
-            print(rRel.as_euler('zyx', degrees=True))
-            print(qRel)
+            self.qRel = self.rRel.as_quat()
+            # ypr = self.rRel.as_euler('zyx', degrees=True)
+            # yprStr = 'ypr'
+            # print('-' * 20)
+            print('Euler 0: ', ' '.join([f'{"ypr"[i]}{self.ypr0[i]:6.3f}deg' for i in range(3)]))
+            # print('Now Euler: ', ' '.join([f'{yprStr[i]}{ypr[i]:6.3f}deg' for i in range(3)]))
+            # print(self.qRel)
+
+            imuMsg = Imu()
+            imuMsg.header.stamp = rospy.Time.now()
+            imuMsg.orientation.x = self.qRel[0]
+            imuMsg.orientation.y = self.qRel[1]
+            imuMsg.orientation.z = self.qRel[2]
+            imuMsg.orientation.w = self.qRel[3]
+
+            self.imuRelPub.publish(imuMsg)
 
 
 
