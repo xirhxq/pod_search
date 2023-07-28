@@ -60,7 +60,7 @@ class PodSearch:
         ]
 
         self.tra = [
-            [90 - 5, -80, 15, 20], [90 - 5, 50, 15, 2],
+            [90 - 10, -10, 8, 20], [90 - 10, 20, 8, 0.2],
             [90, 0, 60, 20]
         ]
 
@@ -188,8 +188,8 @@ class PodSearch:
         self.toTransformerPub.publish(Bool(True))
         if self.traCnt == len(self.tra):
             self.toStepEnd()
-        if self.aimOn:
-            self.toStepAim()
+        #if self.aimOn:
+            #self.toStepAim()
 
     def stepAim(self):
         aimTime = self.getTimeNow() - self.thisAimStartTime
