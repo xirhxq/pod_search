@@ -13,8 +13,8 @@ class Classifier:
         self.targetsReal = []
         self.threshold = 2
 
-        self.checkThreshold = 10
-        self.targetThreshold = 60
+        self.checkThreshold = 5
+        self.targetThreshold = 50
 
     def newTarget(self, pos=[0, 0, 0]):
         self.targets.append(pos)
