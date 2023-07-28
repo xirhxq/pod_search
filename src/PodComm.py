@@ -180,7 +180,7 @@ class POD_COMM:
 
         self.maxRate = 300
         self.zoomUnit = 4.3
-        self.pyTol = 0.5
+        self.pyTol = 0.4
         self.zTol = 0.05
 
         self.downSer = serial.Serial(
@@ -252,6 +252,14 @@ class POD_COMM:
         else:
             return val
 
+    def deadZone(x, z=100):
+        if x == 0:
+            return 0
+        elif -z <= x and x <= z:
+            return z * abs(x) / x
+        else:
+            return x
+
     def genUpMsg(self):
         up = UP_MSG()
 
@@ -266,9 +274,13 @@ class POD_COMM:
             relZoomDiff = absZoomDiff / self.expectedZoom
 
             if (not self.pAtTarget or not self.yAtTarget) and self.lazyTag == 0:
-                prMax, yrMax = 300, self.maxRate
-                prate = max(-prMax, min(prMax, pitchDiff * 200))
-                yrate = max(-yrMax, min(yrMax, yawDiff * 300))
+                prMax, yrMax = self.maxRate, self.maxRate
+                prate = max(-prMax, min(prMax, pitchDiff * 300))
+                yrate = max(-yrMax, min(yrMax, yawDiff * 200))
+
+                #prate = self.deadZone(prate)
+                #yrate = self.deadZone(yrate)
+                
 
                 up.manualPYRate(prate, yrate)
 
@@ -278,7 +290,7 @@ class POD_COMM:
                 if self.lazyTag == 0:
                     # print(f'change zoom level {self.podZoomLevel} to {self.expectedZoomLevel}')
                     up.changeZoomLevel(self.expectedZoomLevel)
-                    self.lazyTag = 200 if abs(self.expectedZoomLevel - self.podZoomLevel) > 15 else 100
+                    self.lazyTag = max(abs(self.expectedZoomLevel - self.podZoomLevel) * 10, 50)
                     self.podF = self.zoomUnit * self.expectedZoomLevel
 
             # elif relZoomDiff < -self.zTol:
@@ -418,27 +430,36 @@ class POD_COMM:
         self.fFeedbackPub.publish(self.getHfov(self.expectedZoom))
 
     @property
+    def pAtTargetStrict(self):
+        return (abs(self.podPitch - self.expectedPitch) < self.pyTol / 2)
+
+    @property
+    def yAtTargetStrict(self):
+        return (abs(self.round(self.podYaw - self.expectedYaw, 180)) < self.pyTol / 2)
+
+    @property
     def pAtTarget(self):
         if not (abs(self.podPitch - self.expectedPitch) < self.pyTol):
             self.pNotAtTargetTime = self.getTimeNow()
-        return self.getTimeNow() - self.pNotAtTargetTime > 0.5
+        return self.getTimeNow() - self.pNotAtTargetTime > 0.1
 
     @property
     def yAtTarget(self):
         if not (abs(self.round(self.podYaw - self.expectedYaw, 180)) < self.pyTol):
             self.yNotAtTargetTime = self.getTimeNow()
-        return self.getTimeNow() - self.yNotAtTargetTime > 0.5
+        return self.getTimeNow() - self.yNotAtTargetTime > 0.1
 
     @property
     def fAtTarget(self):
         if not (self.expectedZoomLevel == self.podZoomLevel):
             self.fNotAtTargetTime = self.getTimeNow()
-        return self.getTimeNow() - self.fNotAtTargetTime > 0.5
+        return self.getTimeNow() - self.fNotAtTargetTime > 0.1
 
     @timer(tol=5 / HZ)
     def spinOnce(self):
         self.printState()
         self.rosPub()
+        #self.writeOnce()
 
     def spin(self):
         self.startRead()
