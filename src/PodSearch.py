@@ -24,6 +24,7 @@ class State:
     SEARCH = 1
     AIM = 2
     END = 3
+    BROWSE = 4
 
 
 class PodSearch:
@@ -55,12 +56,12 @@ class PodSearch:
         ]
 
         self.tra = [
-            [90 - 18, -80, 20, 20], [90 - 18, 50, 20, 2],
+            [90 - 4, -80, 10, 20], [90 - 4, 50, 10, 2],
             [90, 0, 60, 20]
         ]
 
         self.tra = [
-            [90 - 10, -10, 8, 20], [90 - 10, 20, 8, 0.2],
+            [90 - 20, -30, 20, 20], [90 - 20, 30, 20, 2],
             [90, 0, 60, 20]
         ]
 
@@ -105,6 +106,7 @@ class PodSearch:
 
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/aim', Float64MultiArray, self.aimCallback)
         self.aimFailPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/aimFail', Int16, queue_size=10)
+
         self.aimPitch = 0
         self.aimYaw = 0
         self.aimOn = False
@@ -122,6 +124,15 @@ class PodSearch:
         rospy.Subscriber(self.uavName + '/uavReady', Empty, lambda msg: setattr(self, 'uavReady', True))
 
         self.endBeginTime = None
+
+        self.browseTra = [
+            [86, -10, 8],
+            [86, -2, 8],
+            [86, 6, 8],
+            [86, 14, 8]
+        ]
+        self.browseCnt = 0
+        self.browseBeginTime = None
 
 
     def aimCallback(self, msg):
@@ -165,6 +176,12 @@ class PodSearch:
         self.state = State.END
         self.endBeginTime = self.getTimeNow()
 
+    def toStepBrowse(self):
+        self.state = State.BROWSE
+        self.browseCnt = 0
+        self.browseBeginTime = self.getTimeNow()
+        self.browseFlag = False
+
     def stepInit(self):
         self.expectedPitch = self.tra[0][0]
         self.expectedYaw = self.tra[0][1]
@@ -188,8 +205,8 @@ class PodSearch:
         self.toTransformerPub.publish(Bool(True))
         if self.traCnt == len(self.tra):
             self.toStepEnd()
-        #if self.aimOn:
-            #self.toStepAim()
+        if self.aimOn:
+            self.toStepAim()
 
     def stepAim(self):
         aimTime = self.getTimeNow() - self.thisAimStartTime
@@ -205,7 +222,7 @@ class PodSearch:
         
         self.expectedPitch = self.aimPitch
         self.expectedYaw = self.aimYaw
-        self.expectedHfov = self.tra[self.traCnt][2] if self.thisAimFinish else 90 - self.aimPitch
+        self.expectedHfov = self.tra[self.traCnt][2] if self.thisAimFinish else self.tra[self.traCnt][2] / 2
         self.maxRate = 90 - self.aimPitch
         self.maxRate = 2
         self.pubPYZMaxRate()
@@ -220,10 +237,28 @@ class PodSearch:
     def stepEnd(self):
         self.searchOverPub.publish(Empty())
         endTime = self.getTimeNow() - self.endBeginTime
-        print(f'StepEnd with {endTime} seconds')
+        print(f'StepEnd with {endTime:.2f} seconds')
         if endTime >= 3.0:
             exit(0)
 
+    def stepBrowse(self):
+        self.expectedPitch = self.browseTra[self.browseCnt][0]
+        self.expectedYaw = self.browseTra[self.browseCnt][1]
+        self.expectedHfov = self.browseTra[self.browseCnt][2]
+        self.maxRate = 20
+        print(f'{YELLOW}==> StepBrowse @ {self.browseCnt} <=={RESET}')
+        print((f'{GREEN}Flag True{RESET}' if self.browseFlag else f'{RED}Flag False{RESET}'))
+        print(f'Browse Time: {self.getTimeNow() - self.browseBeginTime:.2f}')
+        self.pubPYZMaxRate()
+        if self.isAtTarget():
+            self.browseFlag = True
+        if not self.browseFlag:
+            self.browseBeginTime = self.getTimeNow()
+        if self.getTimeNow() - self.browseBeginTime >= 3.0:
+            self.browseCnt += 1
+            self.browseFlag = False
+        if self.browseCnt == len(self.browseTra):
+            self.toStepEnd()
 
     def pubPYZMaxRate(self):
         self.pitchPub.publish(self.expectedPitch)
@@ -240,13 +275,14 @@ class PodSearch:
             self.stepAim()
         elif self.state == State.END:
             self.stepEnd()
+        elif self.state == State.BROWSE:
+            self.stepBrowse()
         else:
             print("Invalid state")
 
     def spin(self):
         while not rospy.is_shutdown():
             self.taskTime = self.getTimeNow() - self.startTime
-            self.controlStateMachine()
             system('clear')
             print('-' * 20)
             print(pyfiglet.figlet_format('PodSearch', font='slant'))
@@ -262,6 +298,7 @@ class PodSearch:
             print(f'Yaw: {self.yaw:.2f} -> {self.expectedYaw:.2f} == {self.yFeedback:.2f}{RESET}')
             print(GREEN if self.fAtTarget else RED, end='')
             print(f'HFov: {self.hfov:.2f} -> {self.expectedHfov:.2f} == {self.fFeedback:.2f} {RESET}')
+            self.controlStateMachine()
             self.rate.sleep()
 
 
@@ -285,3 +322,4 @@ if __name__ == '__main__':
     elif args.takeoff:
         print('WILL TAKE OFF!!!')
     podSearch.spin()
+
