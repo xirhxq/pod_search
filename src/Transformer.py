@@ -84,8 +84,8 @@ class TimeBuffer:
 
 
 class Transformer:
-    def __init__(self, logOn=False):
-        self.TRANSFORM_DEBUG = False
+    def __init__(self, logOn=False, debug=False):
+        self.debug = debug
         self.orderFromSearcher = False
         self.uavQuat = [0, 0, 0, 1]
 
@@ -150,6 +150,7 @@ class Transformer:
         self.aimPub = rospy.Publisher(self.uavName + '/' + self.podName + '/aim', Float64MultiArray, queue_size=1)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/aimFail', Int16, self.aimFailCallback, queue_size=1)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/classifierClear', Empty, self.clear, queue_size=1)
+        
 
     def clear(self, msg):
         self.clsfy.clear()
@@ -192,7 +193,7 @@ class Transformer:
         # print(f'Callback time {toc - tic}')
 
     def transform(self, pixelX, pixelY, category):
-        if not self.orderFromSearcher:
+        if not self.orderFromSearcher and not self.debug:
             return
         timeDiff = self.podDelay
         try:
@@ -206,22 +207,13 @@ class Transformer:
 
         pixelX = (pixelX - 0.5) * 2
         pixelY = (pixelY - 0.5) * 2
-        if self.TRANSFORM_DEBUG:
-            ShowBar(-1, 1).show(pixelX, str='PixelX')
-            ShowBar(-1, 1).show(pixelY, str='PixelY')
         cameraYaw = pixelX * podHfov / 2
         cameraPitch = pixelY * podVfov / 2
-        if self.TRANSFORM_DEBUG:
-            ShowBar(-podHfov / 2, podHfov / 2).show(cameraYaw, str='CameraYaw')
-            ShowBar(-podVfov / 2, podVfov / 2).show(cameraPitch, str='CameraPitch')
         rCameraYaw = R.from_euler('z', -cameraYaw, degrees=True)
         rCameraPitch = R.from_euler('y', cameraPitch, degrees=True)
         rCamera = rCameraPitch * rCameraYaw
         rPodYaw = R.from_euler('z', -podYaw, degrees=True)
         rPodPitch = R.from_euler('y', podPitch, degrees=True)
-        if self.TRANSFORM_DEBUG:
-            ShowBar(-90, 90).show(podYaw, str='PodYaw')
-            ShowBar(0, 90).show(podPitch, str='PodPitch')
 
         rUAV = R.from_quat(self.uavQuat)
 
@@ -239,9 +231,6 @@ class Transformer:
         #     f'pYP: ({podYaw:.2f}, {podPitch:.2f}) '
         #     f'Target @ {realTargetAbs[0]:.2f}, {realTargetAbs[1]:.2f}, {realTargetAbs[2]:.2f} '
         # ))
-
-        if self.TRANSFORM_DEBUG:
-            print(f'-' * 20)
 
         if not self.outOfBound(*realTargetAbs):
             # self.clsfy.newPos(*realTargetAbs)
@@ -346,13 +335,11 @@ class Transformer:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--log', help='turn on log or not', action="store_true")
+    parser.add_argument('--debug', help='debug or not', action='store_true')
     args, unknown = parser.parse_known_args()
 
     rospy.init_node('Transformer', anonymous=True)
-    # ipt = input('If debug? (y/n): ')
-    # if ipt == 'y':
-    #     t.TRANSFORM_DEBUG = True
-    t = Transformer(args.log)
+    t = Transformer(logOn=args.log, debug=args.debug)
     time.sleep(1)
 
     t.spin()
