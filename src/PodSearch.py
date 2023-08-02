@@ -65,14 +65,13 @@ class PodSearch:
             [90, 0, 60, 20]
         ]
 
-        '''
         self.tra = [
-            [90 - 30, -55, 30, 20], [90 - 30, 55, 30, 10],
-            [90 - 11, 78, 12, 20], [90 - 30, -78, 12, 5],
-            [90 - 4, -83, 6, 20], [90 - 4, 83, 6, 2],
+            [61.52, -20, 90, 20], [61.52, 20, 90, 15],
+            [82.85, 73, 22, 20], [82.85, -73, 22, 5],
+            #[87.75, -57, 13, 20], [87.75, 57, 13, 3],
             [90, 0, 60, 20]
         ]
-        '''
+
 
         self.traCnt = 0
 
@@ -214,8 +213,8 @@ class PodSearch:
         self.toTransformerPub.publish(Bool(True))
         if self.traCnt == len(self.tra):
             self.toStepEnd()
-        if self.aimOn:
-            self.toStepAim()
+        # if self.aimOn:
+        #     self.toStepAim()
 
     def stepAim(self):
         aimTime = self.getTimeNow() - self.thisAimStartTime
