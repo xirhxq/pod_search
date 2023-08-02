@@ -89,14 +89,14 @@ class Transformer:
         self.orderFromSearcher = False
         self.uavQuat = [0, 0, 0, 1]
 
-        self.h = 1.2
+        self.h = 0.6
         self.a = self.h / 100 * 3000
-        self.selfPos = np.array([-self.h / 4, 0, self.h])
+        self.selfPos = np.array([0, 0, self.h])
 
         self.podPitchBuffer = TimeBuffer('Pod Pitch Buffer')
         self.podYawBuffer = TimeBuffer('Pod Yaw Buffer')
         self.podHfovBuffer = TimeBuffer('Pod HFov Buffer')
-        self.podDelay = 0.4
+        self.podDelay = 0.6
 
         self.uavName = 'suav'
         self.podName = 'pod'
@@ -192,9 +192,7 @@ class Transformer:
         # toc = rospy.Time.now().to_sec()
         # print(f'Callback time {toc - tic}')
 
-    def transform(self, pixelX, pixelY, category):
-        if not self.orderFromSearcher and not self.debug:
-            return
+    def calTarget(self, pixelX, pixelY, category):
         timeDiff = self.podDelay
         try:
             podHfov = self.podHfovBuffer.getMessage(timeDiff).data
@@ -225,12 +223,25 @@ class Transformer:
         # print(f'realTargetRel: {realTargetRel}')
 
         realTargetAbs = realTargetRel + self.selfPos
-        # print((
-        #     f'XY: ({pixelX:.2f}, {pixelY:.2f}) '
-        #     f'cYP: ({cameraYaw:.2f}, {cameraPitch:.2f}) '
-        #     f'pYP: ({podYaw:.2f}, {podPitch:.2f}) '
-        #     f'Target @ {realTargetAbs[0]:.2f}, {realTargetAbs[1]:.2f}, {realTargetAbs[2]:.2f} '
-        # ))
+        
+        if self.debug:
+            print((
+                f'XY: ({pixelX:.2f}, {pixelY:.2f}) '
+                f'cYP: ({cameraYaw:.2f}, {cameraPitch:.2f}) '
+                f'pYP: ({podYaw:.2f}, {podPitch:.2f}) '
+                f'Target @ {realTargetAbs[0]:.2f}, {realTargetAbs[1]:.2f}, {realTargetAbs[2]:.2f} '
+            ))
+        
+        return realTargetAbs
+
+    def transform(self, pixelX, pixelY, category):
+        if not self.orderFromSearcher and not self.debug:
+            return
+
+        realTargetAbs = self.calTarget(pixelX, pixelY, category)
+        
+        if realTargetAbs is None:
+            return
 
         if not self.outOfBound(*realTargetAbs):
             # self.clsfy.newPos(*realTargetAbs)
