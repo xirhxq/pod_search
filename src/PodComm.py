@@ -180,7 +180,7 @@ class POD_COMM:
 
         self.maxRate = 300
         self.zoomUnit = 4.3
-        self.pyTol = 0.4
+        self.pyTol = 0.5
         self.zTol = 0.05
 
         self.downSer = serial.Serial(
