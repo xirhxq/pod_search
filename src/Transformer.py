@@ -42,7 +42,7 @@ class TimeBuffer:
     def empty(self):
         return not self.buffer
 
-    def addMessage(self, msg, maxAge=0.5):
+    def addMessage(self, msg, maxAge=0.8):
         time = rospy.Time.now()
         self.buffer.append((time, msg))
 
@@ -137,6 +137,7 @@ class Transformer:
             ("podHfovDelayed", "double"),
             ("podVfov", "double"),
             ("podVfovDelayed", "double"),
+            ('selfPos[3]', 'vector')
         ] 
         for i in range(self.targetsAvailable):
             variable_info.append((f'target{i}[3]', "list"))
@@ -286,6 +287,7 @@ class Transformer:
         vFovDelayed = degrees(2 * np.arctan(np.tan(radians(hFovDelayed) / 2) * 9 / 16))
         self.dtlg.log('podVfov', vFov)
         self.dtlg.log('podVfovDelayed', vFovDelayed)
+        self.dtlg.log('selfPos', self.selfPos)
 
         t = self.clsfy.targets
         tLen = len(t)
