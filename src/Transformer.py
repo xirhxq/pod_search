@@ -104,7 +104,7 @@ class Transformer:
         self.uwbName = 'uwb'
         self.heightSensorName = 'height_sensor'
 
-        rospy.Subscriber(self.uavName + '/' + self.osdkName + '/imuRel', Imu, self.imuCallback)
+        rospy.Subscriber(self.uavName + '/' + self.osdkName + '/imuRel/noData', Imu, self.imuCallback)
         rospy.Subscriber(self.uavName + '/' + self.uwbName + '/filter/odom', Odometry, self.posCallback)
         rospy.Subscriber(self.uavName + '/' + self.heightSensorName + '/data', Vector3Stamped, self.hCallback)
 
@@ -137,7 +137,7 @@ class Transformer:
             ("podHfovDelayed", "double"),
             ("podVfov", "double"),
             ("podVfovDelayed", "double"),
-            ('selfPos[3]', 'vector')
+            ('selfPos[3]', 'list')
         ] 
         for i in range(self.targetsAvailable):
             variable_info.append((f'target{i}[3]', "list"))
@@ -147,6 +147,7 @@ class Transformer:
 
         if self.logOn:
             self.dtlg.initialize(variable_info)
+            print(self.dtlg.variable_names)
 
         self.aimPub = rospy.Publisher(self.uavName + '/' + self.podName + '/aim', Float64MultiArray, queue_size=1)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/aimFail', Int16, self.aimFailCallback, queue_size=1)
@@ -287,7 +288,7 @@ class Transformer:
         vFovDelayed = degrees(2 * np.arctan(np.tan(radians(hFovDelayed) / 2) * 9 / 16))
         self.dtlg.log('podVfov', vFov)
         self.dtlg.log('podVfovDelayed', vFovDelayed)
-        self.dtlg.log('selfPos', self.selfPos)
+        self.dtlg.log('selfPos', list(self.selfPos))
 
         t = self.clsfy.targets
         tLen = len(t)
