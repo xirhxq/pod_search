@@ -39,7 +39,7 @@ class DataLogger:
                 or isinstance(value, int) \
                 or isinstance(value, float):
             self.parse_variable_value(variable_name, value)
-        elif isinstance(value, np.matrix) or isinstance(value, np.ndarray):
+        elif isinstance(value, (np.matrix, np.ndarray)):
             self.parse_matrix_value(variable_name, value)
         elif isinstance(value, list):
             self.parse_list_value(variable_name, value)
