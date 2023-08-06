@@ -115,6 +115,14 @@ class UP_MSG:
         self.orderB = b'\x93'
         return self.msg()
 
+    def antiFogOn(self):
+        self.orderB = b'\xDD'
+        return self.msg()
+
+    def antiFogOff(self):
+        self.orderB = b'\xDE'
+        return self.msg()
+
     def changeZoomLevel(self, level):
         self.orderB = b'\xDC'
         self.orderC = pack('<h', int(level))
@@ -147,7 +155,8 @@ def timer(tol=1):
 
 class POD_COMM:
     def __init__(self):
-        self.init = False
+        self.initTextOff = False
+        self.initAntiFog = False
         self.state = WAITING_DOWN_FRAME_HEAD_1
         self.expectedPitch = 90.0
         self.expectedYaw = 0.0
@@ -263,10 +272,14 @@ class POD_COMM:
     def genUpMsg(self):
         up = UP_MSG()
 
-        if self.init == False:
+        if not self.initTextOff:
             up.textOnOff()
             self.lazyTag = 10
-            self.init = True
+            self.initTextOff = True
+        if not self.initAntiFog:
+            up.antiFogOn()
+            self.lazyTag = 10
+            self.initAntiFog = True
         elif self.lazyTag <= 15:
             pitchDiff = self.expectedPitch - self.podPitch
             yawDiff = self.round(self.expectedYaw - self.podYaw, 180)
