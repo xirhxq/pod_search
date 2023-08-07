@@ -276,7 +276,7 @@ class POD_COMM:
             up.textOnOff()
             self.lazyTag = 10
             self.initTextOff = True
-        if not self.initAntiFog:
+        elif not self.initAntiFog:
             up.antiFogOn()
             self.lazyTag = 10
             self.initAntiFog = True
