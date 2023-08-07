@@ -25,7 +25,7 @@ class State:
     AIM = 2
     END = 3
     BROWSE = 4
-
+    STREAM = 5
 
 class PodSearch:
     def __init__(self):
@@ -79,6 +79,10 @@ class PodSearch:
             [90, 0, 60, 20]
         ]
 
+        self.tra = [
+            [87, -60, 20, 20], [87, 60, 20, 4]
+        ]
+
         self.traCnt = 0
 
         self.uavName = 'suav'
@@ -120,6 +124,10 @@ class PodSearch:
 
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/aim', Float64MultiArray, self.aimCallback)
         self.aimFailPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/aimFail', Int16, queue_size=10)
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/stream', Float64MultiArray, self.streamCallback)
+        self.streamIndex = None
+        self.streamPitch = 0
+        self.streamYaw = 0
 
         self.aimPitch = 0
         self.aimYaw = 0
@@ -157,6 +165,12 @@ class PodSearch:
             self.aimIndex = int(msg.data[3])
         else:
             self.aimOn = False
+
+    def streamCallback(self, msg):
+        if msg.data[0] > 0:
+            self.streamPitch = msg.data[1]
+            self.streamYaw = msg.data[2]
+            self.streamIndex = int(msg.data[3])
 
     def getTimeNow(self):
         return rospy.Time.now().to_sec()
@@ -196,6 +210,13 @@ class PodSearch:
         self.browseBeginTime = self.getTimeNow()
         self.browseFlag = False
 
+    def toStepStream(self):
+        self.state = State.STREAM
+        if self.streamIndex == None:
+            print(f'{RED}No targets to stream{RESET}')
+            self.toStepEnd()
+        self.streamStartTime = self.getTimeNow()
+
     def stepInit(self):
         self.expectedPitch = self.tra[0][0]
         self.expectedYaw = self.tra[0][1]
@@ -218,13 +239,13 @@ class PodSearch:
             self.traCnt += 1
         self.toTransformerPub.publish(Bool(True))
         if self.traCnt == len(self.tra):
-            self.toStepEnd()
+            self.toStepStream()
         # if self.aimOn:
         #     self.toStepAim()
 
     def stepAim(self):
         aimTime = self.getTimeNow() - self.thisAimStartTime
-        if self.getTimeNow() - self.thisAimStartTime >= self.aimTimeThreshold and not self.thisAimFinish:
+        if aimTime >= self.aimTimeThreshold and not self.thisAimFinish:
             self.aimFailPub.publish(Int16(self.thisAimIndex))
             self.thisAimFinish = True
 
@@ -247,7 +268,19 @@ class PodSearch:
               (RED + "Finished" + RESET) if self.thisAimFinish else "",
               (GREEN + "At Target" + RESET) if self.isAtTarget() else ""
         )
-        
+    
+    def stepStream(self):
+        streamTime = self.getTimeNow() - self.streamStartTime
+        print(f'{YELLOW}==> StepStream @ Target {self.streamIndex} <=={RESET}')
+        print(f'Time: {streamTime:.2f}')
+        self.expectedPitch = self.streamPitch
+        self.expectedYaw = self.streamYaw
+        self.expectedHfov = 10
+        self.maxRate = 20
+        self.pubPYZMaxRate()
+        if streamTime >= 10.0:
+            self.toStepEnd()
+
     def stepEnd(self):
         self.searchOverPub.publish(Empty())
         endTime = self.getTimeNow() - self.endBeginTime
@@ -275,6 +308,8 @@ class PodSearch:
             self.toStepEnd()
 
     def pubPYZMaxRate(self):
+        if self.expectedYaw < -90 or self.expectedYaw > 90:
+            self.expectedYaw += 180
         self.pitchPub.publish(self.expectedPitch)
         self.yawPub.publish(self.expectedYaw)
         self.hfovPub.publish(self.expectedHfov)
@@ -291,6 +326,8 @@ class PodSearch:
             self.stepEnd()
         elif self.state == State.BROWSE:
             self.stepBrowse()
+        elif self.state == State.STREAM:
+            self.stepStream()
         else:
             print("Invalid state")
 

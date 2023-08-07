@@ -154,7 +154,7 @@ class Transformer:
         self.aimPub = rospy.Publisher(self.uavName + '/' + self.podName + '/aim', Float64MultiArray, queue_size=1)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/aimFail', Int16, self.aimFailCallback, queue_size=1)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/classifierClear', Empty, self.clear, queue_size=1)
-        
+        self.streamPub = rospy.Publisher(self.uavName + '/' + self.podName + '/stream', Float64MultiArray, queue_size=1) 
 
     def clear(self, msg):
         self.clsfy.clear()
@@ -347,7 +347,12 @@ class Transformer:
             else:
                 msg = Float64MultiArray(data=[-1, -1, -1, -1])
                 self.aimPub.publish(msg)
-
+           
+            streamInd = self.clsfy.highestScoreIndex()
+            if streamInd is not None and 0 <= streamInd < len(t):
+                streamPitch, streamYaw = self.untransform(self.clsfy.targets[streamInd])
+                msg = Float64MultiArray(data=[1, streamPitch, streamYaw, streamInd])
+                self.streamPub.publish(msg)
             time.sleep(0.05)
 
 

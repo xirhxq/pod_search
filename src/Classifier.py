@@ -25,7 +25,6 @@ class Classifier:
         self.targetsReal.append(False)
 
     def updateTarget(self, ind, pos, score):
-        print(f'update at ind {ind} with pos{pos} score{score}')
         while len(self.targets) < ind + 1:
             self.newTarget()
         self.targets[ind] = pos
@@ -45,6 +44,11 @@ class Classifier:
         if False not in self.targetsCheck:
             return None
         return self.targetsCheck.index(False)
+
+    def highestScoreIndex(self):
+        if len(self.targetsScore) == 0:
+            return None
+        return np.argmax(self.targetsScore)
 
     def newPos(self, x, y, z):
         if len(self.targets) == 0:
