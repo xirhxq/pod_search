@@ -84,8 +84,10 @@ class TimeBuffer:
 
 
 class Transformer:
-    def __init__(self, logOn=False, debug=False):
+    def __init__(self, logOn=False, debug=False, infBound=False):
         self.debug = debug
+        self.infBound = infBound
+
         self.orderFromSearcher = False
         self.uavQuat = [0, 0, 0, 1]
 
@@ -152,7 +154,7 @@ class Transformer:
         self.aimPub = rospy.Publisher(self.uavName + '/' + self.podName + '/aim', Float64MultiArray, queue_size=1)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/aimFail', Int16, self.aimFailCallback, queue_size=1)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/classifierClear', Empty, self.clear, queue_size=1)
-        
+        self.streamPub = rospy.Publisher(self.uavName + '/' + self.podName + '/stream', Float64MultiArray, queue_size=1) 
 
     def clear(self, msg):
         self.clsfy.clear()
@@ -190,7 +192,7 @@ class Transformer:
         # tic = rospy.Time.now().to_sec()
         for target in msg.targets:
             if target.category == 'car' and target.category_id != 100:
-                self.transform(target.cx, target.cy, target.category_id)
+                self.transform(target.cx, target.cy, target.category_id, target.score)
         # toc = rospy.Time.now().to_sec()
         # print(f'Callback time {toc - tic}')
 
@@ -236,10 +238,9 @@ class Transformer:
         
         return realTargetAbs
 
-    def transform(self, pixelX, pixelY, category):
+    def transform(self, pixelX, pixelY, category, score):
         if not self.orderFromSearcher and not self.debug:
             return
-
         realTargetAbs = self.calTarget(pixelX, pixelY, category)
         
         if realTargetAbs is None:
@@ -247,7 +248,7 @@ class Transformer:
 
         if not self.outOfBound(*realTargetAbs):
             # self.clsfy.newPos(*realTargetAbs)
-            self.clsfy.updateTarget(category, list(realTargetAbs))
+            self.clsfy.updateTarget(category, list(realTargetAbs), score)
             # self.clsfy.outputTargets()
 
     def untransform(self, pos):
@@ -268,6 +269,8 @@ class Transformer:
         return podPitch, podYaw
 
     def outOfBound(self, x, y, z):
+        if self.infBound:
+            return False
         if x < 0 or x > self.a:
             return True
         if abs(y) > self.a / 2:
@@ -322,6 +325,7 @@ class Transformer:
 
             t = self.clsfy.targets
             tLen = len(t)
+            tScore = self.clsfy.targetsScore
             tCnt = self.clsfy.targetsCnt
             tCheck = self.clsfy.targetsCheck
             tReal = self.clsfy.targetsReal
@@ -330,6 +334,7 @@ class Transformer:
                     f'Target[{i}] @ {", ".join([f"{x:.2f}" for x in t[i]])}, {tCnt[i]} Frames, '
                     f'{("" if tCheck[i] else (YELLOW + "Not Checked")) if tCnt[i] >= self.clsfy.checkThreshold else "Not enough"}'
                     f'{((GREEN + "is a target") if tReal[i] else (RED + "not a target")) if tCheck[i] else ""}'
+                    f', Score: {tScore[i]:.2f}'
                     f'{RESET}'
                 )
 
@@ -342,7 +347,12 @@ class Transformer:
             else:
                 msg = Float64MultiArray(data=[-1, -1, -1, -1])
                 self.aimPub.publish(msg)
-
+           
+            streamInd = self.clsfy.highestScoreIndex()
+            if streamInd is not None and 0 <= streamInd < len(t):
+                streamPitch, streamYaw = self.untransform(self.clsfy.targets[streamInd])
+                msg = Float64MultiArray(data=[1, streamPitch, streamYaw, streamInd])
+                self.streamPub.publish(msg)
             time.sleep(0.05)
 
 
@@ -350,10 +360,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--log', help='turn on log or not', action="store_true")
     parser.add_argument('--debug', help='debug or not', action='store_true')
+    parser.add_argument('--infBound', help='infinite bound', action='store_true')
     args, unknown = parser.parse_known_args()
 
     rospy.init_node('Transformer', anonymous=True)
-    t = Transformer(logOn=args.log, debug=args.debug)
+    t = Transformer(logOn=args.log, debug=args.debug, infBound=args.infBound)
     time.sleep(1)
 
     t.spin()

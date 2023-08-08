@@ -8,6 +8,7 @@ import numpy as np
 class Classifier:
     def __init__(self):
         self.targets = []
+        self.targetsScore = []
         self.targetsCnt = []
         self.targetsCheck = []
         self.targetsReal = []
@@ -16,16 +17,18 @@ class Classifier:
         self.checkThreshold = 1
         self.targetThreshold = 2
 
-    def newTarget(self, pos=[0, 0, 0]):
+    def newTarget(self, pos=[0, 0, 0], score=0):
         self.targets.append(pos)
+        self.targetsScore.append(score)
         self.targetsCnt.append(1)
         self.targetsCheck.append(False)
         self.targetsReal.append(False)
 
-    def updateTarget(self, ind, pos):
+    def updateTarget(self, ind, pos, score):
         while len(self.targets) < ind + 1:
             self.newTarget()
         self.targets[ind] = pos
+        self.targetsScore[ind] = max(self.targetsScore[ind], score)
         self.targetsCnt[ind] += 1
         if self.targetsCnt[ind] > self.targetThreshold and not self.targetsCheck[ind]:
             self.targetsCheck[ind] = True
@@ -41,6 +44,11 @@ class Classifier:
         if False not in self.targetsCheck:
             return None
         return self.targetsCheck.index(False)
+
+    def highestScoreIndex(self):
+        if len(self.targetsScore) == 0:
+            return None
+        return np.argmax(self.targetsScore)
 
     def newPos(self, x, y, z):
         if len(self.targets) == 0:
