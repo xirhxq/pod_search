@@ -91,9 +91,9 @@ class Transformer:
         self.orderFromSearcher = False
         self.uavQuat = [0, 0, 0, 1]
 
-        self.h = 0.6
+        self.h = 2
         self.a = self.h / 100 * 3000
-        self.selfPos = np.array([0, 0, self.h])
+        self.selfPos = np.array([-self.h / 2, 0, self.h])
 
         self.podPitchBuffer = TimeBuffer('Pod Pitch Buffer')
         self.podYawBuffer = TimeBuffer('Pod Yaw Buffer')
