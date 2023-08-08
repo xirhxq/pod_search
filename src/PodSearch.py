@@ -138,6 +138,8 @@ class PodSearch:
         self.streamIndex = None
         self.streamPitch = 0
         self.streamYaw = 0
+        self.streamFlag = False
+
 
         self.aimPitch = 0
         self.aimYaw = 0
@@ -280,6 +282,8 @@ class PodSearch:
         )
     
     def stepStream(self):
+        if not self.streamFlag:
+            self.streamStartTime = self.getTimeNow()
         streamTime = self.getTimeNow() - self.streamStartTime
         print(f'{YELLOW}==> StepStream @ Target {self.streamIndex} <=={RESET}')
         print(f'Time: {streamTime:.2f}')
@@ -288,6 +292,8 @@ class PodSearch:
         self.expectedHfov = 10
         self.maxRate = 20
         self.pubPYZMaxRate()
+        if self.isAtTarget():
+            self.streamFlag = True
         if streamTime >= 10.0:
             self.toStepEnd()
 
