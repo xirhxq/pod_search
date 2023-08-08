@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from math import degrees, atan, tan, radians, sin, cos, sqrt
@@ -23,7 +25,7 @@ class AutoTra:
 
         self.cmap = plt.get_cmap('tab10')
 
-        self.overlapD = 5 * self.h / 100 if overlapOn else 0
+        self.overlapD = 10 * self.h / 100 if overlapOn else 0
 
         self.pitchLevelOn = pitchLevelOn
         self.drawNum = drawNum
@@ -92,7 +94,7 @@ class AutoTra:
                 yRange = -yRange
             print(f'[{90 - podP:.6f}, {yRange:.2f}, {hfov:.2f}, 20], [{90 - podP:.6f}, {-yRange:.2f}, {hfov:.2f}, {hfov/3:.2f}]')
             self.theList.append([90 - podP, yRange, hfov, 20])
-            self.theList.append([90 - podP, -yRange, hfov, hfov / 3])
+            self.theList.append([90 - podP, -yRange, hfov, hfov / 4])
 
         self.theList.append([90, 0, 60, 20])
         print('### The List ###')
