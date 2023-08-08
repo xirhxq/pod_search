@@ -10,6 +10,7 @@ from std_msgs.msg import Float32, Bool, Int16, Float64MultiArray, Empty
 
 from Utils import *
 
+from AutoTra import AutoTra
 
 def signal_handler(sig, frame):
     print('You pressed Ctrl+C!')
@@ -79,9 +80,18 @@ class PodSearch:
             [90, 0, 60, 20]
         ]
 
-        self.tra = [
-            [87, -60, 20, 20], [87, 60, 20, 4]
-        ]
+        #self.tra = [
+        #    [87, -60, 20, 20], [87, 60, 20, 4]
+        #]
+
+        h = float(input('Input the search h: '))
+        a = float(input('Input the length a: '))
+
+        self.autoTra = AutoTra(h=h, a=a, pitchLevelOn=True, overlapOn=True, drawNum=-1, hfovPitchRatio=1.2)
+
+        self.tra = self.autoTra.theList
+
+        input('Type anything to continue...')
 
         self.traCnt = 0
 
