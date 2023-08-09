@@ -414,7 +414,8 @@ class POD_COMM:
     def printState(self):
         system('clear')
         print('-' * 20)
-        print(pyfiglet.figlet_format('PodComm', font='slant'))
+        print('### PodComm ###')
+        # print(pyfiglet.figlet_format('PodComm', font='slant'))
         print(f'Pod state: {self.podState0} {self.podState1} Camera state: {self.podCameraState}')
         print(GREEN if self.pAtTarget else RED, end='')
         print(f'Pitch {self.podPitch:.1f} -> {self.expectedPitch:.1f}{RESET}')
