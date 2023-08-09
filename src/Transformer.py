@@ -16,7 +16,7 @@ from nav_msgs.msg import Odometry
 from scipy.spatial.transform import Rotation as R
 from sensor_msgs.msg import Imu
 from spirecv_msgs.msg import TargetsInFrame
-from std_msgs.msg import Float32, Bool, Float64MultiArray, Int16, Empty
+from std_msgs.msg import Int8, Float32, Bool, Float64MultiArray, Int16, Empty
 from geometry_msgs.msg import Vector3Stamped
 
 from Classifier import Classifier
@@ -118,6 +118,9 @@ class Transformer:
 
         rospy.Subscriber(self.uavName + '/' + self.podName + '/toTransformer', Bool, self.orderFromSearcherCallback)
 
+        self.searchState = 0
+        rospy.Subscriber(self.uavName + '/' + self.podName + '/searchState', Int8, lambda msg: setattr(self, 'searchState', msg.data))
+
         self.clsfy = Classifier()
 
         self.logOn = logOn
@@ -153,12 +156,7 @@ class Transformer:
 
         self.aimPub = rospy.Publisher(self.uavName + '/' + self.podName + '/aim', Float64MultiArray, queue_size=1)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/aimFail', Int16, self.aimFailCallback, queue_size=1)
-        rospy.Subscriber(self.uavName + '/' + self.podName + '/classifierClear', Empty, self.clear, queue_size=1)
         self.streamPub = rospy.Publisher(self.uavName + '/' + self.podName + '/stream', Float64MultiArray, queue_size=1) 
-
-    def clear(self, msg):
-        self.clsfy.clear()
-
 
     def aimFailCallback(self, msg):
         self.clsfy.targetsCheck[msg.data] = True
@@ -248,7 +246,8 @@ class Transformer:
 
         if not self.outOfBound(*realTargetAbs):
             # self.clsfy.newPos(*realTargetAbs)
-            self.clsfy.updateTarget(category, list(realTargetAbs), score)
+            if self.searchState == 1:
+                self.clsfy.updateTarget(category, list(realTargetAbs), score)
             # self.clsfy.outputTargets()
 
     def untransform(self, pos):
@@ -311,6 +310,10 @@ class Transformer:
                 self.dtlg.log(f'targetReal{i}', False)
 
         self.dtlg.newline()
+
+    def ControlStateMachine(self):
+        if self.searchState == 0 or self.searchState == 5:
+            self.clsfy.clear()
 
     def spin(self):
         while not rospy.is_shutdown():

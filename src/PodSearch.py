@@ -6,7 +6,7 @@ from signal import signal, SIGINT
 
 import pyfiglet
 import rospy
-from std_msgs.msg import Float32, Bool, Int16, Float64MultiArray, Empty
+from std_msgs.msg import Float32, Bool, Int16, Float64MultiArray, Empty, Int8
 
 from Utils import *
 
@@ -23,10 +23,10 @@ signal(SIGINT, signal_handler)
 class State:
     INIT = 0
     SEARCH = 1
-    AIM = 2
-    END = 3
-    BROWSE = 4
-    STREAM = 5
+    BROWSE = 2
+    AIM = 3
+    STREAM = 4
+    END = 5
 
 class PodSearch:
     def __init__(self):
@@ -155,7 +155,6 @@ class PodSearch:
 
         self.searchOverPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/searchOver', Empty, queue_size=10)
         self.uavReady = False
-        rospy.Subscriber(self.uavName + '/uavReady', Empty, lambda msg: setattr(self, 'uavReady', True))
 
         self.endBeginTime = None
 
@@ -168,6 +167,9 @@ class PodSearch:
         self.browseCnt = 0
         self.browseBeginTime = None
 
+        self.searchStatePub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/searchState', Int8, queue_size=1)
+        self.uavState = 0
+        rospy.Subscriber(self.uavName + '/uavState', Int8, lambda msg: setattr(self, 'uavState', msg.data))
 
     def aimCallback(self, msg):
         if msg.data[0] > 0:
@@ -282,18 +284,19 @@ class PodSearch:
         )
     
     def stepStream(self):
+        if self.isAtTarget():
+            self.streamFlag = True
         if not self.streamFlag:
             self.streamStartTime = self.getTimeNow()
         streamTime = self.getTimeNow() - self.streamStartTime
         print(f'{YELLOW}==> StepStream @ Target {self.streamIndex} <=={RESET}')
         print(f'Time: {streamTime:.2f}')
+        print(f'StreamFlag: {self.streamFlag}')
         self.expectedPitch = self.streamPitch
         self.expectedYaw = self.streamYaw
         self.expectedHfov = 10
         self.maxRate = 20
         self.pubPYZMaxRate()
-        if self.isAtTarget():
-            self.streamFlag = True
         if streamTime >= 10.0:
             self.toStepEnd()
 
@@ -332,6 +335,9 @@ class PodSearch:
         self.maxRatePub.publish(self.maxRate)
 
     def controlStateMachine(self):
+        self.searchStatePub.publish(Int8(self.state))
+        if self.uavState >= 4:
+            self.uavReady = True
         if self.state == State.INIT:
             self.stepInit()
         elif self.state == State.SEARCH:
@@ -352,7 +358,9 @@ class PodSearch:
             self.taskTime = self.getTimeNow() - self.startTime
             system('clear')
             print('-' * 20)
-            print(pyfiglet.figlet_format('PodSearch', font='slant'))
+            print(f'### PodSearch ###')
+            print(f'Me @ State #{self.state} sUAV @ State #{self.uavState}')
+            #print(pyfiglet.figlet_format('PodSearch', font='slant'))
             print(
                 f'Time {self.taskTime:.1f}',
                 f'State: {self.state}',
