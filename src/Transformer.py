@@ -351,7 +351,7 @@ class Transformer:
                 msg = Float64MultiArray(data=[-1, -1, -1, -1])
                 self.aimPub.publish(msg)
            
-            streamInd = self.clsfy.highestScoreIndex()
+            streamInd = self.clsfy.lowestScoreIndex()
             if streamInd is not None and 0 <= streamInd < len(t):
                 streamPitch, streamYaw = self.untransform(self.clsfy.targets[streamInd])
                 msg = Float64MultiArray(data=[1, streamPitch, streamYaw, streamInd])

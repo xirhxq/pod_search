@@ -45,10 +45,10 @@ class Classifier:
             return None
         return self.targetsCheck.index(False)
 
-    def highestScoreIndex(self):
+    def lowestScoreIndex(self):
         if len(self.targetsScore) == 0:
             return None
-        return np.argmax(self.targetsScore)
+        return np.argmin(self.targetsScore)
 
     def newPos(self, x, y, z):
         if len(self.targets) == 0:
