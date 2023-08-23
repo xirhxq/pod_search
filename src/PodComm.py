@@ -111,6 +111,14 @@ class UP_MSG:
         self.orderB = b'\x44'
         return self.msg()
 
+    def lockOn(self):
+        self.orderB = b'\xC5'
+        return self.msg()
+
+    def lockOff(self):
+        self.orderB = b'\xC6'
+        return self.msg()
+
     def textOnOff(self):
         self.orderB = b'\x93'
         return self.msg()
@@ -191,6 +199,8 @@ class POD_COMM:
         self.zoomUnit = 4.3
         self.pyTol = 0.5
         self.zTol = 0.05
+        self.locked = False
+        self.lockCnt = 0
 
         self.downSer = serial.Serial(
             port=PORT,
@@ -261,7 +271,7 @@ class POD_COMM:
         else:
             return val
 
-    def deadZone(x, z=100):
+    def deadZone(self, x, z=110):
         if x == 0:
             return 0
         elif -z <= x and x <= z:
@@ -288,17 +298,21 @@ class POD_COMM:
 
             if (not self.pAtTarget or not self.yAtTarget) and self.lazyTag == 0:
                 prMax, yrMax = self.maxRate, self.maxRate
-                prate = max(-prMax, min(prMax, pitchDiff * 300))
+                prate = max(-prMax, min(prMax, pitchDiff * 240))
                 yrate = max(-yrMax, min(yrMax, yawDiff * 200))
 
-                #prate = self.deadZone(prate)
-                #yrate = self.deadZone(yrate)
+                prate = self.deadZone(prate, z=80)
+                yrate = self.deadZone(yrate, z=110)
                 
 
                 up.manualPYRate(prate, yrate)
 
                 # print(f'up pitch {self.podPitch:.2f} -> {self.expectedPitch:.2f} diff: {pitchDiff:.2f} rate: {prate:.2f}')
                 # print(f'up yaw {self.podYaw:.2f} -> {self.expectedYaw:.2f} diff: {yawDiff:.2f} rate: {yrate:.2f}')
+            elif self.pAtTargetStrict and self.yAtTargetStrict:
+                up.lockOn()
+                self.lockCnt += 1
+
             elif not self.fAtTarget:
                 if self.lazyTag == 0:
                     # print(f'change zoom level {self.podZoomLevel} to {self.expectedZoomLevel}')
@@ -353,8 +367,8 @@ class POD_COMM:
                              self.podCameraState, self.podLaserRes,
                              self.podElecZoom, self.podOrder) = downData[:-2]
                             # self.podF = podFx10 / 10
-                            self.podPitch = podPitchx100 / 100
-                            self.podYaw = self.round(podYawx100 / 100, 180)
+                            self.podPitch = podPitchx100 / 100 - 2.2
+                            self.podYaw = self.round(podYawx100 / 100 + 5.3, 180)
                             self.podZoomLevel = self.looseZoomLevel(round(self.podF / self.zoomUnit))
 
                             currentTime = datetime.now()
@@ -418,13 +432,13 @@ class POD_COMM:
         # print(pyfiglet.figlet_format('PodComm', font='slant'))
         print(f'Pod state: {self.podState0} {self.podState1} Camera state: {self.podCameraState}')
         print(GREEN if self.pAtTarget else RED, end='')
-        print(f'Pitch {self.podPitch:.1f} -> {self.expectedPitch:.1f}{RESET}')
+        print(f'Pitch {self.podPitch:.2f} -> {self.expectedPitch:.2f}{RESET}')
         print(GREEN if self.yAtTarget else RED, end='')
-        print(f'Yaw {self.podYaw:.1f} -> {self.expectedYaw:.1f}{RESET}')
+        print(f'Yaw {self.podYaw:.2f} -> {self.expectedYaw:.2f}{RESET}')
         print(GREEN if self.fAtTarget else RED, end='')
         print(f'Zoom {self.podF:.1f}({self.podZoomLevel}) -> {self.expectedZoom:.1f}({self.expectedZoomLevel}){RESET}')
         print(f'Hfov {self.getHfov(self.podF):.2f} -> {self.getHfov(self.expectedZoom):2f}')
-        print(f'LazyTag {self.lazyTag}')
+        print(f'LazyTag {self.lazyTag}', (RED + 'Locked' + RESET) if self.locked else (GREEN + 'Unlocked' + RESET) + ' LockCnt: ', self.lockCnt)
         # print(f'Yaw deque: {self.podYawDeque}')"
         # if len(self.podYawDeque) > 1:
         #     print(f'Yaw history data: from {self.podYawDeque[0][0].strftime("%H:%M:%S.%f")} to {self.podYawDeque[-1][0].strftime("%H:%M:%S.%f")}')
@@ -445,11 +459,11 @@ class POD_COMM:
 
     @property
     def pAtTargetStrict(self):
-        return (abs(self.podPitch - self.expectedPitch) < self.pyTol / 2)
+        return (abs(self.podPitch - self.expectedPitch) < self.pyTol * 0.8)
 
     @property
     def yAtTargetStrict(self):
-        return (abs(self.round(self.podYaw - self.expectedYaw, 180)) < self.pyTol / 2)
+        return (abs(self.round(self.podYaw - self.expectedYaw, 180)) < self.pyTol * 0.8)
 
     @property
     def pAtTarget(self):
@@ -469,15 +483,15 @@ class POD_COMM:
             self.fNotAtTargetTime = self.getTimeNow()
         return self.getTimeNow() - self.fNotAtTargetTime > 0.1
 
-    @timer(tol=5 / HZ)
+    @timer(tol=1 / HZ)
     def spinOnce(self):
         self.printState()
         self.rosPub()
-        #self.writeOnce()
+        self.writeOnce()
 
     def spin(self):
         self.startRead()
-        self.startWrite()
+        #self.startWrite()
         while not rospy.is_shutdown():
             self.spinOnce()
 
