@@ -199,7 +199,6 @@ class POD_COMM:
         self.zoomUnit = 4.3
         self.pyTol = 0.5
         self.zTol = 0.05
-        self.locked = False
         self.lockCnt = 0
 
         self.downSer = serial.Serial(
@@ -437,8 +436,8 @@ class POD_COMM:
         print(f'Yaw {self.podYaw:.2f} -> {self.expectedYaw:.2f}{RESET}')
         print(GREEN if self.fAtTarget else RED, end='')
         print(f'Zoom {self.podF:.1f}({self.podZoomLevel}) -> {self.expectedZoom:.1f}({self.expectedZoomLevel}){RESET}')
-        print(f'Hfov {self.getHfov(self.podF):.2f} -> {self.getHfov(self.expectedZoom):2f}')
-        print(f'LazyTag {self.lazyTag}', (RED + 'Locked' + RESET) if self.locked else (GREEN + 'Unlocked' + RESET) + ' LockCnt: ', self.lockCnt)
+        print(f'Hfov {self.getHfov(self.podF):.2f} -> {self.getHfov(self.expectedZoom):.2f}')
+        print(f'LazyTag {self.lazyTag}', ' LockCnt: ', self.lockCnt)
         # print(f'Yaw deque: {self.podYawDeque}')"
         # if len(self.podYawDeque) > 1:
         #     print(f'Yaw history data: from {self.podYawDeque[0][0].strftime("%H:%M:%S.%f")} to {self.podYawDeque[-1][0].strftime("%H:%M:%S.%f")}')
