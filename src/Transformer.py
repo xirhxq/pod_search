@@ -84,14 +84,70 @@ class TimeBuffer:
 
 
 class Transformer:
-    def __init__(self, logOn=False, debug=False, infBound=False):
-        self.debug = debug
-        self.infBound = infBound
+    def __init__(self, args):
+        self.args = args
+        
+        if self.args.cali:
+            import rospkg
+            pre = rospkg.RosPack().get_path('pod_search')
+            self.caliLog = DataLogger(pre, 'cali.csv')
 
+            variable_info = [
+                ('rosTime', 'double'),
+                ("podYaw", "double"),
+                ("podYawDelayed", "double"),
+                ("podPitch", "double"),
+                ("podPitchDelayed", "double"),
+                ("podHfov", "double"),
+                ("podHfovDelayed", "double"),
+                ("podVfov", "double"),
+                ("podVfovDelayed", "double"),
+                ('pixelX', 'double'),
+                ('pixelY', 'double'),
+                ('cameraYaw', 'double'),
+                ('cameraPitch', 'double'),
+                ('cameraPlusPodYPR[3]', 'list'),
+                ('uavQuat[4]', 'list'),
+                ('uavEuler[3]', 'list'),
+                ('selfPos[3]', 'list'),
+                ('targetPosRel[3]', 'list'),
+                ('targetPosAbs[3]', 'list'),
+                ('targetId', 'int')
+            ]
+            self.caliLog.initialize(variable_info)
+            print(self.caliLog.variable_names) 
+
+        if self.args.log:
+            import rospkg
+            pre = rospkg.RosPack().get_path('pod_search')
+            self.dtlg = DataLogger(pre, "data.csv")
+
+            self.targetsAvailable = 30
+            variable_info = [
+                ("rosTime", "double"),
+                ("podYaw", "double"),
+                ("podYawDelayed", "double"),
+                ("podPitch", "double"),
+                ("podPitchDelayed", "double"),
+                ("podHfov", "double"),
+                ("podHfovDelayed", "double"),
+                ("podVfov", "double"),
+                ("podVfovDelayed", "double"),
+                ('selfPos[3]', 'list')
+            ] 
+            for i in range(self.targetsAvailable):
+                variable_info.append((f'target{i}[3]', "list"))
+                variable_info.append((f'targetCnt{i}', 'int'))
+                variable_info.append((f'targetCheck{i}', 'bool'))
+                variable_info.append((f'targetReal{i}', 'bool'))
+
+            self.dtlg.initialize(variable_info)
+            print(self.dtlg.variable_names)
+        
         self.orderFromSearcher = False
         self.uavQuat = [0, 0, 0, 1]
 
-        self.h = 2
+        self.h = 4
         self.a = self.h / 100 * 3000
         self.selfPos = np.array([-self.h / 2, 0, self.h])
 
@@ -123,36 +179,7 @@ class Transformer:
 
         self.clsfy = Classifier()
 
-        self.logOn = logOn
-        if self.logOn:
-            import rospkg
-            pre = rospkg.RosPack().get_path('pod_search')
-            self.dtlg = DataLogger(pre, "data.csv")
-
         self.startTime = rospy.Time.now().to_sec()
-
-        self.targetsAvailable = 30
-        variable_info = [
-            ("rosTime", "double"),
-            ("podYaw", "double"),
-            ("podYawDelayed", "double"),
-            ("podPitch", "double"),
-            ("podPitchDelayed", "double"),
-            ("podHfov", "double"),
-            ("podHfovDelayed", "double"),
-            ("podVfov", "double"),
-            ("podVfovDelayed", "double"),
-            ('selfPos[3]', 'list')
-        ] 
-        for i in range(self.targetsAvailable):
-            variable_info.append((f'target{i}[3]', "list"))
-            variable_info.append((f'targetCnt{i}', 'int'))
-            variable_info.append((f'targetCheck{i}', 'bool'))
-            variable_info.append((f'targetReal{i}', 'bool'))
-
-        if self.logOn:
-            self.dtlg.initialize(variable_info)
-            print(self.dtlg.variable_names)
 
         self.aimPub = rospy.Publisher(self.uavName + '/' + self.podName + '/aim', Float64MultiArray, queue_size=1)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/aimFail', Int16, self.aimFailCallback, queue_size=1)
@@ -226,18 +253,50 @@ class Transformer:
 
         realTargetAbs = realTargetRel + self.selfPos
         
-        if self.debug:
+        if self.args.debug:
+            yprStr = {'y': f'{BLUE}y{RESET}', 'p': f'{YELLOW}p{RESET}', 'r': f'{RED}r{RESET}'}
+            yprB = (rUAV * rPodYaw * rPodPitch * rCamera).as_euler('zyx', degrees=True)
+            
             print((
-                f'XY: ({pixelX:.2f}, {pixelY:.2f}) '
-                f'cYP: ({cameraYaw:.2f}, {cameraPitch:.2f}) '
-                f'pYP: ({podYaw:.2f}, {podPitch:.2f}) '
+                f'[{podHfov:.2f} / 2 * ({pixelX:.2f}, {pixelY:.2f}) =] '
+                f'({yprStr["y"]}{cameraYaw:.2f}, {yprStr["p"]}{cameraPitch:.2f}) '
+                f'+ ({yprStr["y"]}{podYaw:.2f}, {yprStr["p"]}{podPitch:.2f}) '
+                f'= ({yprStr["y"]}{yprB[0]:.2f}, {yprStr["p"]}{yprB[1]:.2f}, {yprStr["r"]}{yprB[2]:.2f}) '
                 f'Target @ {realTargetAbs[0]:.2f}, {realTargetAbs[1]:.2f}, {realTargetAbs[2]:.2f} '
             ))
+
+            if self.args.cali:
+                self.caliLog.log("rosTime", rospy.Time.now().to_sec() - self.startTime)
+                self.caliLog.log("podYaw", self.podYawBuffer.getMessageNoDelay().data)
+                self.caliLog.log("podYawDelayed", self.podYawBuffer.getMessage(self.podDelay).data)
+                self.caliLog.log("podPitch", self.podPitchBuffer.getMessageNoDelay().data)
+                self.caliLog.log("podPitchDelayed", self.podPitchBuffer.getMessage(self.podDelay).data)
+                hFov = self.podHfovBuffer.getMessageNoDelay().data 
+                hFovDelayed = self.podHfovBuffer.getMessage(self.podDelay).data 
+                self.caliLog.log("podHfov", hFov)
+                self.caliLog.log("podHfovDelayed", hFovDelayed)
+                vFov = degrees(2 * np.arctan(np.tan(radians(hFov) / 2) * 9 / 16))
+                vFovDelayed = degrees(2 * np.arctan(np.tan(radians(hFovDelayed) / 2) * 9 / 16))
+                self.caliLog.log('podVfov', vFov)
+                self.caliLog.log('podVfovDelayed', vFovDelayed)
+                self.caliLog.log('pixelX', pixelX)
+                self.caliLog.log('pixelY', pixelY)
+                self.caliLog.log('cameraYaw', cameraYaw)
+                self.caliLog.log('cameraPitch', cameraPitch)
+                self.caliLog.log('cameraPlusPodYPR', list(yprB))
+                self.caliLog.log('uavQuat', list(self.uavQuat))
+                self.caliLog.log('uavEuler', list(rUAV.as_euler('zyx', degrees=True)))
+                self.caliLog.log('selfPos', list(self.selfPos))
+                self.caliLog.log('targetPosRel', list(realTargetRel))
+                self.caliLog.log('targetPosAbs', list(realTargetAbs))
+                self.caliLog.log('targetId', category)
+                self.caliLog.newline()
+                
         
         return realTargetAbs
 
     def transform(self, pixelX, pixelY, category, score):
-        if not self.orderFromSearcher and not self.debug:
+        if not self.orderFromSearcher and not self.args.debug:
             return
         realTargetAbs = self.calTarget(pixelX, pixelY, category)
         
@@ -268,7 +327,7 @@ class Transformer:
         return podPitch, podYaw
 
     def outOfBound(self, x, y, z):
-        if self.infBound:
+        if self.args.infBound:
             return False
         if x < 0 or x > self.a:
             return True
@@ -323,7 +382,7 @@ class Transformer:
             print(f'RelImu: {R.from_quat(self.uavQuat).as_euler("zyx", degrees=True)}')
 
 
-            if self.logOn and not self.podYawBuffer.empty and not self.podPitchBuffer.empty:
+            if self.args.log and not self.podYawBuffer.empty and not self.podPitchBuffer.empty:
                 self.log()
 
             t = self.clsfy.targets
@@ -364,10 +423,11 @@ if __name__ == '__main__':
     parser.add_argument('--log', help='turn on log or not', action="store_true")
     parser.add_argument('--debug', help='debug or not', action='store_true')
     parser.add_argument('--infBound', help='infinite bound', action='store_true')
+    parser.add_argument('--cali', help='calibration', action='store_true')
     args, unknown = parser.parse_known_args()
-
+    
     rospy.init_node('Transformer', anonymous=True)
-    t = Transformer(logOn=args.log, debug=args.debug, infBound=args.infBound)
+    t = Transformer(args)
     time.sleep(1)
 
     t.spin()
