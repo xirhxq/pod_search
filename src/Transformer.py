@@ -37,19 +37,29 @@ class TimeBuffer:
     def __init__(self, name='Buffer'):
         self.buffer = deque()
         self.name = name
+        self.maxAge = 0.4
+
+        self.preT = None
+        self.preMsg = None
 
     @property
     def empty(self):
         return not self.buffer
 
-    def addMessage(self, msg, maxAge=0.8):
+    def addMessage(self, msg):
         time = rospy.Time.now()
         self.buffer.append((time, msg))
 
-        oldestTime = time - rospy.Duration.from_sec(maxAge)
+        # oldestTime = time - rospy.Duration.from_sec(self.maxAge)
 
-        while self.buffer and self.buffer[0][0] < oldestTime:
-            self.buffer.popleft()
+        # while self.buffer and self.buffer[0][0] < oldestTime:
+        #     self.buffer.popleft()
+
+    def getData(self, x):
+        if hasattr(x, 'data'):
+            return x.data
+        else:
+            return x
 
     def getMessage(self, time):
         if not self.buffer:
@@ -57,18 +67,27 @@ class TimeBuffer:
 
         currentTime = rospy.Time.now()
         targetTime = currentTime - rospy.Duration.from_sec(time)
+        
+        while self.buffer and self.buffer[0][0] < targetTime:
+            self.preT = self.buffer[0][0]
+            self.preMsg = self.buffer[0][1]
+            self.buffer.popleft()
+
+        if self.preT == None or self.preMsg == None:
+            return None
+
+        if not (self.preT <= targetTime <= self.buffer[0][0]):
+            raise AssertionError(f'Buffer not right {self.preT.to_sec():.3f} -- {targetTime.to_sec():3f} -- {self.buffer[0][0]:.3f}')
+
+        t1 = self.preT.to_sec()
+        t2 = self.buffer[0][0].to_sec()
+        val1 = self.getData(self.preMsg)
+        val2 = self.getData(self.buffer[0][1])
+
+        ret = Float32(data=val1 + (val2 - val1) * (targetTime.to_sec() - t1) / (t2 - t1))
+        return ret
 
         return self.buffer[0][1]
-        closestTimeDiff = float('inf')
-        closestMsg = None
-
-        for b in self.buffer:
-            timeDiff = abs((b[0] - targetTime).to_sec())
-            if timeDiff < closestTimeDiff:
-                closestTimeDiff = timeDiff
-                closestMsg = b[1]
-
-        return closestMsg
 
     def getMessageNoDelay(self):
         if not self.buffer:
@@ -258,7 +277,7 @@ class Transformer:
             yprB = (rUAV * rPodYaw * rPodPitch * rCamera).as_euler('zyx', degrees=True)
             
             print((
-                f'[{podHfov:.2f} / 2 * ({pixelX:.2f}, {pixelY:.2f}) =] '
+                f'({pixelX:.2f}, {pixelY:.2f}) '
                 f'({yprStr["y"]}{cameraYaw:.2f}, {yprStr["p"]}{cameraPitch:.2f}) '
                 f'+ ({yprStr["y"]}{podYaw:.2f}, {yprStr["p"]}{podPitch:.2f}) '
                 f'= ({yprStr["y"]}{yprB[0]:.2f}, {yprStr["p"]}{yprB[1]:.2f}, {yprStr["r"]}{yprB[2]:.2f}) '
