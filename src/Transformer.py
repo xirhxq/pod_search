@@ -66,7 +66,7 @@ class TimeBuffer:
             return None
 
         currentTime = rospy.Time.now()
-        targetTime = currentTime - rospy.Duration.from_sec(time)
+        targetTime = currentTime - rospy.Duration.from_sec(self.maxAge)
         
         while self.buffer and self.buffer[0][0] < targetTime:
             self.preT = self.buffer[0][0]
