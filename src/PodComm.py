@@ -68,7 +68,7 @@ signal(SIGINT, signal_handler)
 SECRET_DICT = {
     0: 100, 1: 140, 2: 160, 3: 180, 5: 220, 7: 250, 10: 290, 20: 355
 }
-SECRET_PITCH_OFFSET = 2.2
+SECRET_PITCH_OFFSET = 3.2
 SECRET_YAW_OFFSET = -5.3
 
 def secretInterp(x, data=SECRET_DICT):
