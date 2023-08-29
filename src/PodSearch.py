@@ -4,7 +4,6 @@ import argparse
 from os import system
 from signal import signal, SIGINT
 
-import pyfiglet
 import rospy
 from std_msgs.msg import Float32, Bool, Int16, Float64MultiArray, Empty, Int8
 
@@ -360,7 +359,6 @@ class PodSearch:
             print('-' * 20)
             print(f'### PodSearch ###')
             print(f'Me @ State #{self.state} sUAV @ State #{self.uavState}')
-            #print(pyfiglet.figlet_format('PodSearch', font='slant'))
             print(
                 f'Time {self.taskTime:.1f}',
                 f'State: {self.state}',
