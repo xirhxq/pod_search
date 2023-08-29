@@ -9,7 +9,6 @@ from struct import pack, unpack
 from sys import exit
 from time import time, sleep
 
-import pyfiglet
 import rospy
 import serial
 from std_msgs.msg import Float32, Bool
@@ -33,7 +32,7 @@ READING_DATA = 3
 
 from glob import glob
 
-PORT = path.join('/dev', readlink(glob('/dev/serial/by-path/*usb-0:2.4:1.0*')[0]).split('/')[-1])
+PORT = path.join('/dev', readlink(glob('/dev/serial/by-path/*2.4.4*')[0]).split('/')[-1])
 
 def open_serial_port():
     try:
@@ -429,7 +428,6 @@ class POD_COMM:
         system('clear')
         print('-' * 20)
         print('### PodComm ###')
-        # print(pyfiglet.figlet_format('PodComm', font='slant'))
         print(f'Pod state: {self.podState0} {self.podState1} Camera state: {self.podCameraState}')
         print(GREEN if self.pAtTarget else RED, end='')
         print(f'Pitch {self.podPitch:.2f} -> {self.expectedPitch:.2f}{RESET}')
