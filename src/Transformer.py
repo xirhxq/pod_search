@@ -230,7 +230,7 @@ class Transformer:
         self.podHfovBuffer.addMessage(msg)
 
     def hCallback(self, msg):
-        self.selfPos[2] = msg.vector.y - 0.00
+        self.selfPos[2] = msg.vector.y - 0.02
 
     def targetsCallback(self, msg):
         # tic = rospy.Time.now().to_sec()
