@@ -242,7 +242,7 @@ class PodSearch:
             self.toStepSearch()
 
     def stepSearch(self):
-        print(f'{GREEN}==> StepSearch @ {self.traCnt} <=={RESET}')
+        print(f'{GREEN}==> StepSearch @ #{self.traCnt + 1}/{len(self.tra) + 1} <=={RESET}')
         self.expectedPitch = self.tra[self.traCnt][0]
         self.expectedYaw = self.tra[self.traCnt][1]
         self.expectedHfov = self.tra[self.traCnt][2]
