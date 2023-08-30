@@ -7,7 +7,16 @@ import numpy as np
 
 
 class AutoTra:
-    def __init__(self, h=100, a=None, overlapOn=True, pitchLevelOn=True, drawNum=-1, pos2d=None, hfovPitchRatio=1):
+    def __init__(self,
+                 h=100,
+                 a=None,
+                 overlapOn=True,
+                 pitchLevelOn=True,
+                 drawNum=-1,
+                 pos2d=None,
+                 hfovPitchRatio=1,
+                 b=None
+        ):
         self.h = h
         if a is not None:
             self.a = a
@@ -17,11 +26,16 @@ class AutoTra:
             self.pos2d = np.array([-self.h / 2, 0])
         else:
             self.pos2d = np.array(pos2d)
+        if b is not None:
+            self.b = b
+        else:
+            self.b = self.a / 2
+
         self.ratio = 16 / 9
         self.SENSOR_WIDTH = tan(radians(2.3) / 2) * 2 * 129
         self.hfovPitchRatio = hfovPitchRatio
 
-        print(f'a: {self.a:.2f} pos: {self.pos2d} h: {self.h:.2f}')
+        print(f'a: {self.a:.2f} b:  {self.b:.2f} pos: {self.pos2d} h: {self.h:.2f}')
 
         self.cmap = plt.get_cmap('tab10')
 
@@ -58,7 +72,7 @@ class AutoTra:
         self.pRange = [90, 0]
         if self.pos2d[0] < 0:
             self.pRange[0] = degrees(atan(self.h / (-self.pos2d[0])))
-            self.pRange[1] = degrees(atan(self.h / sqrt((self.a - self.pos2d[0]) ** 2 + (self.a / 2) ** 2)))
+            self.pRange[1] = degrees(atan(self.h / sqrt((self.a - self.pos2d[0]) ** 2 + self.b ** 2)))
 
         # self.pRange[0] = 50
 
@@ -149,7 +163,7 @@ class AutoTra:
         smallerPitch = pitch - vFov / 2
         rWithSmallerPitch = self.getRFromPitch(smallerPitch)
 
-        rToCorner = sqrt(self.pos2d[0] ** 2 + (self.a / 2) ** 2)
+        rToCorner = sqrt(self.pos2d[0] ** 2 + self.b ** 2)
 
         r = rToCorner
         if rWithBiggerPitch < rWithSmallerPitch <= rToCorner:
@@ -158,9 +172,9 @@ class AutoTra:
             r = rWithBiggerPitch
 
         mostFar = np.array([0, sqrt(r ** 2 - self.pos2d[0] ** 2)])
-        if mostFar[1] > self.a / 2:
-            mostFar[0] = sqrt(r ** 2 - (self.a / 2) ** 2)
-            mostFar[1] = self.a / 2
+        if mostFar[1] > self.b:
+            mostFar[0] = sqrt(r ** 2 - self.b ** 2) + self.pos2d[0]
+            mostFar[1] = self.b
 
         rel = mostFar - self.pos2d
         if rel[0] == 0:
@@ -267,13 +281,13 @@ class AutoTra:
         self.ax = self.fig.add_subplot(111)
         self.ax.set_aspect('equal')
         self.ax.set_xlim(self.inflateInterval([0, self.a], ratio=0.3))
-        self.ax.set_ylim(self.inflateInterval([-self.a / 2, self.a / 2], ratio=0.3))
+        self.ax.set_ylim(self.inflateInterval([-self.b, self.b], ratio=0.3))
 
         self.ax.add_patch(
             patches.Rectangle(
-                (0, -self.a / 2),
+                (0, -self.b),
                 self.a,
-                self.a,
+                self.b * 2,
                 facecolor='gray',
                 alpha=0.5,
                 edgecolor='black'
@@ -293,5 +307,25 @@ class AutoTra:
 
 
 if __name__ == '__main__':
-    autoTra = AutoTra(h=0.6, a=10, pitchLevelOn=True, overlapOn=True, drawNum=-1, hfovPitchRatio=1.5)
+    def getVal(str=''):
+        str = input(f'Input {str}: ')
+        if str == '':
+            return None
+        else:
+            return float(str)
+    h = getVal('h')
+    a = getVal('a')
+    b = getVal('b')
+    x = getVal('x')
+    pos2d = [float(x), 0] if x is not None else None
+    autoTra = AutoTra(
+        h=h,
+        a=a,
+        pitchLevelOn=True,
+        overlapOn=True,
+        drawNum=-1,
+        hfovPitchRatio=1.2,
+        pos2d=pos2d,
+        b=b
+    )
     autoTra.draw()
