@@ -212,8 +212,8 @@ class Transformer:
         self.orderFromSearcher = msg.data
 
     def posCallback(self, msg):
-        self.selfPos[0] = msg.pose.pose.position.x + 0.3
-        self.selfPos[1] = msg.pose.pose.position.y - 0.2
+        self.selfPos[0] = msg.pose.pose.position.x + 0.6
+        self.selfPos[1] = msg.pose.pose.position.y - 0.3
 
     def imuCallback(self, msg):
         orientation = msg.orientation
@@ -230,7 +230,7 @@ class Transformer:
         self.podHfovBuffer.addMessage(msg)
 
     def hCallback(self, msg):
-        self.selfPos[2] = msg.vector.y - 0.05
+        self.selfPos[2] = msg.vector.y - 0.00
 
     def targetsCallback(self, msg):
         # tic = rospy.Time.now().to_sec()
@@ -318,7 +318,6 @@ class Transformer:
         if not self.orderFromSearcher and not self.args.debug:
             return
         realTargetAbs = self.calTarget(pixelX, pixelY, category)
-        
         if realTargetAbs is None:
             return
 
