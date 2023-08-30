@@ -7,33 +7,29 @@ import numpy as np
 
 
 class AutoTra:
+    def getVal(self, str='', default=None):
+        str = input(f'Input {str} (Default: {default}): ')
+        if str == '':
+            return default
+        else:
+            return float(str)
+
     def __init__(self,
-                 h=100,
-                 a=None,
                  overlapOn=True,
                  pitchLevelOn=True,
-                 drawNum=-1,
-                 pos2d=None,
-                 hfovPitchRatio=1,
-                 b=None
+                 drawNum=-1
         ):
-        self.h = h
-        if a is not None:
-            self.a = a
-        else:
-            self.a = 3000 * self.h / 100
-        if pos2d is None:
-            self.pos2d = np.array([-self.h / 2, 0])
-        else:
-            self.pos2d = np.array(pos2d)
-        if b is not None:
-            self.b = b
-        else:
-            self.b = self.a / 2
+        self.h = self.getVal(str='h', default=100)
+        self.a = self.getVal(str='a', default=3000)
+        self.b = self.getVal(str='b', default=1500)
+        x = self.getVal(str='x', default=-self.h)
+        self.hfovPitchRatio = self.getVal(str='hfov/pitch', default=1.2)
+        self.theTime = self.getVal(str='THE Time', default=4)
+
+        self.pos2d = np.array([x, 0])
 
         self.ratio = 16 / 9
         self.SENSOR_WIDTH = tan(radians(2.3) / 2) * 2 * 129
-        self.hfovPitchRatio = hfovPitchRatio
 
         print(f'a: {self.a:.2f} b:  {self.b:.2f} pos: {self.pos2d} h: {self.h:.2f}')
 
@@ -100,20 +96,24 @@ class AutoTra:
         print('-' * 30)
 
         self.theList = []
+        self.expectedTime = 0
 
         for ind, podP in enumerate(self.pitches):
             hfov = self.getHFovFromPitch(podP)
             yRange = self.getYawRangeFromPitch(podP)[1] - self.getHFovFromPitch(podP) / 2
             if ind % 2 == 0:
                 yRange = -yRange
-            print(f'[{90 - podP:.6f}, {yRange:.2f}, {hfov:.2f}, 20], [{90 - podP:.6f}, {-yRange:.2f}, {hfov:.2f}, {hfov/3:.2f}]')
+            print(f'[{90 - podP:.6f}, {yRange:.2f}, {hfov:.2f}, 20], [{90 - podP:.6f}, {-yRange:.2f}, {hfov:.2f}, {hfov/self.theTime:.2f}]')
             self.theList.append([90 - podP, yRange, hfov, 20])
-            self.theList.append([90 - podP, -yRange, hfov, hfov / 4])
+            self.theList.append([90 - podP, -yRange, hfov, hfov / self.theTime])
+            self.expectedTime += abs(yRange) * 2 / hfov * 4
+            print(f'After this round time is {self.expectedTime:.2f}')
 
         self.theList.append([90, 0, 60, 20])
         print('### The List ###')
         print(self.theList)
         print('################')
+        print(f'Expected Total Time: {self.expectedTime:.2f}')
 
     def getRFromPitch(self, pitch):
         pitchCliped = min(self.pRange[0], max(self.pRange[1], pitch))
@@ -307,25 +307,9 @@ class AutoTra:
 
 
 if __name__ == '__main__':
-    def getVal(str=''):
-        str = input(f'Input {str}: ')
-        if str == '':
-            return None
-        else:
-            return float(str)
-    h = getVal('h')
-    a = getVal('a')
-    b = getVal('b')
-    x = getVal('x')
-    pos2d = [float(x), 0] if x is not None else None
     autoTra = AutoTra(
-        h=h,
-        a=a,
         pitchLevelOn=True,
         overlapOn=True,
-        drawNum=-1,
-        hfovPitchRatio=1.2,
-        pos2d=pos2d,
-        b=b
+        drawNum=-1
     )
-    autoTra.draw()
+    # autoTra.draw()
