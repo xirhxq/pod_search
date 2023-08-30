@@ -83,10 +83,7 @@ class PodSearch:
         #    [87, -60, 20, 20], [87, 60, 20, 4]
         #]
 
-        h = float(input('Input the search h: '))
-        a = float(input('Input the length a: '))
-
-        self.autoTra = AutoTra(h=h, a=a, pitchLevelOn=True, overlapOn=True, drawNum=-1, hfovPitchRatio=1.2)
+        self.autoTra = AutoTra(pitchLevelOn=True, overlapOn=True, drawNum=-1)
 
         self.tra = self.autoTra.theList
 

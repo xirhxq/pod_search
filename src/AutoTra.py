@@ -312,4 +312,4 @@ if __name__ == '__main__':
         overlapOn=True,
         drawNum=-1
     )
-    # autoTra.draw()
+    autoTra.draw()
