@@ -235,7 +235,7 @@ class Transformer:
     def targetsCallback(self, msg):
         # tic = rospy.Time.now().to_sec()
         for target in msg.targets:
-            if target.category == 'car' and target.category_id != 100:
+            if target.category_id != 100:
                 self.transform(target.cx, target.cy, target.category_id, target.score)
         # toc = rospy.Time.now().to_sec()
         # print(f'Callback time {toc - tic}')
