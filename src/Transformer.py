@@ -166,7 +166,7 @@ class Transformer:
         self.orderFromSearcher = False
         self.uavQuat = [0, 0, 0, 1]
 
-        self.h = 45
+        self.h = 10.6
         self.a = self.h / 100 * 3000
         self.selfPos = np.array([0, 0, self.h])
 
@@ -181,7 +181,7 @@ class Transformer:
         self.uwbName = 'uwb'
         self.heightSensorName = 'height_sensor'
 
-        rospy.Subscriber(self.uavName + '/' + self.osdkName + '/imuRel/noData', Imu, self.imuCallback)
+        rospy.Subscriber(self.uavName + '/' + self.osdkName + '/imu', Imu, self.imuCallback)
         rospy.Subscriber(self.uavName + '/' + self.uwbName + '/filter/odom', Odometry, self.posCallback)
         rospy.Subscriber(self.uavName + '/' + self.heightSensorName + '/data/noData', Vector3Stamped, self.hCallback)
 
@@ -203,6 +203,8 @@ class Transformer:
         self.aimPub = rospy.Publisher(self.uavName + '/' + self.podName + '/aim', Float64MultiArray, queue_size=1)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/aimFail', Int16, self.aimFailCallback, queue_size=1)
         self.streamPub = rospy.Publisher(self.uavName + '/' + self.podName + '/stream', Float64MultiArray, queue_size=1) 
+
+        self.trackPub = rospy.Publisher(self.uavName + '/' + self.podName + '/track', Float64MultiArray, queue_size=1)
 
     def aimFailCallback(self, msg):
         self.clsfy.targetsCheck[msg.data] = True
@@ -273,6 +275,9 @@ class Transformer:
 
         realTargetAbs = realTargetRel + self.selfPos
         
+        self.trackPub.publish(Float64MultiArray(data=[90 - cameraPitch - podPitch, cameraYaw + podYaw, podHfov, 2]))
+
+
         if self.args.debug:
             yprStr = {'y': f'{BLUE}y{RESET}', 'p': f'{YELLOW}p{RESET}', 'r': f'{RED}r{RESET}'}
             yprB = (rUAV * rPodYaw * rPodPitch * rCamera).as_euler('zyx', degrees=True)

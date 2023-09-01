@@ -26,6 +26,7 @@ class State:
     AIM = 3
     STREAM = 4
     END = 5
+    TRACK = 6
 
 class PodSearch:
     def __init__(self):
@@ -166,7 +167,10 @@ class PodSearch:
         self.searchStatePub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/searchState', Int8, queue_size=1)
         self.uavState = 0
         rospy.Subscriber(self.uavName + '/uavState', Int8, lambda msg: setattr(self, 'uavState', msg.data))
-
+        
+        self.trackData = []
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/track', Float64MultiArray, lambda msg: setattr(self, 'trackData', msg.data))
+        
     def aimCallback(self, msg):
         if msg.data[0] > 0:
             self.aimOn = True
@@ -204,6 +208,7 @@ class PodSearch:
     def toStepSearch(self):
         self.state = State.SEARCH
 
+
     def toStepAim(self):
         self.state = State.AIM
         self.thisAimIndex = self.aimIndex
@@ -226,6 +231,9 @@ class PodSearch:
             print(f'{RED}No targets to stream{RESET}')
             self.toStepEnd()
         self.streamStartTime = self.getTimeNow()
+
+    def toStepTrack(self):
+        self.state = State.TRACK
 
     def stepInit(self):
         self.expectedPitch = self.tra[0][0]
@@ -252,6 +260,8 @@ class PodSearch:
             self.toStepStream()
         # if self.aimOn:
         #     self.toStepAim()
+        if len(self.trackData) > 0:
+            self.toStepTrack()
 
     def stepAim(self):
         aimTime = self.getTimeNow() - self.thisAimStartTime
@@ -322,6 +332,16 @@ class PodSearch:
         if self.browseCnt == len(self.browseTra):
             self.toStepEnd()
 
+    def stepTrack(self):
+        print('Step Track')
+        if len(self.trackData) != 4:
+            return
+        self.expectedPitch = self.trackData[0]
+        self.expectedYaw = self.trackData[1]
+        self.expectedHfov = self.trackData[2]
+        self.maxRate = self.trackData[3]
+        self.pubPYZMaxRate()
+
     def pubPYZMaxRate(self):
         if self.expectedYaw < -90 or self.expectedYaw > 90:
             self.expectedYaw += 180
@@ -346,6 +366,8 @@ class PodSearch:
             self.stepBrowse()
         elif self.state == State.STREAM:
             self.stepStream()
+        elif self.state == State.TRACK:
+            self.stepTrack()
         else:
             print("Invalid state")
 
@@ -376,6 +398,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--takeoff', help='takeoff', action="store_true")
     parser.add_argument('--test', help='on ground test', action='store_true')
+    parser.add_argument('--track', help='track mode', action='store_true')
     args, unknown = parser.parse_known_args()
     
     podSearch = PodSearch()
@@ -391,5 +414,7 @@ if __name__ == '__main__':
         print('Set uavReady to True')
     elif args.takeoff:
         print('WILL TAKE OFF!!!')
+    if args.track:
+        podSearch.state = State.TRACK
+        print('<<<TRACK MODE>>>')
     podSearch.spin()
-
