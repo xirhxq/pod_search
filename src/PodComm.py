@@ -32,7 +32,8 @@ READING_DATA = 3
 
 from glob import glob
 
-PORT = path.join('/dev', readlink(glob('/dev/serial/by-path/*2.4.4*')[0]).split('/')[-1])
+#PORT = path.join('/dev', readlink(glob('/dev/serial/by-path/*2.4.4*')[0]).split('/')[-1])
+PORT = '/dev/ttyUSB0'
 
 def open_serial_port():
     try:
