@@ -166,9 +166,9 @@ class Transformer:
         self.orderFromSearcher = False
         self.uavQuat = [0, 0, 0, 1]
 
-        self.h = 4
+        self.h = 45
         self.a = self.h / 100 * 3000
-        self.selfPos = np.array([-self.h / 2, 0, self.h])
+        self.selfPos = np.array([0, 0, self.h])
 
         self.podPitchBuffer = TimeBuffer('Pod Pitch Buffer')
         self.podYawBuffer = TimeBuffer('Pod Yaw Buffer')
@@ -183,7 +183,7 @@ class Transformer:
 
         rospy.Subscriber(self.uavName + '/' + self.osdkName + '/imuRel/noData', Imu, self.imuCallback)
         rospy.Subscriber(self.uavName + '/' + self.uwbName + '/filter/odom', Odometry, self.posCallback)
-        rospy.Subscriber(self.uavName + '/' + self.heightSensorName + '/data', Vector3Stamped, self.hCallback)
+        rospy.Subscriber(self.uavName + '/' + self.heightSensorName + '/data/noData', Vector3Stamped, self.hCallback)
 
         rospy.Subscriber(self.uavName + '/' + self.podName + '/pitch', Float32, self.pitchCallback)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/yaw', Float32, self.yawCallback)
@@ -212,8 +212,9 @@ class Transformer:
         self.orderFromSearcher = msg.data
 
     def posCallback(self, msg):
-        self.selfPos[0] = msg.pose.pose.position.x + 0.6
-        self.selfPos[1] = msg.pose.pose.position.y - 0.3
+        # self.selfPos[0] = msg.pose.pose.position.x + 0.6
+        # self.selfPos[1] = msg.pose.pose.position.y - 0.3
+        self.selfPos[2] = msg.pose.pose.position.z
 
     def imuCallback(self, msg):
         orientation = msg.orientation
