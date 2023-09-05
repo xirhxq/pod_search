@@ -206,6 +206,11 @@ class Transformer:
 
         self.trackPub = rospy.Publisher(self.uavName + '/' + self.podName + '/track', Float64MultiArray, queue_size=1)
 
+        self.yawB2GB = 0
+        self.pitchB2GB = 0
+        self.rollB2GB = 0
+        self.rB2GB = R.from_euler('zyx', [self.yawB2GB, self.pitchB2GB, self.rollB2GB], degrees=True)
+
     def aimFailCallback(self, msg):
         self.clsfy.targetsCheck[msg.data] = True
         self.clsfy.targetsReal[msg.data] = False
@@ -247,7 +252,6 @@ class Transformer:
         timeDiff = self.podDelay
         try:
             podHfov = self.podHfovBuffer.getMessage(timeDiff).data
-            podVfov = degrees(2 * np.arctan(np.tan(radians(podHfov) / 2) * 9 / 16))
             podYaw = self.podYawBuffer.getMessage(timeDiff).data
             podPitch = self.podPitchBuffer.getMessage(timeDiff).data
         except Exception as e:
@@ -256,38 +260,37 @@ class Transformer:
 
         pixelX = (pixelX - 0.5) * 2
         pixelY = (pixelY - 0.5) * 2
-        cameraYaw = pixelX * podHfov / 2
-        cameraPitch = pixelY * podVfov / 2
-        rCameraYaw = R.from_euler('z', -cameraYaw, degrees=True)
-        rCameraPitch = R.from_euler('y', cameraPitch, degrees=True)
-        rCamera = rCameraPitch * rCameraYaw
+        cameraAzimuth = -np.degrees(np.arctan(np.tan(np.radians(podHfov) / 2) * pixelX))
+        podVfov = -np.degrees(2 * np.arctan(np.tan(np.radians(podHfov) / 2) * 9 / 16))
+        cameraElevation = np.degrees(np.arctan(np.tan(np.radians(podVfov) / 2) * pixelY))
+        base = np.sqrt(1 + np.tan(np.radians(cameraElevation)) ** 2 + np.tan(np.radians(cameraAzimuth)) ** 2)
+        targetC = np.array([
+            1 / base,
+            np.tan(np.radians(cameraAzimuth)) / base,
+            np.tan(np.radians(cameraElevation)) / base
+        ])
         rPodYaw = R.from_euler('z', -podYaw, degrees=True)
         rPodPitch = R.from_euler('y', podPitch, degrees=True)
-
-        rUAV = R.from_quat(self.uavQuat)
-
-        imgTarget = [1000, 0, 0]
-        imgTargetRel = (rUAV * rPodYaw * rPodPitch * rCamera).apply(imgTarget)
-        # print(f'imgTarget: {imgTargetRel}')
-
-        realTargetRel = imgTargetRel * self.selfPos[2] / (-imgTargetRel[2])
-        # print(f'realTargetRel: {realTargetRel}')
-
-        realTargetAbs = realTargetRel + self.selfPos
+        rGB2P = rPodYaw * rPodPitch
+        rI2B = R.from_quat(self.uavQuat)
+        rI2C = rI2B * self.rB2GB * rGB2P
+        imgTargetRelI = rI2C.apply(targetC)
+        realTargetRelI = imgTargetRelI / imgTargetRelI[2] * (-self.selfPos[2])
+        realTargetAbsI = realTargetRelI + np.array(self.selfPos)
         
-        self.trackPub.publish(Float64MultiArray(data=[90 - cameraPitch - podPitch, cameraYaw + podYaw, podHfov, 2]))
+        self.trackPub.publish(Float64MultiArray(data=[90 - cameraElevation - podPitch, cameraAzimuth + podYaw, podHfov, 2]))
 
 
         if self.args.debug:
             yprStr = {'y': f'{BLUE}y{RESET}', 'p': f'{YELLOW}p{RESET}', 'r': f'{RED}r{RESET}'}
-            yprB = (rUAV * rPodYaw * rPodPitch * rCamera).as_euler('zyx', degrees=True)
+            yprB = rI2C.as_euler('zyx', degrees=True)
             
             print((
                 f'({pixelX:.2f}, {pixelY:.2f}) '
-                f'({yprStr["y"]}{cameraYaw:.2f}, {yprStr["p"]}{cameraPitch:.2f}) '
+                f'({yprStr["y"]}{cameraAzimuth:.2f}, {yprStr["p"]}{cameraElevation:.2f}) '
                 f'+ ({yprStr["y"]}{podYaw:.2f}, {yprStr["p"]}{podPitch:.2f}) '
                 f'= ({yprStr["y"]}{yprB[0]:.2f}, {yprStr["p"]}{yprB[1]:.2f}, {yprStr["r"]}{yprB[2]:.2f}) '
-                f'Target @ {realTargetAbs[0]:.2f}, {realTargetAbs[1]:.2f}, {realTargetAbs[2]:.2f} '
+                f'Target @ {realTargetAbsI[0]:.2f}, {realTargetAbsI[1]:.2f}, {realTargetAbsI[2]:.2f} '
             ))
 
             if self.args.cali:
@@ -306,19 +309,18 @@ class Transformer:
                 self.caliLog.log('podVfovDelayed', vFovDelayed)
                 self.caliLog.log('pixelX', pixelX)
                 self.caliLog.log('pixelY', pixelY)
-                self.caliLog.log('cameraYaw', cameraYaw)
-                self.caliLog.log('cameraPitch', cameraPitch)
+                self.caliLog.log('cameraYaw', cameraAzimuth)
+                self.caliLog.log('cameraPitch', cameraElevation)
                 self.caliLog.log('cameraPlusPodYPR', list(yprB))
                 self.caliLog.log('uavQuat', list(self.uavQuat))
-                self.caliLog.log('uavEuler', list(rUAV.as_euler('zyx', degrees=True)))
+                self.caliLog.log('uavEuler', list(rI2C.as_euler('zyx', degrees=True)))
                 self.caliLog.log('selfPos', list(self.selfPos))
-                self.caliLog.log('targetPosRel', list(realTargetRel))
-                self.caliLog.log('targetPosAbs', list(realTargetAbs))
+                self.caliLog.log('targetPosRel', list(realTargetRelI))
+                self.caliLog.log('targetPosAbs', list(realTargetAbsI))
                 self.caliLog.log('targetId', category)
                 self.caliLog.newline()
-                
         
-        return realTargetAbs
+        return realTargetAbsI
 
     def transform(self, pixelX, pixelY, category, score):
         if not self.orderFromSearcher and not self.args.debug:
@@ -340,7 +342,7 @@ class Transformer:
         rUAV = R.from_quat(self.uavQuat)
         rUAVInv = rUAV.inv()
         posRel = pos - self.selfPos
-        targetBody = rUAVInv.apply(posRel)
+        targetBody = (self.rB2GB.inv() * rUAVInv).apply(posRel)
 
         podPitch = np.arctan2(-targetBody[2], np.sqrt(targetBody[0] ** 2 + targetBody[1] ** 2))
         podYaw = -np.arctan2(targetBody[1], targetBody[0])
