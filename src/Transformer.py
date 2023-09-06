@@ -208,10 +208,12 @@ class Transformer:
             self.yawB2GB = 0
             self.pitchB2GB = 0
             self.rollB2GB = 0
+            print(f'{RED}No rB2GB{RESET}')
         else:
-            self.yawB2GB = -1.10712152
-            self.pitchB2GB = -0.30210842
-            self.rollB2GB = -0.78357797
+            self.yawB2GB = -0.31312872
+            self.pitchB2GB = -0.80392953
+            self.rollB2GB = -0.08510879
+            print(f'{GREEN}With rB2GB on{RESET}')
         self.rB2GB = R.from_euler('zyx', [self.yawB2GB, self.pitchB2GB, self.rollB2GB], degrees=True)
 
     def aimFailCallback(self, msg):
