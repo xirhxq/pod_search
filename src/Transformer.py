@@ -166,7 +166,7 @@ class Transformer:
         self.orderFromSearcher = False
         self.uavQuat = [0, 0, 0, 1]
 
-        self.h = 10.6
+        self.h = 0.658
         self.a = self.h / 100 * 3000
         self.selfPos = np.array([-2, 0, self.h])
 
@@ -232,7 +232,7 @@ class Transformer:
         self.uavQuat = [orientation.x, orientation.y, orientation.z, orientation.w]
 
     def pitchCallback(self, msg):
-        msg.data = 90 - msg.data
+        msg.data = msg.data
         self.podPitchBuffer.addMessage(msg)
 
     def yawCallback(self, msg):
@@ -264,39 +264,36 @@ class Transformer:
 
         pixelX = (pixelX - 0.5) * 2
         pixelY = (pixelY - 0.5) * 2
-        cameraAzimuth = np.degrees(np.arctan(np.tan(np.radians(podHfov) / 2) * pixelX))
+        cameraAzimuth = -np.degrees(np.arctan(np.tan(np.radians(podHfov) / 2) * pixelX))
         podVfov = np.degrees(2 * np.arctan(np.tan(np.radians(podHfov) / 2) * 9 / 16))
-        cameraElevation = -np.degrees(np.arctan(np.tan(np.radians(podVfov) / 2) * pixelY))
+        cameraElevation = np.degrees(np.arctan(np.tan(np.radians(podVfov) / 2) * pixelY))
         base = np.sqrt(1 + np.tan(np.radians(cameraElevation)) ** 2 + np.tan(np.radians(cameraAzimuth)) ** 2)
-        rP2T = R.from_matrix(np.array([
-            [1 / base,
+        imgTargetP = np.array([
+            1 / base,
             np.tan(np.radians(cameraAzimuth)) / base,
-            np.tan(np.radians(cameraElevation)) / base],
-            [0, 0, 0], [0, 0, 0]
-        ]))
-        rPodYaw = R.from_euler('z', -podYaw, degrees=True)
+            np.tan(np.radians(cameraElevation)) / base
+        ])
+        rPodYaw = R.from_euler('z', podYaw, degrees=True)
         rPodPitch = R.from_euler('y', podPitch, degrees=True)
         rGB2P = rPodYaw * rPodPitch
         rI2B = R.from_quat(self.uavQuat)
-        rI2T = rI2B * self.rB2GB * rGB2P * rP2T
-        imgTargetT = np.array([10000, 0, 0])
-        imgTargetRelI = rI2T.apply(imgTargetT)
+        rI2P = rI2B * self.rB2GB * rGB2P
+        imgTargetRelI = rI2P.apply(imgTargetP)
         realTargetRelI = imgTargetRelI / imgTargetRelI[2] * (-self.selfPos[2])
         realTargetAbsI = realTargetRelI + np.array(self.selfPos)
         
-        self.trackPub.publish(Float64MultiArray(data=[90 - cameraElevation - podPitch, cameraAzimuth + podYaw, podHfov, 2]))
+        self.trackPub.publish(Float64MultiArray(data=[cameraElevation + podPitch, cameraAzimuth + podYaw, podHfov, 2]))
 
 
         if self.args.debug:
             yprStr = {'y': f'{BLUE}y{RESET}', 'p': f'{YELLOW}p{RESET}', 'r': f'{RED}r{RESET}'}
-            yprI2T = rI2T.as_euler('zyx', degrees=True)
 
             np.set_printoptions(precision=2)
             print((
+                f'Me @ {self.selfPos}'
                 f'({pixelX:.2f}, {pixelY:.2f}) '
-                f'({yprStr["y"]}{yprI2T[0]:.2f}, {yprStr["p"]}{yprI2T[1]:.2f}, {yprStr["r"]}{yprI2T[2]:.2f}) '
-                f'({yprStr["y"]}{cameraAzimuth:.2f}, {yprStr["p"]}{cameraElevation:.2f}) '
-                f'+ ({yprStr["y"]}{podYaw:.2f}, {yprStr["p"]}{podPitch:.2f}) '
+                f'c({yprStr["y"]}{cameraAzimuth:.2f}, {yprStr["p"]}{cameraElevation:.2f}) '
+                f'p({yprStr["y"]}{podYaw:.2f}, {yprStr["p"]}{podPitch:.2f}) '
                 f'Target @ {realTargetAbsI} '
             ))
 
@@ -354,7 +351,7 @@ class Transformer:
         podPitch = np.arctan2(-targetBody[2], np.sqrt(targetBody[0] ** 2 + targetBody[1] ** 2))
         podYaw = -np.arctan2(targetBody[1], targetBody[0])
 
-        podPitch = 90 - np.degrees(podPitch)
+        podPitch = np.degrees(podPitch)
         podYaw = np.degrees(podYaw)
 
         return podPitch, podYaw
@@ -409,10 +406,10 @@ class Transformer:
 
     def spin(self):
         while not rospy.is_shutdown():
-            print('-' * 20)
-            np.set_printoptions(precision=2)
-            print(f'My pos: {self.selfPos}')
-            print(f'RelImu: {R.from_quat(self.uavQuat).as_euler("zyx", degrees=True)}')
+            # print('-' * 20)
+            # np.set_printoptions(precision=2)
+            # print(f'My pos: {self.selfPos}')
+            # print(f'RelImu: {R.from_quat(self.uavQuat).as_euler("zyx", degrees=True)}')
 
 
             if self.args.log and not self.podYawBuffer.empty and not self.podPitchBuffer.empty:
