@@ -125,7 +125,6 @@ class Transformer:
                 ('pixelY', 'double'),
                 ('cameraYaw', 'double'),
                 ('cameraPitch', 'double'),
-                ('cameraPlusPodYPR[3]', 'list'),
                 ('uavQuat[4]', 'list'),
                 ('uavEuler[3]', 'list'),
                 ('selfPos[3]', 'list'),
@@ -300,24 +299,21 @@ class Transformer:
             if self.args.cali:
                 self.caliLog.log("rosTime", rospy.Time.now().to_sec() - self.startTime)
                 self.caliLog.log("podYaw", self.podYawBuffer.getMessageNoDelay().data)
-                self.caliLog.log("podYawDelayed", self.podYawBuffer.getMessage(self.podDelay).data)
+                self.caliLog.log("podYawDelayed", podYaw)
                 self.caliLog.log("podPitch", self.podPitchBuffer.getMessageNoDelay().data)
-                self.caliLog.log("podPitchDelayed", self.podPitchBuffer.getMessage(self.podDelay).data)
+                self.caliLog.log("podPitchDelayed", podPitch)
                 hFov = self.podHfovBuffer.getMessageNoDelay().data 
-                hFovDelayed = self.podHfovBuffer.getMessage(self.podDelay).data 
                 self.caliLog.log("podHfov", hFov)
-                self.caliLog.log("podHfovDelayed", hFovDelayed)
+                self.caliLog.log("podHfovDelayed", podHfov)
                 vFov = degrees(2 * np.arctan(np.tan(radians(hFov) / 2) * 9 / 16))
-                vFovDelayed = degrees(2 * np.arctan(np.tan(radians(hFovDelayed) / 2) * 9 / 16))
                 self.caliLog.log('podVfov', vFov)
-                self.caliLog.log('podVfovDelayed', vFovDelayed)
+                self.caliLog.log('podVfovDelayed', podVfov)
                 self.caliLog.log('pixelX', pixelX)
                 self.caliLog.log('pixelY', pixelY)
                 self.caliLog.log('cameraYaw', cameraAzimuth)
                 self.caliLog.log('cameraPitch', cameraElevation)
-                self.caliLog.log('cameraPlusPodYPR', list(yprI2T))
                 self.caliLog.log('uavQuat', list(self.uavQuat))
-                self.caliLog.log('uavEuler', list(rI2T.as_euler('zyx', degrees=True)))
+                self.caliLog.log('uavEuler', list(rI2B.as_euler('zyx', degrees=True)))
                 self.caliLog.log('selfPos', list(self.selfPos))
                 self.caliLog.log('targetPosRel', list(realTargetRelI))
                 self.caliLog.log('targetPosAbs', list(realTargetAbsI))
