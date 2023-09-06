@@ -235,7 +235,7 @@ class PodSearch:
         self.expectedPitch = self.aimPitch
         self.expectedYaw = self.aimYaw
         self.expectedHfov = self.tra[self.traCnt][2] if self.thisAimFinish else self.tra[self.traCnt][2] / 2
-        self.maxRate = 90 - self.aimPitch
+        self.maxRate = self.aimPitch
         self.maxRate = 2
         self.pubPYZMaxRate()
         self.toTransformerPub.publish(Bool(True))
