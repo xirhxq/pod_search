@@ -88,7 +88,7 @@ class AutoTra:
         print('-' * 10 + 'Pod P Results' + '-' * 10)
         for ind, podP in enumerate(self.pitches):
             print(f'### Round {ind + 1}')
-            print(f'p: {podP:.12f}({90 - podP:.12f}) -> hfov: {self.getHFovFromPitch(podP):.2f}')
+            print(f'p: {podP:.12f} -> hfov: {self.getHFovFromPitch(podP):.2f}')
             print(f'yawRange: {self.getYawRangeFromPitch(podP)[1] - self.getHFovFromPitch(podP) / 2:.2f}')
             print(f'p Range: {podP - self.getVFovFromPitch(podP) / 2:.2f} ~ {podP + self.getVFovFromPitch(podP) / 2:.2f}')
             print(f'R Range: {self.getRFromPitch(podP - self.getVFovFromPitch(podP) / 2):.2f} ~ {self.getRFromPitch(podP + self.getVFovFromPitch(podP) / 2):.2f}')
@@ -103,13 +103,13 @@ class AutoTra:
             yRange = self.getYawRangeFromPitch(podP)[1] - self.getHFovFromPitch(podP) / 2
             if ind % 2 == 0:
                 yRange = -yRange
-            print(f'[{90 - podP:.6f}, {yRange:.2f}, {hfov:.2f}, 20], [{90 - podP:.6f}, {-yRange:.2f}, {hfov:.2f}, {hfov/self.theTime:.2f}]')
-            self.theList.append([90 - podP, yRange, hfov, 20])
-            self.theList.append([90 - podP, -yRange, hfov, hfov / self.theTime])
+            print(f'[{podP:.6f}, {yRange:.2f}, {hfov:.2f}, 20], [{podP:.6f}, {-yRange:.2f}, {hfov:.2f}, {hfov/self.theTime:.2f}]')
+            self.theList.append([podP, yRange, hfov, 20])
+            self.theList.append([podP, -yRange, hfov, hfov / self.theTime])
             self.expectedTime += abs(yRange) * 2 / hfov * 4
             print(f'After this round time is {self.expectedTime:.2f}')
 
-        self.theList.append([90, 0, 60, 20])
+        self.theList.append([0, 0, 60, 20])
         print('### The List ###')
         print(self.theList)
         print('################')

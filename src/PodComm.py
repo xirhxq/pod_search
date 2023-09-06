@@ -48,7 +48,7 @@ signal(SIGINT, signal_handler)
 SECRET_DICT = {
     0: 100, 1: 140, 2: 160, 3: 180, 5: 220, 7: 250, 10: 290, 20: 355
 }
-SECRET_PITCH_OFFSET = 2.57
+SECRET_PITCH_OFFSET = -2.57
 SECRET_YAW_OFFSET = -5.3
 
 def secretInterp(x, data=SECRET_DICT):
@@ -147,7 +147,7 @@ class POD_COMM:
         self.initTextOff = False
         self.initAntiFog = False
         self.state = WAITING_DOWN_FRAME_HEAD_1
-        self.expectedPitch = 90.0
+        self.expectedPitch = 0.0
         self.expectedYaw = 0.0
         self.expectedZoom = 21
         self.expectedZoomLevel = 5
@@ -281,8 +281,8 @@ class POD_COMM:
                 prate = max(-prMax, min(prMax, pitchDiff * 240))
                 yrate = max(-yrMax, min(yrMax, yawDiff * 200))
 
-                prate = self.deadZone(prate, z=80)
-                yrate = self.deadZone(yrate, z=110)
+                prate = -self.deadZone(prate, z=80)
+                yrate = -self.deadZone(yrate, z=110)
                 
 
                 up.manualPYRate(prate, yrate)
@@ -347,8 +347,8 @@ class POD_COMM:
                              self.podCameraState, self.podLaserRes,
                              self.podElecZoom, self.podOrder) = downData[:-2]
                             # self.podF = podFx10 / 10
-                            self.podPitch = podPitchx100 / 100 - SECRET_PITCH_OFFSET
-                            self.podYaw = self.round(podYawx100 / 100 - SECRET_YAW_OFFSET, 180)
+                            self.podPitch = 90 - podPitchx100 / 100 - SECRET_PITCH_OFFSET
+                            self.podYaw = - self.round(podYawx100 / 100 - SECRET_YAW_OFFSET, 180)
                             self.podZoomLevel = self.looseZoomLevel(round(self.podF / self.zoomUnit))
 
                             currentTime = datetime.now()
