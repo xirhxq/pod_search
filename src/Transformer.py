@@ -270,7 +270,7 @@ class Transformer:
         imgTargetP = np.array([
             1 / base,
             np.tan(np.radians(cameraAzimuth)) / base,
-            np.tan(np.radians(cameraElevation)) / base
+            -np.tan(np.radians(cameraElevation)) / base
         ])
         rPodYaw = R.from_euler('z', podYaw, degrees=True)
         rPodPitch = R.from_euler('y', podPitch, degrees=True)
