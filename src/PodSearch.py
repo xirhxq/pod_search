@@ -29,8 +29,18 @@ class State:
     TRACK = 6
 
 class PodSearch:
-    def __init__(self):
+    def __init__(self, args):
         self.state = State.INIT
+        self.args = args
+        print(YELLOW + 'ARGS:', self.args, RESET)
+
+        if not self.args.takeoff and not self.args.test:
+            raise AssertionError("Please add --takeoff or --test arg")
+        if self.args.takeoff and self.args.test:
+            raise AssertionError("Not two args at the same time!")
+        if args.track:
+            self.state = State.TRACK
+            print('<<<TRACK MODE>>>')
 
         self.pitch = 0.0
         self.yaw = 0.0
@@ -108,7 +118,7 @@ class PodSearch:
         self.classifierClearPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/classifierClear', Empty, queue_size=10)
 
         self.searchOverPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/searchOver', Empty, queue_size=10)
-        self.uavReady = False
+        self.uavReady = True if self.args.test else False
 
         self.endBeginTime = None
 
@@ -217,8 +227,6 @@ class PodSearch:
             self.toStepStream()
         # if self.aimOn:
         #     self.toStepAim()
-        if len(self.trackData) > 0:
-            self.toStepTrack()
 
     def stepAim(self):
         aimTime = self.getTimeNow() - self.thisAimStartTime
@@ -358,20 +366,6 @@ if __name__ == '__main__':
     parser.add_argument('--track', help='track mode', action='store_true')
     args, unknown = parser.parse_known_args()
     
-    podSearch = PodSearch()
+    podSearch = PodSearch(args)
 
-    print(f'--takeoff: {args.takeoff} --test: {args.test}')
-
-    if not args.takeoff and not args.test:
-        raise AssertionError("Please add --takeoff or --test arg")
-    if args.takeoff and args.test:
-        raise AssertionError("Not two args at the same time!")
-    if args.test:
-        podSearch.uavReady = True
-        print('Set uavReady to True')
-    elif args.takeoff:
-        print('WILL TAKE OFF!!!')
-    if args.track:
-        podSearch.state = State.TRACK
-        print('<<<TRACK MODE>>>')
     podSearch.spin()
