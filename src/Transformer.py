@@ -176,7 +176,7 @@ class Transformer:
         self.podPitchBuffer = TimeBuffer('Pod Pitch Buffer')
         self.podYawBuffer = TimeBuffer('Pod Yaw Buffer')
         self.podHfovBuffer = TimeBuffer('Pod HFov Buffer')
-        self.podDelay = 0.6
+        self.podDelay = 0.4
 
         self.uavName = 'suav'
         self.podName = 'pod'
