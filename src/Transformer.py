@@ -105,7 +105,8 @@ class TimeBuffer:
 class Transformer:
     def __init__(self, args):
         self.args = args
-        
+        print(YELLOW + 'ARGS: ', self.args, RESET)
+
         if self.args.cali:
             import rospkg
             pre = rospkg.RosPack().get_path('pod_search')
@@ -180,7 +181,7 @@ class Transformer:
         self.uwbName = 'uwb'
         self.heightSensorName = 'height_sensor'
 
-        rospy.Subscriber(self.uavName + '/' + self.osdkName + '/imu', Imu, self.imuCallback)
+        rospy.Subscriber(self.uavName + '/' + self.osdkName + '/imu' + ('/noData' if self.args.noImu else ''), Imu, self.imuCallback)
         rospy.Subscriber(self.uavName + '/' + self.uwbName + '/filter/odom', Odometry, self.posCallback)
         rospy.Subscriber(self.uavName + '/' + self.heightSensorName + '/data', Vector3Stamped, self.hCallback)
 
@@ -453,6 +454,7 @@ if __name__ == '__main__':
     parser.add_argument('--infBound', help='infinite bound', action='store_true')
     parser.add_argument('--cali', help='calibration', action='store_true')
     parser.add_argument('--noB2GB', help='not adding rB2GB', action='store_true')
+    parser.add_argument('--noImu', help='not using IMU', action='store_true')
     args, unknown = parser.parse_known_args()
     
     rospy.init_node('Transformer', anonymous=True)
