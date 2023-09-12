@@ -129,6 +129,7 @@ class Transformer:
                 ('uavQuat[4]', 'list'),
                 ('uavEuler[3]', 'list'),
                 ('selfPos[3]', 'list'),
+                ('targetPosAbsGB[3]', 'list'),
                 ('targetPosRel[3]', 'list'),
                 ('targetPosAbs[3]', 'list'),
                 ('targetId', 'int')
@@ -169,6 +170,8 @@ class Transformer:
         self.h = 10.6 + 1.2
         self.a = self.h / 100 * 3000
         self.selfPos = np.array([0, 0, self.h])
+        
+        self.dockENU = np.array([136.128, 253.91, 0])
 
         self.podPitchBuffer = TimeBuffer('Pod Pitch Buffer')
         self.podYawBuffer = TimeBuffer('Pod Yaw Buffer')
@@ -214,6 +217,9 @@ class Transformer:
             self.yawB2GB = -0.31312872
             self.pitchB2GB = -0.80392953
             self.rollB2GB = -0.08510879
+            self.yawB2GB = 7.02698051
+            self.pitchB2GB = 1.3983148
+            self.rollB2GB = -1.17492166
             print(f'{GREEN}With rB2GB on{RESET}')
         self.rB2GB = R.from_euler('zyx', [self.yawB2GB, self.pitchB2GB, self.rollB2GB], degrees=True)
 
@@ -271,9 +277,9 @@ class Transformer:
         cameraElevation = np.degrees(np.arctan(np.tan(np.radians(podVfov) / 2) * pixelY))
         base = np.sqrt(1 + np.tan(np.radians(cameraElevation)) ** 2 + np.tan(np.radians(cameraAzimuth)) ** 2)
         imgTargetP = np.array([
-            1 / base,
-            np.tan(np.radians(cameraAzimuth)) / base,
-            -np.tan(np.radians(cameraElevation)) / base
+            1000 * 1 / base,
+            1000 * np.tan(np.radians(cameraAzimuth)) / base,
+            -1000 * np.tan(np.radians(cameraElevation)) / base
         ])
         rPodYaw = R.from_euler('z', podYaw, degrees=True)
         rPodPitch = R.from_euler('y', podPitch, degrees=True)
@@ -284,6 +290,10 @@ class Transformer:
         realTargetRelI = imgTargetRelI / imgTargetRelI[2] * (-self.selfPos[2])
         realTargetAbsI = realTargetRelI + np.array(self.selfPos)
         
+        imgTargetRelGB = rGB2P.apply(imgTargetP)
+        realTargetRelGB = imgTargetRelGB / imgTargetRelGB[2] * (-self.selfPos[2])
+        realTargetAbsGB = realTargetRelGB + np.array(self.selfPos)
+
         self.trackPub.publish(Float64MultiArray(data=[cameraElevation + podPitch, cameraAzimuth + podYaw, podHfov, 2]))
 
 
@@ -292,11 +302,12 @@ class Transformer:
 
             np.set_printoptions(precision=2)
             print((
-                f'Me @ {self.selfPos}'
-                f'({pixelX:.2f}, {pixelY:.2f}) '
+                # f'Me @ {self.selfPos}'
+                f'px({pixelX:.2f}, {pixelY:.2f}) '
                 f'c({yprStr["y"]}{cameraAzimuth:.2f}, {yprStr["p"]}{cameraElevation:.2f}) '
                 f'p({yprStr["y"]}{podYaw:.2f}, {yprStr["p"]}{podPitch:.2f}) '
-                f'Target @ {realTargetAbsI} '
+                f'q{rI2B.as_euler("zyx", degrees=True)}'
+                f'Target GB{realTargetAbsGB} I{realTargetAbsI} '
             ))
 
             if self.args.cali:
@@ -318,6 +329,7 @@ class Transformer:
                 self.caliLog.log('uavQuat', list(self.uavQuat))
                 self.caliLog.log('uavEuler', list(rI2B.as_euler('zyx', degrees=True)))
                 self.caliLog.log('selfPos', list(self.selfPos))
+                self.caliLog.log('targetPosAbsGB', list(realTargetAbsGB))
                 self.caliLog.log('targetPosRel', list(realTargetRelI))
                 self.caliLog.log('targetPosAbs', list(realTargetAbsI))
                 self.caliLog.log('targetId', category)
@@ -342,13 +354,13 @@ class Transformer:
         # from pos and self.pos and self.uavQuat
         # cal the pod pitch and yaw to aim at pos
         # return podPitch, podYaw
-        rUAV = R.from_quat(self.uavQuat)
-        rUAVInv = rUAV.inv()
+        rB2I = R.from_quat(self.uavQuat).inv()
+        rGB2B = self.rB2GB.inv()
         posRel = pos - self.selfPos
-        targetBody = (self.rB2GB.inv() * rUAVInv).apply(posRel)
+        targetBody = (rGB2B * rB2I).apply(posRel)
 
         podPitch = np.arctan2(-targetBody[2], np.sqrt(targetBody[0] ** 2 + targetBody[1] ** 2))
-        podYaw = -np.arctan2(targetBody[1], targetBody[0])
+        podYaw = np.arctan2(targetBody[1], targetBody[0])
 
         podPitch = np.degrees(podPitch)
         podYaw = np.degrees(podYaw)
@@ -429,7 +441,9 @@ class Transformer:
                     f'{RESET}'
                 )
 
+            '''
             tInd = self.clsfy.firstNotChecked()
+            
             if tInd is not None:
                 aimPitch, aimYaw = self.untransform(self.clsfy.targets[tInd])
                 msg = Float64MultiArray(data=[1, aimPitch, aimYaw, tInd])
@@ -438,12 +452,15 @@ class Transformer:
             else:
                 msg = Float64MultiArray(data=[-1, -1, -1, -1])
                 self.aimPub.publish(msg)
-           
+            '''
+
             streamInd = self.clsfy.lowestScoreIndex()
             if streamInd is not None and 0 <= streamInd < len(t):
                 streamPitch, streamYaw = self.untransform(self.clsfy.targets[streamInd])
                 msg = Float64MultiArray(data=[1, streamPitch, streamYaw, streamInd])
                 self.streamPub.publish(msg)
+                targetToDockENU = self.clsfy.targets[streamInd] - self.dockENU
+                print(f'to dock {targetToDockENU}')
             time.sleep(0.05)
 
 
