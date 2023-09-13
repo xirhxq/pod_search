@@ -214,12 +214,10 @@ class Transformer:
             self.rollB2GB = 0
             print(f'{RED}No rB2GB{RESET}')
         else:
-            self.yawB2GB = -0.31312872
-            self.pitchB2GB = -0.80392953
-            self.rollB2GB = -0.08510879
-            self.yawB2GB = 7.02698051
-            self.pitchB2GB = 1.3983148
-            self.rollB2GB = -1.17492166
+            self.yawB2GB = 7.09025345
+            self.yawB2GB = 0
+            self.pitchB2GB = 1.6993649
+            self.rollB2GB = -1.47965152
             print(f'{GREEN}With rB2GB on{RESET}')
         self.rB2GB = R.from_euler('zyx', [self.yawB2GB, self.pitchB2GB, self.rollB2GB], degrees=True)
 
