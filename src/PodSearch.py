@@ -27,6 +27,7 @@ class State:
     STREAM = 4
     END = 5
     TRACK = 6
+    DOCK = 7
 
 class PodSearch:
     def __init__(self, args):
@@ -41,6 +42,10 @@ class PodSearch:
         if args.track:
             self.state = State.TRACK
             print('<<<TRACK MODE>>>')
+
+        if args.dock:
+            self.state = State.DOCK
+            print('<<<DOCK MODE>>>')
 
         self.pitch = 0.0
         self.yaw = 0.0
@@ -137,7 +142,11 @@ class PodSearch:
         
         self.trackData = []
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/track', Float64MultiArray, lambda msg: setattr(self, 'trackData', msg.data))
-        
+
+        self.dockData = []
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/dock', Float64MultiArray, lambda msg: setattr(self, 'dockData', msg.data))
+
+
     def aimCallback(self, msg):
         if msg.data[0] > 0:
             self.aimOn = True
@@ -201,6 +210,10 @@ class PodSearch:
 
     def toStepTrack(self):
         self.state = State.TRACK
+
+    def toStepDock(self):
+        self.state = State.DOCK
+        self.dockTime = self.getTimeNow()
 
     def stepInit(self):
         self.expectedPitch = self.tra[0][0]
@@ -269,7 +282,7 @@ class PodSearch:
         self.maxRate = 20
         self.pubPYZMaxRate()
         if streamTime >= 10.0:
-            self.toStepEnd()
+            self.toStepDock()
 
     def stepEnd(self):
         self.searchOverPub.publish(Empty())
@@ -307,6 +320,19 @@ class PodSearch:
         self.maxRate = self.trackData[3]
         self.pubPYZMaxRate()
 
+    def stepDock(self):
+        print('Look at dock')
+        if len(self.dockData) < 4:
+            print('No dock data!!!')
+            return
+        self.expectedPitch = self.dockData[1]
+        self.expectedYaw = self.dockData[2]
+        self.expectedHfov = 10
+        self.maxRate = 10
+        self.pubPYZMaxRate()
+        if self.isAtTarget() and self.getTimeNow() - self.dockTime >= 10:
+            self.toStepTrack()
+
     def pubPYZMaxRate(self):
         if self.expectedYaw < -90 or self.expectedYaw > 90:
             self.expectedYaw += 180
@@ -333,6 +359,8 @@ class PodSearch:
             self.stepStream()
         elif self.state == State.TRACK:
             self.stepTrack()
+        elif self.state == State.DOCK:
+            self.stepDock()
         else:
             print("Invalid state")
 
@@ -364,6 +392,7 @@ if __name__ == '__main__':
     parser.add_argument('--takeoff', help='takeoff', action="store_true")
     parser.add_argument('--test', help='on ground test', action='store_true')
     parser.add_argument('--track', help='track mode', action='store_true')
+    parser.add_argument('--dock', help='look at dock', action='store_true')
     args, unknown = parser.parse_known_args()
     
     podSearch = PodSearch(args)

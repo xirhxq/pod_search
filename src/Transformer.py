@@ -17,7 +17,7 @@ from scipy.spatial.transform import Rotation as R
 from sensor_msgs.msg import Imu
 from spirecv_msgs.msg import TargetsInFrame
 from std_msgs.msg import Int8, Float32, Bool, Float64MultiArray, Int16, Empty
-from geometry_msgs.msg import Vector3Stamped
+from geometry_msgs.msg import Vector3Stamped, Pose2D
 
 from Classifier import Classifier
 from DataLogger import DataLogger
@@ -171,7 +171,7 @@ class Transformer:
         self.a = self.h / 100 * 3000
         self.selfPos = np.array([0, 0, self.h])
         
-        self.dockENU = np.array([136.128, 253.91, 0])
+        self.dockENU = np.array([160, 255, 0])
 
         self.podPitchBuffer = TimeBuffer('Pod Pitch Buffer')
         self.podYawBuffer = TimeBuffer('Pod Yaw Buffer')
@@ -196,7 +196,7 @@ class Transformer:
 
         rospy.Subscriber(self.uavName + '/' + self.podName + '/toTransformer', Bool, self.orderFromSearcherCallback)
 
-        self.searchState = 0
+        self.searchState = -1
         rospy.Subscriber(self.uavName + '/' + self.podName + '/searchState', Int8, lambda msg: setattr(self, 'searchState', msg.data))
 
         self.clsfy = Classifier()
@@ -208,6 +208,10 @@ class Transformer:
         self.streamPub = rospy.Publisher(self.uavName + '/' + self.podName + '/stream', Float64MultiArray, queue_size=1) 
 
         self.trackPub = rospy.Publisher(self.uavName + '/' + self.podName + '/track', Float64MultiArray, queue_size=1)
+        
+        self.usvTargetPub = rospy.Publisher(self.uavName + '/' + self.podName + '/target_nav_position', Pose2D, queue_size=1)
+        self.dockPub = rospy.Publisher(self.uavName + '/' + self.podName + '/dock', Float64MultiArray, queue_size=1)
+
         if self.args.noB2GB:
             self.yawB2GB = 0
             self.pitchB2GB = 0
@@ -291,6 +295,10 @@ class Transformer:
         realTargetRelGB = imgTargetRelGB / imgTargetRelGB[2] * (-self.selfPos[2])
         realTargetAbsGB = realTargetRelGB + np.array(self.selfPos)
 
+        realTargetRelDockI = realTargetAbsI - self.dockENU
+        realTargetRelDockTheta = np.degrees(np.arctan2(*realTargetRelDockI[[1, 0]]))
+
+        self.usvTargetPub.publish(Pose2D(x=realTargetRelDockI[0], y=realTargetRelDockI[1], theta=realTargetRelDockTheta))    
         self.trackPub.publish(Float64MultiArray(data=[cameraElevation + podPitch, cameraAzimuth + podYaw, podHfov, 2]))
 
 
@@ -304,7 +312,8 @@ class Transformer:
                 f'c({yprStr["y"]}{cameraAzimuth:.2f}, {yprStr["p"]}{cameraElevation:.2f}) '
                 f'p({yprStr["y"]}{podYaw:.2f}, {yprStr["p"]}{podPitch:.2f}) '
                 f'q{rI2B.as_euler("zyx", degrees=True)}'
-                f'Target GB{realTargetAbsGB} I{realTargetAbsI} '
+                f'Target GB{realTargetAbsGB[:2]} I{realTargetAbsI[:2]} '
+                f'TtoD ENU{(realTargetAbsI - self.dockENU)[:2]} {realTargetRelDockTheta:.2f}'
             ))
 
             if self.args.cali:
@@ -457,7 +466,10 @@ class Transformer:
                 msg = Float64MultiArray(data=[1, streamPitch, streamYaw, streamInd])
                 self.streamPub.publish(msg)
                 targetToDockENU = self.clsfy.targets[streamInd] - self.dockENU
-                print(f'to dock {targetToDockENU}')
+            
+            dockPitch, dockYaw = self.untransform(self.dockENU)
+            self.dockPub.publish(Float64MultiArray(data=[1, dockPitch, dockYaw, 0]))
+
             time.sleep(0.05)
 
 
