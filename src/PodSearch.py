@@ -315,9 +315,9 @@ class PodSearch:
         print('Step Track')
         if len(self.trackData) != 4:
             return
-        self.expectedPitch = self.trackData[0]
+        self.expectedPitch = self.trackData[0] - 0.5
         self.expectedYaw = self.trackData[1]
-        self.expectedHfov = self.trackData[2]
+        self.expectedHfov = self.trackData[0] * self.autoTra.hfovPitchRatio
         self.maxRate = self.trackData[3]
         self.pubPYZMaxRate()
 
