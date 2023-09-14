@@ -35,18 +35,6 @@ class PodSearch:
         self.args = args
         print(YELLOW + 'ARGS:', self.args, RESET)
 
-        if not self.args.takeoff and not self.args.test:
-            raise AssertionError("Please add --takeoff or --test arg")
-        if self.args.takeoff and self.args.test:
-            raise AssertionError("Not two args at the same time!")
-        if args.track:
-            self.state = State.TRACK
-            print('<<<TRACK MODE>>>')
-
-        if args.dock:
-            self.state = State.DOCK
-            print('<<<DOCK MODE>>>')
-
         self.pitch = 0.0
         self.yaw = 0.0
         self.hfov = 0.0
@@ -145,6 +133,20 @@ class PodSearch:
 
         self.dockData = []
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/dock', Float64MultiArray, lambda msg: setattr(self, 'dockData', msg.data))
+        
+
+        if not self.args.takeoff and not self.args.test:
+            raise AssertionError("Please add --takeoff or --test arg")
+        if self.args.takeoff and self.args.test:
+            raise AssertionError("Not two args at the same time!")
+        if args.track:
+            self.toStepTrack()
+            print('<<<TRACK MODE>>>')
+
+        if args.dock:
+            self.toStepDock()
+            print('<<<DOCK MODE>>>')
+
 
 
     def aimCallback(self, msg):
@@ -268,9 +270,8 @@ class PodSearch:
         )
     
     def stepStream(self):
-        if self.isAtTarget():
+        if not self.streamFlag and self.isAtTarget() and self.getTimeNow() - self.streamStartTime >= 3.0:
             self.streamFlag = True
-        if not self.streamFlag:
             self.streamStartTime = self.getTimeNow()
         streamTime = self.getTimeNow() - self.streamStartTime
         print(f'{YELLOW}==> StepStream @ Target {self.streamIndex} <=={RESET}')
@@ -327,7 +328,7 @@ class PodSearch:
             return
         self.expectedPitch = self.dockData[1]
         self.expectedYaw = self.dockData[2]
-        self.expectedHfov = 10
+        self.expectedHfov = 6
         self.maxRate = 10
         self.pubPYZMaxRate()
         if self.isAtTarget() and self.getTimeNow() - self.dockTime >= 10:
