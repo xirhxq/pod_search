@@ -18,7 +18,7 @@ class Classifier:
         self.targetThreshold = 2
 
     def newTarget(self, pos=[0, 0, 0], score=0):
-        self.targets.append(pos)
+        self.targets.append(np.array(pos))
         self.targetsScore.append(score)
         self.targetsCnt.append(1)
         self.targetsCheck.append(False)
@@ -27,7 +27,7 @@ class Classifier:
     def updateTarget(self, ind, pos, score):
         while len(self.targets) < ind + 1:
             self.newTarget()
-        self.targets[ind] = pos
+        self.targets[ind] = (np.array(pos) + self.targets[ind] * self.targetsCnt[ind]) / (self.targetsCnt[ind] + 1)
         self.targetsScore[ind] = max(self.targetsScore[ind], score)
         self.targetsCnt[ind] += 1
         if self.targetsCnt[ind] > self.targetThreshold and not self.targetsCheck[ind]:
@@ -45,10 +45,17 @@ class Classifier:
             return None
         return self.targetsCheck.index(False)
 
-    def lowestScoreIndex(self):
-        if len(self.targetsScore) == 0:
+    def lowestScoreIndex(self, threshold=0):
+        tS = self.targetsScore
+        res = 1.01
+        resInd = -1
+        for ind, value in enumerate(tS):
+            if self.targetsCnt[ind] >= threshold and value <= res:
+                res = value
+                resInd = ind
+        if resInd == -1:
             return None
-        return np.argmin(self.targetsScore)
+        return resInd
 
     def newPos(self, x, y, z):
         if len(self.targets) == 0:
