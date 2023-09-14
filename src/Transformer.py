@@ -167,11 +167,13 @@ class Transformer:
         self.orderFromSearcher = False
         self.uavQuat = [0, 0, 0, 1]
 
-        self.h = 10.6 + 1.2
+        self.h = 10.6 + 1.1
         self.a = self.h / 100 * 3000
         self.selfPos = np.array([0, 0, self.h])
         
-        self.dockENU = np.array([160, 255, 0])
+        self.dockENU = np.array([150, 255, 0])
+        self.dockENU = np.array([-40, 210, 0])
+        self.usvENU = self.dockENU
 
         self.podPitchBuffer = TimeBuffer('Pod Pitch Buffer')
         self.podYawBuffer = TimeBuffer('Pod Yaw Buffer')
@@ -295,10 +297,6 @@ class Transformer:
         realTargetRelGB = imgTargetRelGB / imgTargetRelGB[2] * (-self.selfPos[2])
         realTargetAbsGB = realTargetRelGB + np.array(self.selfPos)
 
-        realTargetRelDockI = realTargetAbsI - self.dockENU
-        realTargetRelDockTheta = np.degrees(np.arctan2(*realTargetRelDockI[[1, 0]]))
-
-        self.usvTargetPub.publish(Pose2D(x=realTargetRelDockI[0], y=realTargetRelDockI[1], theta=realTargetRelDockTheta))    
         self.trackPub.publish(Float64MultiArray(data=[cameraElevation + podPitch, cameraAzimuth + podYaw, podHfov, 2]))
 
 
@@ -313,7 +311,7 @@ class Transformer:
                 f'p({yprStr["y"]}{podYaw:.2f}, {yprStr["p"]}{podPitch:.2f}) '
                 f'q{rI2B.as_euler("zyx", degrees=True)}'
                 f'Target GB{realTargetAbsGB[:2]} I{realTargetAbsI[:2]} '
-                f'TtoD ENU{(realTargetAbsI - self.dockENU)[:2]} {realTargetRelDockTheta:.2f}'
+                f'TtoD ENU{(realTargetAbsI - self.dockENU)[:2]}'
             ))
 
             if self.args.cali:
@@ -354,6 +352,9 @@ class Transformer:
             # self.clsfy.newPos(*realTargetAbs)
             if self.searchState == 1:
                 self.clsfy.updateTarget(category, list(realTargetAbs), score)
+            if self.searchState == 6:
+                self.usvENU = realTargetAbs
+
             # self.clsfy.outputTargets()
 
     def untransform(self, pos):
@@ -460,12 +461,16 @@ class Transformer:
                 self.aimPub.publish(msg)
             '''
 
-            streamInd = self.clsfy.lowestScoreIndex()
+            streamInd = self.clsfy.lowestScoreIndex(threshold=15)
             if streamInd is not None and 0 <= streamInd < len(t):
                 streamPitch, streamYaw = self.untransform(self.clsfy.targets[streamInd])
                 msg = Float64MultiArray(data=[1, streamPitch, streamYaw, streamInd])
                 self.streamPub.publish(msg)
-                targetToDockENU = self.clsfy.targets[streamInd] - self.dockENU
+
+                if self.searchState == 6:
+                    realTargetRelUSVI = self.clsfy.targets[streamInd] - self.usvENU 
+                    realTargetRelUSVTheta = np.degrees(np.arctan2(*realTargetRelUSVI[[1, 0]]))
+                    self.usvTargetPub.publish(Pose2D(x=realTargetRelUSVI[0], y=realTargetRelUSVI[1], theta=realTargetRelUSVTheta)) 
             
             dockPitch, dockYaw = self.untransform(self.dockENU)
             self.dockPub.publish(Float64MultiArray(data=[1, dockPitch, dockYaw, 0]))
