@@ -171,8 +171,8 @@ class Transformer:
         self.a = self.h / 100 * 3000
         self.selfPos = np.array([0, 0, self.h])
         
-        self.dockENU = np.array([150, 255, 0])
-        self.dockENU = np.array([-40, 210, 0])
+        self.dockENU = np.array([20, 225, 0])
+        self.dockENU = np.array([-20, 50, 0])
         self.usvENU = self.dockENU
 
         self.podPitchBuffer = TimeBuffer('Pod Pitch Buffer')
@@ -253,7 +253,7 @@ class Transformer:
         self.podHfovBuffer.addMessage(msg)
 
     def hCallback(self, msg):
-        self.selfPos[2] = msg.vector.y
+        self.selfPos[2] = msg.vector.y + 10.6 + 0.75
 
     def targetsCallback(self, msg):
         # tic = rospy.Time.now().to_sec()
@@ -305,7 +305,7 @@ class Transformer:
 
             np.set_printoptions(precision=2)
             print((
-                # f'Me @ {self.selfPos}'
+                f'h{self.selfPos[2]:.2f}'
                 f'px({pixelX:.2f}, {pixelY:.2f}) '
                 f'c({yprStr["y"]}{cameraAzimuth:.2f}, {yprStr["p"]}{cameraElevation:.2f}) '
                 f'p({yprStr["y"]}{podYaw:.2f}, {yprStr["p"]}{podPitch:.2f}) '
@@ -424,7 +424,7 @@ class Transformer:
 
     def spin(self):
         while not rospy.is_shutdown():
-            # print('-' * 20)
+            print('-' * 20)
             # np.set_printoptions(precision=2)
             # print(f'My pos: {self.selfPos}')
             # print(f'RelImu: {R.from_quat(self.uavQuat).as_euler("zyx", degrees=True)}')
