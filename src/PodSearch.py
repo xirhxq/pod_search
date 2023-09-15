@@ -279,7 +279,7 @@ class PodSearch:
         print(f'StreamFlag: {self.streamFlag}')
         self.expectedPitch = self.streamPitch
         self.expectedYaw = self.streamYaw
-        self.expectedHfov = 10
+        self.expectedHfov = self.streamPitch * self.autoTra.hfovPitchRatio
         self.maxRate = 20
         self.pubPYZMaxRate()
         if streamTime >= 10.0:
@@ -328,7 +328,7 @@ class PodSearch:
             return
         self.expectedPitch = self.dockData[1]
         self.expectedYaw = self.dockData[2]
-        self.expectedHfov = 6
+        self.expectedHfov = self.dockData[1] * self.autoTra.hfovPitchRatio
         self.maxRate = 10
         self.pubPYZMaxRate()
         if self.isAtTarget() and self.getTimeNow() - self.dockTime >= 10:
