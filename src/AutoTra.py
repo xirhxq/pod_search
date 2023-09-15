@@ -19,11 +19,11 @@ class AutoTra:
                  pitchLevelOn=True,
                  drawNum=-1
         ):
-        self.h = self.getVal(str='h', default=100)
-        self.a = self.getVal(str='a', default=3000)
-        self.b = self.getVal(str='b', default=1500)
-        x = self.getVal(str='x', default=-self.h)
-        self.hfovPitchRatio = self.getVal(str='hfov/pitch', default=2)
+        self.h = self.getVal(str='h', default=11.7)
+        self.a = self.getVal(str='a', default=500)
+        self.b = self.getVal(str='b', default=150)
+        x = self.getVal(str='x', default=-200)
+        self.hfovPitchRatio = self.getVal(str='hfov/pitch', default=3)
         self.theTime = self.getVal(str='THE Time', default=3)
 
         self.pos2d = np.array([x, 0])
@@ -109,7 +109,7 @@ class AutoTra:
             self.expectedTime += abs(yRange) * 2 / hfov * 4
             print(f'After this round time is {self.expectedTime:.2f}')
 
-        self.theList.append([0, 0, 20, 20])
+        #self.theList.append([0, 0, 20, 20])
         print('### The List ###')
         print(self.theList)
         print('################')
