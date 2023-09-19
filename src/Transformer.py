@@ -172,7 +172,7 @@ class Transformer:
         self.selfPos = np.array([0, 0, self.h])
         
         self.dockENU = np.array([20, 225, 0])
-        self.dockENU = np.array([-20, 50, 0])
+        self.dockENU = np.array([-20, 0, 0])
         self.usvENU = self.dockENU
 
         self.podPitchBuffer = TimeBuffer('Pod Pitch Buffer')
@@ -188,7 +188,7 @@ class Transformer:
 
         rospy.Subscriber(self.uavName + '/' + self.osdkName + '/imu' + ('/noData' if self.args.noImu else ''), Imu, self.imuCallback)
         rospy.Subscriber(self.uavName + '/' + self.uwbName + '/filter/odom', Odometry, self.posCallback)
-        rospy.Subscriber(self.uavName + '/' + self.heightSensorName + '/data', Vector3Stamped, self.hCallback)
+        rospy.Subscriber(self.uavName + '/' + self.heightSensorName + '/noData', Vector3Stamped, self.hCallback)
 
         rospy.Subscriber(self.uavName + '/' + self.podName + '/pitch', Float32, self.pitchCallback)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/yaw', Float32, self.yawCallback)
@@ -220,7 +220,7 @@ class Transformer:
             self.rollB2GB = 0
             print(f'{RED}No rB2GB{RESET}')
         else:
-            self.yawB2GB = -4.29
+            self.yawB2GB = 30.29
             self.pitchB2GB = 0.26
             self.rollB2GB = 2.47
             print(f'{GREEN}With rB2GB on{RESET}')
@@ -236,7 +236,7 @@ class Transformer:
     def posCallback(self, msg):
         # self.selfPos[0] = msg.pose.pose.position.x + 0.6
         # self.selfPos[1] = msg.pose.pose.position.y - 0.3
-        self.selfPos[2] = msg.pose.pose.position.z
+        self.selfPos[2] = msg.pose.pose.position.z + 100 - 91.6
 
     def imuCallback(self, msg):
         orientation = msg.orientation
@@ -253,7 +253,7 @@ class Transformer:
         self.podHfovBuffer.addMessage(msg)
 
     def hCallback(self, msg):
-        self.selfPos[2] = msg.vector.y + 10.6 + 0.75
+        self.selfPos[2] = msg.vector.y + 100 - 91.6
 
     def targetsCallback(self, msg):
         # tic = rospy.Time.now().to_sec()
@@ -350,7 +350,7 @@ class Transformer:
 
         if not self.outOfBound(*realTargetAbs):
             # self.clsfy.newPos(*realTargetAbs)
-            if self.searchState == 1:
+            if self.searchState == 1 or self.searchState == 4:
                 self.clsfy.updateTarget(category, list(realTargetAbs), score)
             if self.searchState == 6:
                 self.usvENU = realTargetAbs
@@ -424,6 +424,8 @@ class Transformer:
 
     def spin(self):
         while not rospy.is_shutdown():
+            self.ControlStateMachine()
+
             print('-' * 20)
             # np.set_printoptions(precision=2)
             # print(f'My pos: {self.selfPos}')

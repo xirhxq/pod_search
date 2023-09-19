@@ -186,7 +186,6 @@ class PodSearch:
     def toStepSearch(self):
         self.state = State.SEARCH
 
-
     def toStepAim(self):
         self.state = State.AIM
         self.thisAimIndex = self.aimIndex
@@ -212,6 +211,7 @@ class PodSearch:
 
     def toStepTrack(self):
         self.state = State.TRACK
+        self.trackData = []
 
     def toStepDock(self):
         self.state = State.DOCK
@@ -277,10 +277,17 @@ class PodSearch:
         print(f'{YELLOW}==> StepStream @ Target {self.streamIndex} <=={RESET}')
         print(f'Time: {streamTime:.2f}')
         print(f'StreamFlag: {self.streamFlag}')
-        self.expectedPitch = self.streamPitch
-        self.expectedYaw = self.streamYaw
-        self.expectedHfov = self.streamPitch * self.autoTra.hfovPitchRatio
-        self.maxRate = 20
+        if not self.streamFlag:
+            self.expectedPitch = self.streamPitch
+            self.expectedYaw = self.streamYaw
+            self.expectedHfov = self.getHfovFromPitch(self.streamPitch)
+            self.maxRate = 20
+        else:
+            print('Tracking...')
+            self.expectedPitch = self.trackData[0] - 0.5
+            self.expectedYaw = self.trackData[1]
+            self.expectedHfov = self.getHfovFromPitch(self.trackData[0])
+            self.maxRate = self.trackData[3]
         self.pubPYZMaxRate()
         if streamTime >= 10.0:
             self.toStepDock()
@@ -311,24 +318,27 @@ class PodSearch:
         if self.browseCnt == len(self.browseTra):
             self.toStepEnd()
 
+    def getHfovFromPitch(self, pitch):
+        return min(60, max(2.3, pitch * self.autoTra.hfovPitchRatio))
+
     def stepTrack(self):
         print('Step Track')
         if len(self.trackData) != 4:
             return
         self.expectedPitch = self.trackData[0] - 0.5
         self.expectedYaw = self.trackData[1]
-        self.expectedHfov = self.trackData[0] * self.autoTra.hfovPitchRatio
+        self.expectedHfov = self.getHfovFromPitch(self.trackData[0])
         self.maxRate = self.trackData[3]
         self.pubPYZMaxRate()
 
     def stepDock(self):
-        print('Look at dock')
+        print(f'Dock Time {self.getTimeNow() - self.dockTime:.2f}')
         if len(self.dockData) < 4:
             print('No dock data!!!')
             return
         self.expectedPitch = self.dockData[1]
         self.expectedYaw = self.dockData[2]
-        self.expectedHfov = self.dockData[1] * self.autoTra.hfovPitchRatio
+        self.expectedHfov = self.getHfovFromPitch(self.dockData[1])
         self.maxRate = 10
         self.pubPYZMaxRate()
         if self.isAtTarget() and self.getTimeNow() - self.dockTime >= 10:
