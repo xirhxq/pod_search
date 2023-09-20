@@ -53,7 +53,7 @@ class QuaternionBuffer:
     def getMessageNoDelay(self):
         if self.empty:
             return None
-        q = [self.buffer[0][1].x, self.buffer[0][1].y, self.buffer[0][1].z, self.buffer[0][1].w]
+        q = [self.buffer[-1][1].x, self.buffer[-1][1].y, self.buffer[-1][1].z, self.buffer[-1][1].w]
         print(f'uavQuatNoDelay: {q}')
         return q 
 
