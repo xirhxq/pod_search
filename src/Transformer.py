@@ -23,6 +23,7 @@ from Classifier import Classifier
 from DataLogger import DataLogger
 from ShowBar import ShowBar
 from Utils import *
+from QuaternionBuffer import QuaternionBuffer
 
 
 def signal_handler(sig, frame):
@@ -127,6 +128,7 @@ class Transformer:
                 ('cameraYaw', 'double'),
                 ('cameraPitch', 'double'),
                 ('uavQuat[4]', 'list'),
+                ('uavQuatDelayed[4]', 'list'),
                 ('uavEuler[3]', 'list'),
                 ('selfPos[3]', 'list'),
                 ('targetPosAbsGB[3]', 'list'),
@@ -142,7 +144,7 @@ class Transformer:
             pre = rospkg.RosPack().get_path('pod_search')
             self.dtlg = DataLogger(pre, "data.csv")
 
-            self.targetsAvailable = 30
+            self.targetsAvailable = 10
             variable_info = [
                 ("rosTime", "double"),
                 ("podYaw", "double"),
@@ -165,7 +167,6 @@ class Transformer:
             print(self.dtlg.variable_names)
         
         self.orderFromSearcher = False
-        self.uavQuat = [0, 0, 0, 1]
 
         self.h = 10.6 + 1.1
         self.a = self.h / 100 * 3000
@@ -178,6 +179,7 @@ class Transformer:
         self.podPitchBuffer = TimeBuffer('Pod Pitch Buffer')
         self.podYawBuffer = TimeBuffer('Pod Yaw Buffer')
         self.podHfovBuffer = TimeBuffer('Pod HFov Buffer')
+        self.uavQuatBuffer = QuaternionBuffer('IMU Buffer')
         self.podDelay = 0.4
 
         self.uavName = 'suav'
@@ -240,7 +242,7 @@ class Transformer:
 
     def imuCallback(self, msg):
         orientation = msg.orientation
-        self.uavQuat = [orientation.x, orientation.y, orientation.z, orientation.w]
+        self.uavQuatBuffer.addMessage(orientation)
 
     def pitchCallback(self, msg):
         msg.data = msg.data
@@ -269,6 +271,7 @@ class Transformer:
             podHfov = self.podHfovBuffer.getMessage(timeDiff).data
             podYaw = self.podYawBuffer.getMessage(timeDiff).data
             podPitch = self.podPitchBuffer.getMessage(timeDiff).data
+            uavQuat = self.uavQuatBuffer.getMessage()
         except Exception as e:
             print(e)
             return
@@ -287,7 +290,7 @@ class Transformer:
         rPodYaw = R.from_euler('z', podYaw, degrees=True)
         rPodPitch = R.from_euler('y', podPitch, degrees=True)
         rGB2P = rPodYaw * rPodPitch
-        rI2B = R.from_quat(self.uavQuat)
+        rI2B = R.from_quat(uavQuat)
         rI2P = rI2B * self.rB2GB * rGB2P
         imgTargetRelI = rI2P.apply(imgTargetP)
         realTargetRelI = imgTargetRelI / imgTargetRelI[2] * (-self.selfPos[2])
@@ -330,7 +333,8 @@ class Transformer:
                 self.caliLog.log('pixelY', pixelY)
                 self.caliLog.log('cameraYaw', cameraAzimuth)
                 self.caliLog.log('cameraPitch', cameraElevation)
-                self.caliLog.log('uavQuat', list(self.uavQuat))
+                self.caliLog.log('uavQuat', self.uavQuatBuffer.getMessageNoDelay())
+                self.caliLog.log('uavQuatDelayed', list(uavQuat))
                 self.caliLog.log('uavEuler', list(rI2B.as_euler('zyx', degrees=True)))
                 self.caliLog.log('selfPos', list(self.selfPos))
                 self.caliLog.log('targetPosAbsGB', list(realTargetAbsGB))
@@ -358,10 +362,7 @@ class Transformer:
             # self.clsfy.outputTargets()
 
     def untransform(self, pos):
-        # from pos and self.pos and self.uavQuat
-        # cal the pod pitch and yaw to aim at pos
-        # return podPitch, podYaw
-        rB2I = R.from_quat(self.uavQuat).inv()
+        rB2I = R.from_quat(self.uavQuatBuffer.getMessageNoDelay()).inv()
         rGB2B = self.rB2GB.inv()
         posRel = pos - self.selfPos
         targetBody = (rGB2B * rB2I).apply(posRel)
