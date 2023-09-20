@@ -19,7 +19,7 @@ class QuaternionBuffer:
         return len(self.buffer) == 0
 
     def addMessage(self, msg):
-        self.buffer.append((msg.header.stamp, Quaternion(msg.w, msg.x, msg.y, msg.z)))
+        self.buffer.append((rospy.Time.now(), Quaternion(msg.w, msg.x, msg.y, msg.z)))
 
     def getMessage(self):
         if self.empty:
@@ -52,3 +52,9 @@ class QuaternionBuffer:
             return None
 
         return [self.buffer[0][1].x, self.buffer[0][1].y, self.buffer[0][1].z, self.buffer[0][1].w]
+
+
+if __name__ == '__main__':
+    qb = QuaternionBuffer()
+    rospy.init_node('QuaternionBuffer', anonymous=True)
+

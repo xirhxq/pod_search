@@ -155,7 +155,9 @@ class Transformer:
                 ("podHfovDelayed", "double"),
                 ("podVfov", "double"),
                 ("podVfovDelayed", "double"),
-                ('selfPos[3]', 'list')
+                ('selfPos[3]', 'list'),
+                ('uavQuatDelayed[4]', 'list'),
+                ('uavQuat[4]', 'list')
             ] 
             for i in range(self.targetsAvailable):
                 variable_info.append((f'target{i}[3]', "list"))
@@ -362,6 +364,8 @@ class Transformer:
             # self.clsfy.outputTargets()
 
     def untransform(self, pos):
+        if self.uavQuatBuffer.empty:
+            return 0, 0
         rB2I = R.from_quat(self.uavQuatBuffer.getMessageNoDelay()).inv()
         rGB2B = self.rB2GB.inv()
         posRel = pos - self.selfPos
@@ -399,6 +403,8 @@ class Transformer:
         self.dtlg.log('podVfov', vFov)
         self.dtlg.log('podVfovDelayed', vFovDelayed)
         self.dtlg.log('selfPos', list(self.selfPos))
+        self.dtlg.log('uavQuatDelayed', list(self.uavQuatBuffer.getMessage()))
+        self.dtlg.log('uavQuat', list(self.uavQuatBuffer.getMessageNoDelay()))
 
         t = self.clsfy.targets
         tLen = len(t)
@@ -433,7 +439,7 @@ class Transformer:
             # print(f'RelImu: {R.from_quat(self.uavQuat).as_euler("zyx", degrees=True)}')
 
 
-            if self.args.log and not self.podYawBuffer.empty and not self.podPitchBuffer.empty:
+            if self.args.log and not self.podYawBuffer.empty and not self.podPitchBuffer.empty and not self.uavQuatBuffer.empty:
                 self.log()
 
             t = self.clsfy.targets
