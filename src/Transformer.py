@@ -170,7 +170,7 @@ class Transformer:
         
         self.orderFromSearcher = False
 
-        self.h = 10.6 + 1.1
+        self.h = 100 - 91.6 + 0.3
         self.a = self.h / 100 * 3000
         self.selfPos = np.array([0, 0, self.h])
         
@@ -224,7 +224,7 @@ class Transformer:
             self.rollB2GB = 0
             print(f'{RED}No rB2GB{RESET}')
         else:
-            self.yawB2GB = 30.29
+            self.yawB2GB = -4.29
             self.pitchB2GB = 0.26
             self.rollB2GB = 2.47
             print(f'{GREEN}With rB2GB on{RESET}')
