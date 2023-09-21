@@ -26,12 +26,10 @@ class QuaternionBuffer:
             return None
 
         targetTime = rospy.Time.now().to_sec() - self.maxAge
-        print(f'nowTime {rospy.Time.now().to_sec()} targetTime {targetTime}')
         while self.buffer[0][0] < targetTime:
             self.preT = self.buffer[0][0]
             self.preQ = self.buffer[0][1]
             self.buffer.popleft()
-            print(f'pop {self.preT}')
 
         if self.preT is None or self.preQ is None:
             return None
@@ -46,15 +44,12 @@ class QuaternionBuffer:
         t = targetTime
         q = Quaternion.slerp(val1, val2, (t - t1) / (t2 - t1))
 
-        print(f'{t1} -- {t} -- {t2}\n{val1} -- {q} -- {val2}')
-        print(f'uavQuatwithDelay: {[q.x, q.y, q.z, q.w]}')
         return [q.x, q.y, q.z, q.w]
 
     def getMessageNoDelay(self):
         if self.empty:
             return None
         q = [self.buffer[-1][1].x, self.buffer[-1][1].y, self.buffer[-1][1].z, self.buffer[-1][1].w]
-        print(f'uavQuatNoDelay: {q}')
         return q 
 
 
