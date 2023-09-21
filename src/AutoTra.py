@@ -19,11 +19,11 @@ class AutoTra:
                  pitchLevelOn=True,
                  drawNum=-1
         ):
-        self.h = self.getVal(str='h', default=11.7)
-        self.a = self.getVal(str='a', default=500)
-        self.b = self.getVal(str='b', default=150)
+        self.h = self.getVal(str='h', default=8.9)
+        self.a = self.getVal(str='a', default=400)
+        self.b = self.getVal(str='b', default=200)
         x = self.getVal(str='x', default=-200)
-        self.hfovPitchRatio = self.getVal(str='hfov/pitch', default=3)
+        self.hfovPitchRatio = self.getVal(str='hfov/pitch', default=2.2)
         self.theTime = self.getVal(str='THE Time', default=3)
 
         self.pos2d = np.array([x, 0])
