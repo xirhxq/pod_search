@@ -183,11 +183,9 @@ class Transformer:
         self.podName = 'pod'
         self.osdkName = 'dji_osdk_ros'
         self.uwbName = 'uwb'
-        self.heightSensorName = 'height_sensor'
 
         rospy.Subscriber(self.uavName + '/' + self.osdkName + '/imu' + ('/noData' if self.args.noImu else ''), Imu, self.imuCallback)
         rospy.Subscriber(self.uavName + '/' + self.uwbName + '/filter/odom', Odometry, self.posCallback)
-        rospy.Subscriber(self.uavName + '/' + self.heightSensorName + '/noData', Vector3Stamped, self.hCallback)
 
         rospy.Subscriber(self.uavName + '/' + self.podName + '/pitch', Float32, self.pitchCallback)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/yaw', Float32, self.yawCallback)
@@ -241,9 +239,6 @@ class Transformer:
     def hfovCallback(self, msg):
         self.podHfovBuffer.addMessage(msg)
 
-    def hCallback(self, msg):
-        self.selfPos[2] = msg.vector.y + 100 - 91.6
-
     def vesselDetectionCallback(self, msg):
         for target in msg.targets:
             if target.category_id != 100:
@@ -288,7 +283,7 @@ class Transformer:
         realTargetRelGB = imgTargetRelGB / imgTargetRelGB[2] * (-self.selfPos[2])
         realTargetAbsGB = realTargetRelGB + np.array(self.selfPos)
 
-        self.trackPub.publish(Float64MultiArray(data=[cameraElevation + podPitch, cameraAzimuth + podYaw, podHfov, 2]))
+        self.trackPub.publish(Float64MultiArray(data=[cameraElevation + podPitch, cameraAzimuth + podYaw, podHfov, podPitch]))
 
 
         if self.args.debug:
@@ -430,8 +425,9 @@ class Transformer:
             tCnt = self.clsfy.targetsCnt
             for i in range(tLen):
                 print(
-                    f'Target[{i}] @ {", ".join([f"{x:.2f}" for x in t[i]])}, '
-                    f'{tCnt[i]} Frames, '
+                    f'Target[{i}] @ [{t[i][0]:.2f}, {t[i][1]:.2f}], '
+                    f'{YELLOW if tCnt[i] < 15 else GREEN}'
+                    f'{tCnt[i]} Frames{RESET}, '
                     f'Score: {tScore[i]:.2f}'
                     f'{RESET}'
                 )
