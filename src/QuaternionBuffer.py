@@ -14,6 +14,8 @@ class QuaternionBuffer:
         self.preT = None
         self.preQ = None
 
+        self.mode = 'NoInterp'
+
     @property
     def empty(self):
         return len(self.buffer) == 0
@@ -22,6 +24,23 @@ class QuaternionBuffer:
         self.buffer.append((rospy.Time.now().to_sec(), Quaternion(msg.w, msg.x, msg.y, msg.z)))
 
     def getMessage(self):
+        if self.mode == 'Interp':
+            return self.getMessageInterp()
+        elif self.mode == 'NoInterp':
+            return self.getMessageNoInterp()
+
+    def getMessageNoInterp(self):
+        if self.empty:
+            return None
+
+        targetTime = rospy.Time.now().to_sec() - self.maxAge
+        while self.buffer[0][0] < targetTime:
+            self.buffer.popleft()
+
+        q = self.buffer[0][1]
+        return [q.x, q.y, q.z, q.w]
+
+    def getMessageInterp(self):
         if self.empty:
             return None
 
