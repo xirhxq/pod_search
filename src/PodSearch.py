@@ -33,6 +33,11 @@ class PodSearch:
         self.args = args
         print(YELLOW + 'ARGS:', self.args, RESET)
 
+        if not self.args.takeoff and not self.args.test:
+            raise AssertionError("Please add --takeoff or --test arg")
+        if self.args.takeoff and self.args.test:
+            raise AssertionError("Not two args at the same time!")
+        
         self.pitch = 0.0
         self.yaw = 0.0
         self.hfov = 0.0
@@ -42,7 +47,7 @@ class PodSearch:
         self.expectedHfov = 0
         self.maxRate = 0
 
-        self.autoTra = AutoTra(pitchLevelOn=True, overlapOn=True, drawNum=-1)
+        self.autoTra = AutoTra(pitchLevelOn=True, overlapOn=True, drawNum=-1, takeoff=self.args.takeoff)
 
         self.tra = self.autoTra.theList
 
@@ -103,11 +108,6 @@ class PodSearch:
         self.dockData = []
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/dock', Float64MultiArray, lambda msg: setattr(self, 'dockData', msg.data))
 
-
-        if not self.args.takeoff and not self.args.test:
-            raise AssertionError("Please add --takeoff or --test arg")
-        if self.args.takeoff and self.args.test:
-            raise AssertionError("Not two args at the same time!")
         if args.track:
             self.toStepTrack()
             print('<<<TRACK MODE>>>')
@@ -228,7 +228,10 @@ class PodSearch:
         self.pubPYZMaxRate()
 
     def stepDock(self):
-        print(f'Dock Time {self.getTimeNow() - self.dockTime:.2f}')
+        print(
+            f'Dock {self.getTimeNow() - self.dockTime:.2f}, '
+            f'{(GREEN + "At Target" + RESET) if self.isAtTarget() else (RED + "Not At Target" + RESET)}'
+        )
         if len(self.dockData) < 4:
             print('No dock data!!!')
             return
@@ -237,7 +240,7 @@ class PodSearch:
         self.expectedHfov = self.getHfovFromPitch(self.dockData[1])
         self.maxRate = 10
         self.pubPYZMaxRate()
-        if self.isAtTarget() and self.getTimeNow() - self.dockTime >= 10:
+        if self.getTimeNow() - self.dockTime >= 10:
             self.toStepTrack()
 
     def pubPYZMaxRate(self):
@@ -275,7 +278,7 @@ class PodSearch:
             print(f'### PodSearch ###')
             print(f'Me @ State #{self.state} sUAV @ State #{self.uavState}')
             print(
-                f'Time {self.taskTime:.1f}',
+                f'Time {self.taskTime:.1f} / {self.autoTra.expectedTime:.2f}',
                 (GREEN + "At Target" + RESET) if self.isAtTarget() else (RED + "Not at Target" + RESET)
             )
             print(GREEN if self.pAtTarget else RED, end='')
