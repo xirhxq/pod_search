@@ -8,7 +8,7 @@ import numpy as np
 
 class AutoTra:
     def getVal(self, str='', default=None):
-        str = input(f'Input {str} (Default: {default}): ')
+        str = input(f'Input {str} (Default: {default:.2f}): ')
         if str == '':
             return default
         else:
@@ -17,13 +17,14 @@ class AutoTra:
     def __init__(self,
                  overlapOn=True,
                  pitchLevelOn=True,
-                 drawNum=-1
+                 drawNum=-1,
+                 takeoff=False
         ):
-        self.h = self.getVal(str='h', default=8.9)
-        self.a = self.getVal(str='a', default=400)
+        self.h = self.getVal(str='h', default=(5 if takeoff else 0.3) + 100 - 91.38)
+        self.a = self.getVal(str='a', default=200)
         self.b = self.getVal(str='b', default=200)
-        x = self.getVal(str='x', default=-200)
-        self.hfovPitchRatio = self.getVal(str='hfov/pitch', default=2.2)
+        x = self.getVal(str='x', default=-100)
+        self.hfovPitchRatio = self.getVal(str='hfov/pitch', default=3)
         self.theTime = self.getVal(str='THE Time', default=3)
 
         self.pos2d = np.array([x, 0])
