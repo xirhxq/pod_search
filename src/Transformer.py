@@ -198,7 +198,8 @@ class Transformer:
         rospy.Subscriber(self.uavName + '/' + self.podName + '/yaw', Float32, self.yawCallback)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/hfov', Float32, self.hfovCallback)
 
-        rospy.Subscriber(self.uavName + '/' + self.podName + '/car_detection', TargetsInFrame, self.targetsCallback, queue_size=1)
+        rospy.Subscriber(self.uavName + '/' + self.podName + '/vessel_detection', TargetsInFrame, self.vesselDetectionCallback, queue_size=1)
+        rospy.Subscriber(self.uavName + '/' + self.podName + '/usv_detection', TargetsInFrame, self.usvDetectionCallback, queue_size=1)
 
         rospy.Subscriber(self.uavName + '/' + self.podName + '/toTransformer', Bool, self.orderFromSearcherCallback)
 
@@ -259,15 +260,16 @@ class Transformer:
     def hCallback(self, msg):
         self.selfPos[2] = msg.vector.y + 100 - 91.6
 
-    def targetsCallback(self, msg):
-        # tic = rospy.Time.now().to_sec()
+    def vesselDetectionCallback(self, msg):
         for target in msg.targets:
             if target.category_id != 100:
-                self.transform(target.cx, target.cy, target.category_id, target.score)
-        # toc = rospy.Time.now().to_sec()
-        # print(f'Callback time {toc - tic}')
+                self.transform(target.cx, target.cy, target.category, target.category_id, target.score)
 
-    def calTarget(self, pixelX, pixelY, category):
+    def usvDetectionCallback(self, msg):
+        for target in msg.targets:
+            self.transform(target.cx, target.cy, target.category, target.category_id, target.score)
+
+    def calTarget(self, pixelX, pixelY, categoryID):
         timeDiff = self.podDelay
         try:
             podHfov = self.podHfovBuffer.getMessage(timeDiff).data
@@ -342,24 +344,26 @@ class Transformer:
                 self.caliLog.log('targetPosAbsGB', list(realTargetAbsGB))
                 self.caliLog.log('targetPosRel', list(realTargetRelI))
                 self.caliLog.log('targetPosAbs', list(realTargetAbsI))
-                self.caliLog.log('targetId', category)
+                self.caliLog.log('targetId', categoryID)
                 self.caliLog.newline()
         
         return realTargetAbsI
 
-    def transform(self, pixelX, pixelY, category, score):
+    def transform(self, pixelX, pixelY, category, categoryID, score):
         if not self.orderFromSearcher and not self.args.debug:
             return
-        realTargetAbs = self.calTarget(pixelX, pixelY, category)
+        realTargetAbs = self.calTarget(pixelX, pixelY, categoryID)
         if realTargetAbs is None:
             return
 
         if not self.outOfBound(*realTargetAbs):
             # self.clsfy.newPos(*realTargetAbs)
-            if self.searchState == 1 or self.searchState == 4:
-                self.clsfy.updateTarget(category, list(realTargetAbs), score)
-            if self.searchState == 6:
-                self.usvENU = realTargetAbs
+            if category == 'boat':
+                if self.searchState == 1 or self.searchState == 4:
+                    self.clsfy.updateTarget(categoryID, list(realTargetAbs), score)
+            elif category == 'usv':
+                if self.searchState == 6:
+                    self.usvENU = realTargetAbs
 
             # self.clsfy.outputTargets()
 
