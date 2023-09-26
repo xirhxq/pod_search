@@ -21,7 +21,6 @@ from geometry_msgs.msg import Vector3Stamped, Pose2D
 
 from Classifier import Classifier
 from DataLogger import DataLogger
-from ShowBar import ShowBar
 from Utils import *
 from QuaternionBuffer import QuaternionBuffer
 
@@ -162,13 +161,9 @@ class Transformer:
             for i in range(self.targetsAvailable):
                 variable_info.append((f'target{i}[3]', "list"))
                 variable_info.append((f'targetCnt{i}', 'int'))
-                variable_info.append((f'targetCheck{i}', 'bool'))
-                variable_info.append((f'targetReal{i}', 'bool'))
 
             self.dtlg.initialize(variable_info)
             print(self.dtlg.variable_names)
-        
-        self.orderFromSearcher = False
 
         self.h = 100 - 91.6 + 0.3
         self.a = self.h / 100 * 3000
@@ -201,8 +196,6 @@ class Transformer:
         rospy.Subscriber(self.uavName + '/' + self.podName + '/vessel_detection', TargetsInFrame, self.vesselDetectionCallback, queue_size=1)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/usv_detection', TargetsInFrame, self.usvDetectionCallback, queue_size=1)
 
-        rospy.Subscriber(self.uavName + '/' + self.podName + '/toTransformer', Bool, self.orderFromSearcherCallback)
-
         self.searchState = -1
         rospy.Subscriber(self.uavName + '/' + self.podName + '/searchState', Int8, lambda msg: setattr(self, 'searchState', msg.data))
 
@@ -210,8 +203,6 @@ class Transformer:
 
         self.startTime = rospy.Time.now().to_sec()
 
-        self.aimPub = rospy.Publisher(self.uavName + '/' + self.podName + '/aim', Float64MultiArray, queue_size=1)
-        rospy.Subscriber(self.uavName + '/' + self.podName + '/aimFail', Int16, self.aimFailCallback, queue_size=1)
         self.streamPub = rospy.Publisher(self.uavName + '/' + self.podName + '/stream', Float64MultiArray, queue_size=1) 
 
         self.trackPub = rospy.Publisher(self.uavName + '/' + self.podName + '/track', Float64MultiArray, queue_size=1)
@@ -230,13 +221,6 @@ class Transformer:
             self.rollB2GB = 0.22
             print(f'{GREEN}With rB2GB on{RESET}')
         self.rB2GB = R.from_euler('zyx', [self.yawB2GB, self.pitchB2GB, self.rollB2GB], degrees=True)
-
-    def aimFailCallback(self, msg):
-        self.clsfy.targetsCheck[msg.data] = True
-        self.clsfy.targetsReal[msg.data] = False
-
-    def orderFromSearcherCallback(self, msg):
-        self.orderFromSearcher = msg.data
 
     def posCallback(self, msg):
         # self.selfPos[0] = msg.pose.pose.position.x + 0.6
@@ -350,7 +334,7 @@ class Transformer:
         return realTargetAbsI
 
     def transform(self, pixelX, pixelY, category, categoryID, score):
-        if not self.orderFromSearcher and not self.args.debug:
+        if self.searchState <= 0 and not self.args.debug:
             return
         realTargetAbs = self.calTarget(pixelX, pixelY, categoryID)
         if realTargetAbs is None:
@@ -413,19 +397,13 @@ class Transformer:
         t = self.clsfy.targets
         tLen = len(t)
         tCnt = self.clsfy.targetsCnt
-        tCheck = self.clsfy.targetsCheck
-        tReal = self.clsfy.targetsReal
         for i in range(self.targetsAvailable):
-            if i < len(t):
+            if i < tLen:
                 self.dtlg.log(f'target{i}', t[i])
                 self.dtlg.log(f'targetCnt{i}', tCnt[i])
-                self.dtlg.log(f'targetCheck{i}', tCheck[i])
-                self.dtlg.log(f'targetReal{i}', tReal[i])
             else:
                 self.dtlg.log(f'target{i}', [-1, -1, -1])
                 self.dtlg.log(f'targetCnt{i}', 0)
-                self.dtlg.log(f'targetCheck{i}', False)
-                self.dtlg.log(f'targetReal{i}', False)
 
         self.dtlg.newline()
 
@@ -450,29 +428,13 @@ class Transformer:
             tLen = len(t)
             tScore = self.clsfy.targetsScore
             tCnt = self.clsfy.targetsCnt
-            tCheck = self.clsfy.targetsCheck
-            tReal = self.clsfy.targetsReal
             for i in range(tLen):
                 print(
-                    f'Target[{i}] @ {", ".join([f"{x:.2f}" for x in t[i]])}, {tCnt[i]} Frames, '
-                    f'{("" if tCheck[i] else (YELLOW + "Not Checked")) if tCnt[i] >= self.clsfy.checkThreshold else "Not enough"}'
-                    f'{((GREEN + "is a target") if tReal[i] else (RED + "not a target")) if tCheck[i] else ""}'
-                    f', Score: {tScore[i]:.2f}'
+                    f'Target[{i}] @ {", ".join([f"{x:.2f}" for x in t[i]])}, '
+                    f'{tCnt[i]} Frames, '
+                    f'Score: {tScore[i]:.2f}'
                     f'{RESET}'
                 )
-
-            '''
-            tInd = self.clsfy.firstNotChecked()
-            
-            if tInd is not None:
-                aimPitch, aimYaw = self.untransform(self.clsfy.targets[tInd])
-                msg = Float64MultiArray(data=[1, aimPitch, aimYaw, tInd])
-                print(f'{RED}==> Aiming @ Target [{tInd}] <== {RESET}p{aimPitch:.2f}, y{aimYaw:.2f}')
-                self.aimPub.publish(msg)
-            else:
-                msg = Float64MultiArray(data=[-1, -1, -1, -1])
-                self.aimPub.publish(msg)
-            '''
 
             streamInd = self.clsfy.lowestScoreIndex(threshold=15)
             if streamInd is not None and 0 <= streamInd < len(t):

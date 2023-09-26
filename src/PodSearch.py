@@ -22,8 +22,6 @@ signal(SIGINT, signal_handler)
 class State:
     INIT = 0
     SEARCH = 1
-    BROWSE = 2
-    AIM = 3
     STREAM = 4
     END = 5
     TRACK = 6
@@ -85,55 +83,26 @@ class PodSearch:
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/yFeedback', Float32, lambda msg: setattr(self, 'yFeedback', msg.data))
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/fFeedback', Float32, lambda msg: setattr(self, 'fFeedback', msg.data))
 
-        self.toTransformerPub = rospy.Publisher(
-            self.uavName + '/' + self.deviceName + '/toTransformer', Bool, queue_size=10
-        )
-
-        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/aim', Float64MultiArray, self.aimCallback)
-        self.aimFailPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/aimFail', Int16, queue_size=10)
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/stream', Float64MultiArray, self.streamCallback)
         self.streamIndex = None
         self.streamPitch = 0
         self.streamYaw = 0
         self.streamFlag = False
 
-
-        self.aimPitch = 0
-        self.aimYaw = 0
-        self.aimOn = False
-        self.aimIndex = -1
-
-        self.aimTimeThreshold = 10.0
-
-        self.thisAimIndex = -1
-        self.thisAimStartTime = 0
-
-        self.classifierClearPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/classifierClear', Empty, queue_size=10)
-
-        self.searchOverPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/searchOver', Empty, queue_size=10)
         self.uavReady = True if self.args.test else False
 
         self.endBeginTime = None
 
-        self.browseTra = [
-            [86, -10, 8],
-            [86, -2, 8],
-            [86, 6, 8],
-            [86, 14, 8]
-        ]
-        self.browseCnt = 0
-        self.browseBeginTime = None
-
         self.searchStatePub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/searchState', Int8, queue_size=1)
         self.uavState = 0
         rospy.Subscriber(self.uavName + '/uavState', Int8, lambda msg: setattr(self, 'uavState', msg.data))
-        
+
         self.trackData = []
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/track', Float64MultiArray, lambda msg: setattr(self, 'trackData', msg.data))
 
         self.dockData = []
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/dock', Float64MultiArray, lambda msg: setattr(self, 'dockData', msg.data))
-        
+
 
         if not self.args.takeoff and not self.args.test:
             raise AssertionError("Please add --takeoff or --test arg")
@@ -147,16 +116,6 @@ class PodSearch:
             self.toStepDock()
             print('<<<DOCK MODE>>>')
 
-
-
-    def aimCallback(self, msg):
-        if msg.data[0] > 0:
-            self.aimOn = True
-            self.aimPitch = msg.data[1]
-            self.aimYaw = msg.data[2]
-            self.aimIndex = int(msg.data[3])
-        else:
-            self.aimOn = False
 
     def streamCallback(self, msg):
         if msg.data[0] > 0:
@@ -186,21 +145,9 @@ class PodSearch:
     def toStepSearch(self):
         self.state = State.SEARCH
 
-    def toStepAim(self):
-        self.state = State.AIM
-        self.thisAimIndex = self.aimIndex
-        self.thisAimStartTime = self.getTimeNow()
-        self.thisAimFinish = False
-
     def toStepEnd(self):
         self.state = State.END
         self.endBeginTime = self.getTimeNow()
-
-    def toStepBrowse(self):
-        self.state = State.BROWSE
-        self.browseCnt = 0
-        self.browseBeginTime = self.getTimeNow()
-        self.browseFlag = False
 
     def toStepStream(self):
         self.state = State.STREAM
@@ -223,8 +170,6 @@ class PodSearch:
         self.expectedHfov = self.tra[0][2]
         self.maxRate = self.tra[0][3]
         self.pubPYZMaxRate()
-        self.toTransformerPub.publish(Bool(False))
-        self.classifierClearPub.publish(Empty())
         if self.isAtTarget() and self.uavReady:
             self.toStepSearch()
 
@@ -237,38 +182,9 @@ class PodSearch:
         self.pubPYZMaxRate()
         if self.isAtTarget():
             self.traCnt += 1
-        self.toTransformerPub.publish(Bool(True))
         if self.traCnt == len(self.tra):
             self.toStepStream()
-        # if self.aimOn:
-        #     self.toStepAim()
 
-    def stepAim(self):
-        aimTime = self.getTimeNow() - self.thisAimStartTime
-        if aimTime >= self.aimTimeThreshold and not self.thisAimFinish:
-            self.aimFailPub.publish(Int16(self.thisAimIndex))
-            self.thisAimFinish = True
-
-        if not self.aimOn or self.aimIndex != self.thisAimIndex:
-            self.thisAimFinish = True
-
-        if self.thisAimFinish and self.isAtTarget():
-            self.toStepSearch()
-        
-        self.expectedPitch = self.aimPitch
-        self.expectedYaw = self.aimYaw
-        self.expectedHfov = self.tra[self.traCnt][2] if self.thisAimFinish else self.tra[self.traCnt][2] / 2
-        self.maxRate = self.aimPitch
-        self.maxRate = 2
-        self.pubPYZMaxRate()
-        self.toTransformerPub.publish(Bool(True))
-        
-        print(f'{RED}==> StepAim @ Target {self.thisAimIndex} <=={RESET}')
-        print(f'Time: {aimTime:.2f}',
-              (RED + "Finished" + RESET) if self.thisAimFinish else "",
-              (GREEN + "At Target" + RESET) if self.isAtTarget() else ""
-        )
-    
     def stepStream(self):
         if not self.streamFlag and self.isAtTarget() and self.getTimeNow() - self.streamStartTime >= 3.0:
             self.streamFlag = True
@@ -293,30 +209,10 @@ class PodSearch:
             self.toStepDock()
 
     def stepEnd(self):
-        self.searchOverPub.publish(Empty())
         endTime = self.getTimeNow() - self.endBeginTime
         print(f'StepEnd with {endTime:.2f} seconds')
         if endTime >= 3.0:
             exit(0)
-
-    def stepBrowse(self):
-        self.expectedPitch = self.browseTra[self.browseCnt][0]
-        self.expectedYaw = self.browseTra[self.browseCnt][1]
-        self.expectedHfov = self.browseTra[self.browseCnt][2]
-        self.maxRate = 20
-        print(f'{YELLOW}==> StepBrowse @ {self.browseCnt} <=={RESET}')
-        print((f'{GREEN}Flag True{RESET}' if self.browseFlag else f'{RED}Flag False{RESET}'))
-        print(f'Browse Time: {self.getTimeNow() - self.browseBeginTime:.2f}')
-        self.pubPYZMaxRate()
-        if self.isAtTarget():
-            self.browseFlag = True
-        if not self.browseFlag:
-            self.browseBeginTime = self.getTimeNow()
-        if self.getTimeNow() - self.browseBeginTime >= 3.0:
-            self.browseCnt += 1
-            self.browseFlag = False
-        if self.browseCnt == len(self.browseTra):
-            self.toStepEnd()
 
     def getHfovFromPitch(self, pitch):
         return min(60, max(2.3, pitch * self.autoTra.hfovPitchRatio))
@@ -360,12 +256,8 @@ class PodSearch:
             self.stepInit()
         elif self.state == State.SEARCH:
             self.stepSearch()
-        elif self.state == State.AIM:
-            self.stepAim()
         elif self.state == State.END:
             self.stepEnd()
-        elif self.state == State.BROWSE:
-            self.stepBrowse()
         elif self.state == State.STREAM:
             self.stepStream()
         elif self.state == State.TRACK:
@@ -384,8 +276,6 @@ class PodSearch:
             print(f'Me @ State #{self.state} sUAV @ State #{self.uavState}')
             print(
                 f'Time {self.taskTime:.1f}',
-                f'State: {self.state}',
-                f'UAV Ready: {self.uavReady}',
                 (GREEN + "At Target" + RESET) if self.isAtTarget() else (RED + "Not at Target" + RESET)
             )
             print(GREEN if self.pAtTarget else RED, end='')
