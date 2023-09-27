@@ -17,7 +17,7 @@ from nav_msgs.msg import Odometry
 from scipy.spatial.transform import Rotation as R
 from sensor_msgs.msg import Imu
 from spirecv_msgs.msg import TargetsInFrame
-from std_msgs.msg import Int8, Float32, Float64MultiArray
+from std_msgs.msg import Int8, Float32, Float64MultiArray, MultiArrayDimension
 
 from Classifier import Classifier
 from DataLogger import DataLogger
@@ -248,7 +248,7 @@ class Transformer:
         for target in msg.targets:
             self.transform(target.cx, target.cy, target.category, target.category_id, target.score)
 
-    def calTarget(self, pixelX, pixelY, categoryID):
+    def calTarget(self, pixelX, pixelY, category, categoryID):
         timeDiff = self.podDelay
         try:
             podHfov = self.podHfovBuffer.getMessage(timeDiff).data
@@ -283,7 +283,9 @@ class Transformer:
         realTargetRelGB = imgTargetRelGB / imgTargetRelGB[2] * (-self.selfPos[2])
         realTargetAbsGB = realTargetRelGB + np.array(self.selfPos)
 
-        self.trackPub.publish(Float64MultiArray(data=[cameraElevation + podPitch, cameraAzimuth + podYaw, podHfov, podPitch]))
+        trackData = Float64MultiArray(data=[cameraElevation + podPitch, cameraAzimuth + podYaw, podHfov, podPitch])
+        trackData.dim = [MultiArrayDimension(label=category)]
+        self.trackPub.publish(trackData)
 
 
         if self.args.debug:
@@ -331,7 +333,7 @@ class Transformer:
     def transform(self, pixelX, pixelY, category, categoryID, score):
         if self.searchState <= 0 and not self.args.debug:
             return
-        realTargetAbs = self.calTarget(pixelX, pixelY, categoryID)
+        realTargetAbs = self.calTarget(pixelX, pixelY, category, categoryID)
         if realTargetAbs is None:
             return
 

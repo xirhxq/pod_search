@@ -102,8 +102,8 @@ class PodSearch:
         self.uavState = 0
         rospy.Subscriber(self.uavName + '/uavState', Int8, lambda msg: setattr(self, 'uavState', msg.data))
 
-        self.trackData = []
-        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/track', Float64MultiArray, lambda msg: setattr(self, 'trackData', msg.data))
+        self.trackData = {}
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/track', Float64MultiArray, self.trackCallback)
 
         self.dockData = []
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/dock', Float64MultiArray, lambda msg: setattr(self, 'dockData', msg.data))
@@ -120,6 +120,9 @@ class PodSearch:
         self.streamPitch = msg.data[0]
         self.streamYaw = msg.data[1]
         self.streamIndex = int(msg.data[2])
+
+    def trackCallback(self, msg):
+        self.trackData[msg.dim[0].label] = msg.data
 
     def getTimeNow(self):
         return rospy.Time.now().to_sec()
@@ -154,9 +157,9 @@ class PodSearch:
             self.toStepEnd()
         self.streamStartTime = self.getTimeNow()
 
-    def toStepTrack(self):
+    def toStepTrack(self, trackName):
         self.state = State.TRACK
-        self.trackData = []
+        self.trackData[trackName] = []
 
     def toStepDock(self):
         self.state = State.DOCK
@@ -198,10 +201,12 @@ class PodSearch:
             self.maxRate = 20
         else:
             print('Tracking...')
-            self.expectedPitch = self.trackData[0] - 0.5
-            self.expectedYaw = self.trackData[1]
-            self.expectedHfov = self.getHfovFromPitch(self.trackData[0], minHfov=4)
-            self.maxRate = self.trackData[3]
+            if len(self.trackData['boat']) != 4:
+                return
+            self.expectedPitch = self.trackData['boat'][0] - 0.5
+            self.expectedYaw = self.trackData['boat'][1]
+            self.expectedHfov = self.getHfovFromPitch(self.trackData['boat'][0], minHfov=4)
+            self.maxRate = self.trackData['boat'][3]
         self.pubPYZMaxRate()
         if streamTime >= 10.0:
             self.toStepDock()
@@ -217,12 +222,12 @@ class PodSearch:
 
     def stepTrack(self):
         print('Step Track')
-        if len(self.trackData) != 4:
+        if len(self.trackData['usv']) != 4:
             return
-        self.expectedPitch = self.trackData[0] - 0.5
-        self.expectedYaw = self.trackData[1]
-        self.expectedHfov = self.getHfovFromPitch(self.trackData[0])
-        self.maxRate = self.trackData[3]
+        self.expectedPitch = self.trackData['usv'][0] - 0.5
+        self.expectedYaw = self.trackData['usv'][1]
+        self.expectedHfov = self.getHfovFromPitch(self.trackData['usv'][0])
+        self.maxRate = self.trackData['usv'][3]
         self.pubPYZMaxRate()
 
     def stepDock(self):
@@ -239,7 +244,7 @@ class PodSearch:
         self.maxRate = 10
         self.pubPYZMaxRate()
         if self.getTimeNow() - self.dockTime >= 10:
-            self.toStepTrack()
+            self.toStepTrack('usv')
 
     def pubPYZMaxRate(self):
         if self.expectedYaw < -90 or self.expectedYaw > 90:
