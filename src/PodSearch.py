@@ -202,7 +202,7 @@ class PodSearch:
             print('Tracking...')
             self.expectedPitch = self.trackData[0] - 0.5
             self.expectedYaw = self.trackData[1]
-            self.expectedHfov = self.getHfovFromPitch(self.trackData[0])
+            self.expectedHfov = self.getHfovFromPitch(self.trackData[0], minHfov=4)
             self.maxRate = self.trackData[3]
         self.pubPYZMaxRate()
         if streamTime >= 10.0:
@@ -214,7 +214,7 @@ class PodSearch:
         if endTime >= 3.0:
             exit(0)
 
-    def getHfovFromPitch(self, pitch):
+    def getHfovFromPitch(self, pitch, minHfov=2.3, maxHfov=60):
         return min(60, max(2.3, pitch * self.autoTra.hfovPitchRatio))
 
     def stepTrack(self):
