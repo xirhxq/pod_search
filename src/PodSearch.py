@@ -5,11 +5,11 @@ from os import system
 from signal import signal, SIGINT
 
 import rospy
-from std_msgs.msg import Float32, Bool, Int16, Float64MultiArray, Empty, Int8
-
-from Utils import *
+from std_msgs.msg import Float32, Bool, Float64MultiArray, Int8
 
 from AutoTra import AutoTra
+from Utils import *
+
 
 def signal_handler(sig, frame):
     print('You pressed Ctrl+C!')
@@ -116,12 +116,10 @@ class PodSearch:
             self.toStepDock()
             print('<<<DOCK MODE>>>')
 
-
     def streamCallback(self, msg):
-        if msg.data[0] > 0:
-            self.streamPitch = msg.data[1]
-            self.streamYaw = msg.data[2]
-            self.streamIndex = int(msg.data[3])
+        self.streamPitch = msg.data[0]
+        self.streamYaw = msg.data[1]
+        self.streamIndex = int(msg.data[2])
 
     def getTimeNow(self):
         return rospy.Time.now().to_sec()

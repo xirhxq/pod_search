@@ -9,20 +9,20 @@ import time
 from collections import deque
 from math import degrees, radians
 from signal import signal, SIGINT
-
 import numpy as np
+
 import rospy
+from geometry_msgs.msg import Pose2D
 from nav_msgs.msg import Odometry
 from scipy.spatial.transform import Rotation as R
 from sensor_msgs.msg import Imu
 from spirecv_msgs.msg import TargetsInFrame
-from std_msgs.msg import Int8, Float32, Bool, Float64MultiArray, Int16, Empty
-from geometry_msgs.msg import Vector3Stamped, Pose2D
+from std_msgs.msg import Int8, Float32, Float64MultiArray
 
 from Classifier import Classifier
 from DataLogger import DataLogger
-from Utils import *
 from QuaternionBuffer import QuaternionBuffer
+from Utils import *
 
 
 def signal_handler(sig, frame):
@@ -435,7 +435,7 @@ class Transformer:
             streamInd = self.clsfy.lowestScoreIndex(threshold=15)
             if streamInd is not None and 0 <= streamInd < len(t):
                 streamPitch, streamYaw = self.untransform(self.clsfy.targets[streamInd])
-                msg = Float64MultiArray(data=[1, streamPitch, streamYaw, streamInd])
+                msg = Float64MultiArray(data=[streamPitch, streamYaw, streamInd])
                 self.streamPub.publish(msg)
 
                 if self.searchState == 6:
