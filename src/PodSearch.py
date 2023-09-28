@@ -122,7 +122,7 @@ class PodSearch:
         self.streamIndex = int(msg.data[2])
 
     def trackCallback(self, msg):
-        self.trackData[msg.dim[0].label] = msg.data
+        self.trackData[msg.layout.dim[0].label] = msg.data
 
     def getTimeNow(self):
         return rospy.Time.now().to_sec()
