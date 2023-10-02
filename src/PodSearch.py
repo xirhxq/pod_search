@@ -108,6 +108,9 @@ class PodSearch:
         self.dockData = []
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/dock', Float64MultiArray, lambda msg: setattr(self, 'dockData', msg.data))
 
+        self.landFlag = None
+        rospy.Subscriber('/usv/suav_land_flag', Int8, lambda msg: setattr(self, 'landFlag', msg.data))
+
         if args.track:
             self.toStepTrack()
             print('<<<TRACK MODE>>>')
@@ -222,6 +225,8 @@ class PodSearch:
 
     def stepTrack(self):
         print('Step Track')
+        if self.landFlag == 1:
+            self.toStepEnd()
         if len(self.trackData['usv']) != 4:
             return
         self.expectedPitch = self.trackData['usv'][0] - 0.5
