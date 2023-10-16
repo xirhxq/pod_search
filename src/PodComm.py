@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 import threading
+import argparse
 from collections import deque
 from datetime import datetime, timedelta
 from math import tan, degrees, radians, atan
@@ -26,47 +27,31 @@ FRAME_LEN = 30
 bAny, bS8, bU8, bS16, bU16, bS32, bU32, bF = 'x', 'b', 'B', 'h', 'H', 'i', 'I', 'f'
 DOWN_PROTO = '<' + bU8 * 4 + bS16 * 5 + bU8 * 2 + bAny * 2 + bS16 * 3 + bU16 + bU8 + bAny * 2 + bU8
 
+def splitByte(byte, bitSizes=[1]*8):
+    result = []
+    position = 0
+    for size in bitSizes[::-1]:
+        mask = (1 << size) - 1
+        value = (byte >> position) & mask
+        result.append(value)
+        position += size
+    return result[::-1]
+
 WAITING_DOWN_FRAME_HEAD_1 = 1
 WAITING_DOWN_FRAME_HEAD_2 = 2
 READING_DATA = 3
 
 from glob import glob
 
-#PORT = path.join('/dev', readlink(glob('/dev/serial/by-path/*2.4.4*')[0]).split('/')[-1])
 PORT = '/dev/ttyUSB0'
 
 from signal import signal, SIGINT
-
 
 def signal_handler(sig, frame):
     print('You pressed Ctrl+C!')
     exit(0)
 
-
 signal(SIGINT, signal_handler)
-
-SECRET_DICT = {
-    0: 100, 1: 140, 2: 160, 3: 180, 5: 220, 7: 250, 10: 290, 20: 355
-}
-
-def secretInterp(x, data=SECRET_DICT):
-    sortedData = sorted(data.items())
-    xVal, yVal = zip(*sortedData)
-    if x <= xVal[0]:
-        return yVal[0]
-    if x >= xVal[-1]:
-        return yVal[-1]
-
-    index = 0
-    while x > xVal[index]:
-        index += 1
-
-    x1, y1 = xVal[index - 1], yVal[index - 1]
-    x2, y2 = xVal[index], yVal[index]
-
-    y = y1 + (x - x1) * (y2 - y1) / (x2 - x1)
-    return y
-
 
 class UP_MSG:
     def __init__(self):
@@ -102,6 +87,10 @@ class UP_MSG:
 
     def antiFogOff(self):
         self.orderB = b'\x06'
+        return self.msg()
+
+    def followOff(self):
+        self.orderB = b'\x0E'
         return self.msg()
 
     def changeZoomLevel(self, level):
@@ -140,7 +129,9 @@ def timer(tol=1):
 
 
 class POD_COMM:
-    def __init__(self):
+    def __init__(self, args):
+        self.args = args
+
         self.initTextOff = False
         self.initAntiFog = False
         self.state = WAITING_DOWN_FRAME_HEAD_1
@@ -256,15 +247,17 @@ class POD_COMM:
     def genUpMsg(self):
         up = UP_MSG()
 
-        if self.podBigViewType != 0x00 or self.podSmallViewType != 0x00:
+        if self.podBigViewType != 0x00 or self.podSmallViewType != 0x02:
             up.changeViewType()
-
         elif not self.initTextOff:
             up.textOff()
             self.lazyTag = 10
             self.initTextOff = True
             print('Text off')
-        elif not self.initAntiFog:
+        # elif self.podFollowModeOn == 1:
+        #     up.followOff()
+        #     print('Follow Off')
+        elif not self.podImageEnhanceOn:
             up.antiFogOn()
             self.lazyTag = 10
             print('AntiFog')
@@ -343,7 +336,21 @@ class POD_COMM:
                              podRollRatex100, podPitchRatex100, podYawRatex100,
                              laserRangex10, selfCheckRes) = downData[:-1]
                            
-                            '''
+                            podState2Datas = splitByte(podState2)
+                            print(f'podState2Datas: {podState2Datas}')
+                            self.podImageEnhanceOn = podState2Datas[0]
+                            self.podRollControlMode = podState2Datas[4]
+                            self.podFollowModeOn = podState2Datas[5]
+                            self.podLockModeOn = podState2Datas[6]
+                            self.podLaserOn = podState2Datas[7]
+
+                            podState3Datas = splitByte(podState3, [2, 2, 4])
+                            print(f'podState3Datas: {podState3Datas}')
+                            self.podBigViewType = podState3Datas[0]
+                            self.podSmallViewType = podState3Datas[1]
+                            zoomx10High4 = podState3Datas[2]
+
+                            #'''
                             print(
                                 f'state1: {podState1:2x}\n'
                                 f'state2: {podState2:2x}\n'
@@ -357,15 +364,9 @@ class POD_COMM:
                                 f'laserRangex10: {laserRangex10}\n'
                                 f'selfCheckRes: {selfCheckRes}\n'
                             )
-                            '''
+                            #'''
 
-                            if (podState2 >> 7) == 1:
-                                self.initAntiFog = True
-
-                            self.podBigViewType = (podState3 & 0xFF) >> 6 
-                            self.podSmallViewType = (podState3 & 0x3F) >> 4
-
-                            self.podZoomLevel = (zoomx10Low8 + ((podState3 & 0x1111) << 8)) / 10
+                            self.podZoomLevel = (zoomx10Low8 + (zoomx10High4 << 8)) / 10
                             self.podPitch = -podPitchx100 / 100
                             self.podYaw = -self.round(podYawx100 / 100, 180)
                             self.podRoll = podRollx100 / 100
@@ -459,11 +460,14 @@ class POD_COMM:
 
     def spin(self):
         self.startRead()
-        while not rospy.is_shutdown():
+        while not rospy.is_shutdown() and not self.args.read:
             self.spinOnce()
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--read', help='read only', action='store_true')
+    args, unknown = parser.parse_known_args()
     print(f'PORT is {PORT}')
-    pod_comm = POD_COMM()
+    pod_comm = POD_COMM(args)
     pod_comm.spin()
