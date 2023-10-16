@@ -17,14 +17,14 @@ from Utils import *
 
 HZ = 50
 
-DOWN_FRAME_HEAD_1 = b'\xAA'
-DOWN_FRAME_HEAD_2 = b'\x55'
+DOWN_FRAME_HEAD_1 = b'\xEE'
+DOWN_FRAME_HEAD_2 = b'\x16'
 DOWN_FRAME_HEAD = DOWN_FRAME_HEAD_1 + DOWN_FRAME_HEAD_2
 UP_FRAME_HEAD = b'\xEB\x90'
-FRAME_LEN = 48
+FRAME_LEN = 30
 
 bAny, bS8, bU8, bS16, bU16, bS32, bU32, bF = 'x', 'b', 'B', 'h', 'H', 'i', 'I', 'f'
-DOWN_PROTO = '<' + bU8 * 2 + bU16 + bS16 + bU16 + bAny * 29 + bU8 + bAny * 2 + bU16 + bU8 + bAny * 2 + bU8 + bU8 * 2
+DOWN_PROTO = '<' + bU8 * 4 + bS16 * 5 + bU8 * 2 + bAny * 2 + bS16 * 3 + bU16 + bU8 + bAny * 2 + bU8
 
 WAITING_DOWN_FRAME_HEAD_1 = 1
 WAITING_DOWN_FRAME_HEAD_2 = 2
@@ -48,8 +48,6 @@ signal(SIGINT, signal_handler)
 SECRET_DICT = {
     0: 100, 1: 140, 2: 160, 3: 180, 5: 220, 7: 250, 10: 290, 20: 355
 }
-SECRET_PITCH_OFFSET = -2.57
-SECRET_YAW_OFFSET = -5.3
 
 def secretInterp(x, data=SECRET_DICT):
     sortedData = sorted(data.items())
@@ -73,24 +71,18 @@ def secretInterp(x, data=SECRET_DICT):
 class UP_MSG:
     def __init__(self):
         self.orderA = UP_FRAME_HEAD
-        self.orderB = b'\xFF'
-        self.orderC = b'\x00\x00'
-        self.orderD = b'\x00\x00\x00\x00'
-        self.orderE = b'\x00' * 45
+        self.orderB = b'\x00'
+        self.orderX = b'\x00\x00'
+        self.orderY = b'\x00\x00'
+        self.order3 = b'\x00'
+        self.orderZ = b'\x00'
+        self.order4 = b'\x00' * 6
 
     def msg(self):
-        msg = self.orderA + self.orderB + self.orderC + self.orderD + self.orderE
-        assert len(msg) == 54
+        msg = self.orderA + self.orderB + self.orderX + self.orderY + self.order3 + self.orderZ + self.order4
+        assert len(msg) == 15
         checkSum = sum(msg) & 0xFF
         return msg + pack('<B', checkSum)
-
-    def zoomDown(self):
-        self.orderB = b'\x48'
-        return self.msg()
-
-    def zoomUp(self):
-        self.orderB = b'\x44'
-        return self.msg()
 
     def lockOn(self):
         self.orderB = b'\xC5'
@@ -100,16 +92,16 @@ class UP_MSG:
         self.orderB = b'\xC6'
         return self.msg()
 
-    def textOnOff(self):
-        self.orderB = b'\x93'
+    def textOff(self):
+        self.orderB = b'\x52'
         return self.msg()
 
     def antiFogOn(self):
-        self.orderB = b'\xDD'
+        self.orderB = b'\x05'
         return self.msg()
 
     def antiFogOff(self):
-        self.orderB = b'\xDE'
+        self.orderB = b'\x06'
         return self.msg()
 
     def changeZoomLevel(self, level):
@@ -118,10 +110,15 @@ class UP_MSG:
         print(f'change to {level}')
         return self.msg()
 
+    def changeViewType(self):
+        self.orderB = b'\x01'
+        self.order3 = b'\x00'
+        return self.msg()
+
     def manualPYRate(self, prate, yrate):
-        self.orderB = b'\x25'
-        self.orderC = pack('<h', int(prate))
-        self.orderD = pack('<h', int(yrate)) + b'\x00\x00'
+        self.orderB = b'\x24'
+        self.orderX = pack('<h', int(-10 * yrate))
+        self.orderY = pack('<h', int(-10 * prate))
         return self.msg()
 
 
@@ -156,8 +153,8 @@ class POD_COMM:
         self.lazyTag = 0
         self.SENSOR_WIDTH = tan(radians(2.3) / 2) * 2 * 129
 
-        self.podState0 = 0x00
-        self.podState1 = 0x00
+        self.podState0 = -1
+        self.podState1 = -1
         self.podF = 4.3
         self.podZoomLevel = 1
         self.podPitch = 0.0
@@ -167,17 +164,14 @@ class POD_COMM:
         self.podElecZoom = 0
         self.podOrder = 0
 
-        self.podYawDeque = deque()
-        self.podPitchDeque = deque()
-        self.timeInterval = timedelta(seconds=1)
-        self.podYawV = 0
-        self.podPitchV = 0
+        self.podBigViewType = 0
+        self.podSmallViewType = 0
 
         self.checkSumRightCnt = 0
         self.checkSumWrongCnt = 0
 
         self.maxRate = 300
-        self.zoomUnit = 4.3
+        self.zoomUnit = 4.5
         self.pyTol = 0.5
         self.zTol = 0.05
         self.lockCnt = 0
@@ -262,14 +256,18 @@ class POD_COMM:
     def genUpMsg(self):
         up = UP_MSG()
 
-        if not self.initTextOff:
-            up.textOnOff()
+        if self.podBigViewType != 0x00 or self.podSmallViewType != 0x00:
+            up.changeViewType()
+
+        elif not self.initTextOff:
+            up.textOff()
             self.lazyTag = 10
             self.initTextOff = True
+            print('Text off')
         elif not self.initAntiFog:
             up.antiFogOn()
             self.lazyTag = 10
-            self.initAntiFog = True
+            print('AntiFog')
         elif self.lazyTag <= 15:
             pitchDiff = self.expectedPitch - self.podPitch
             yawDiff = self.round(self.expectedYaw - self.podYaw, 180)
@@ -278,24 +276,19 @@ class POD_COMM:
 
             if (not self.pAtTarget or not self.yAtTarget) and self.lazyTag == 0:
                 prMax, yrMax = self.maxRate, self.maxRate
-                prate = max(-prMax, min(prMax, pitchDiff * 240))
-                yrate = max(-yrMax, min(yrMax, yawDiff * 200))
-
-                prate = -self.deadZone(prate, z=80)
-                yrate = -self.deadZone(yrate, z=110)
-                
+                prate = max(-prMax, min(prMax, pitchDiff))
+                yrate = max(-yrMax, min(yrMax, yawDiff))
 
                 up.manualPYRate(prate, yrate)
 
-                # print(f'up pitch {self.podPitch:.2f} -> {self.expectedPitch:.2f} diff: {pitchDiff:.2f} rate: {prate:.2f}')
-                # print(f'up yaw {self.podYaw:.2f} -> {self.expectedYaw:.2f} diff: {yawDiff:.2f} rate: {yrate:.2f}')
+                print(f'up pitch {self.podPitch:.2f} -> {self.expectedPitch:.2f} diff: {pitchDiff:.2f} rate: {prate:.2f}')
+                print(f'up yaw {self.podYaw:.2f} -> {self.expectedYaw:.2f} diff: {yawDiff:.2f} rate: {yrate:.2f}')
             elif self.pAtTargetStrict and self.yAtTargetStrict:
-                up.lockOn()
                 self.lockCnt += 1
 
             elif not self.fAtTarget:
                 if self.lazyTag == 0:
-                    # print(f'change zoom level {self.podZoomLevel} to {self.expectedZoomLevel}')
+                    print(f'change zoom level {self.podZoomLevel} to {self.expectedZoomLevel}')
                     up.changeZoomLevel(self.expectedZoomLevel)
                     self.lazyTag = max(abs(self.expectedZoomLevel - self.podZoomLevel) * 10, 50)
                     self.podF = self.zoomUnit * self.expectedZoomLevel
@@ -332,56 +325,52 @@ class POD_COMM:
                     # print(f'reading data buffer len {len(dataBuf)}')
                     dataBuf.append(data[0])
                     if len(dataBuf) == FRAME_LEN:
-                        # print('down: ', DOWN_FRAME_HEAD.hex(), dataBuf[:-2].hex(), dataBuf[-2:].hex())
+                        # print('down: ', DOWN_FRAME_HEAD.hex(), dataBuf[:-1].hex(), dataBuf[-1:].hex())
                         downData = unpack(DOWN_PROTO, dataBuf)
-                        checkSum = downData[-1] * 0x100 + downData[-2]
-                        if checkSum != sum(dataBuf[:-2]):
-                            # print('Checksum error')
-                            # print('Checksum: ', f'{checkSum:02x}', 'Realsum: ', f'{sum(dataBuf[:-2]):02x}')
+                        checkSum = downData[-1]
+                        realSum = sum(dataBuf[:-1]) + 0xEE + 0x16
+                        if checkSum != realSum & 0xFF:
+                            # print('Checksum: ', f'{checkSum:02x}', 'Realsum: ', f'{realSum:02x}')
                             self.checkSumWrongCnt += 1
                             # raise AssertionError
                         else:
+                            # print('Right!!!')
                             self.checkSumRightCnt += 1
-                            (self.podState0, self.podState1,
-                             podFx10, podPitchx100, podYawx100,
-                             self.podCameraState, self.podLaserRes,
-                             self.podElecZoom, self.podOrder) = downData[:-2]
-                            # self.podF = podFx10 / 10
-                            self.podPitch = 90 - podPitchx100 / 100 - SECRET_PITCH_OFFSET
-                            self.podYaw = - self.round(podYawx100 / 100 - SECRET_YAW_OFFSET, 180)
-                            self.podZoomLevel = self.looseZoomLevel(round(self.podF / self.zoomUnit))
+                            (podState1, podState2, zoomx10Low8, podState3, 
+                             xOffsetDegreex20, yOffsetDegreex20, 
+                             podRollx100, podPitchx100, podYawx100,
+                             waveHor, waveVer, 
+                             podRollRatex100, podPitchRatex100, podYawRatex100,
+                             laserRangex10, selfCheckRes) = downData[:-1]
+                           
+                            '''
+                            print(
+                                f'state1: {podState1:2x}\n'
+                                f'state2: {podState2:2x}\n'
+                                f'zoomx10Low8: {zoomx10Low8}\n'
+                                f'state3: {podState3:2x}\n'
+                                f'xOffsetDegx20: {xOffsetDegreex20}\n'
+                                f'yOffsetDegx20: {yOffsetDegreex20}\n'
+                                f'podRPYx100: R{podRollx100}, P{podPitchx100}, Y{podYawx100}\n'
+                                f'waveHor: {waveHor}, waveVer: {waveVer}\n'
+                                f'podRPYRatex100: R{podRollRatex100}, P{podPitchRatex100}, Y{podYawRatex100}\n'
+                                f'laserRangex10: {laserRangex10}\n'
+                                f'selfCheckRes: {selfCheckRes}\n'
+                            )
+                            '''
 
-                            currentTime = datetime.now()
-                            self.podYawDeque.append((currentTime, self.podYaw))
-                            self.podPitchDeque.append((currentTime, self.podPitch))
+                            if (podState2 >> 7) == 1:
+                                self.initAntiFog = True
 
-                            while (
-                                    len(self.podYawDeque) > 0 and
-                                    self.podYawDeque[0][0] < currentTime - self.timeInterval
-                            ):
-                                # print(f'pop {self.podYawDeque[0]}')
-                                self.podYawDeque.popleft()
+                            self.podBigViewType = (podState3 & 0xFF) >> 6 
+                            self.podSmallViewType = (podState3 & 0x3F) >> 4
 
-                            while (
-                                    len(self.podPitchDeque) > 0 and
-                                    self.podPitchDeque[0][0] < currentTime - self.timeInterval
-                            ):
-                                self.podPitchDeque.popleft()
-
-                            if len(self.podYawDeque) > 1:
-                                self.podYawV = (
-                                        self.round(self.podYawDeque[-1][1] - self.podYawDeque[0][1], 180) /
-                                        (self.podYawDeque[-1][0] - self.podYawDeque[0][0]).total_seconds()
-                                )
-
-                            if len(self.podPitchDeque) > 1:
-                                self.podPitchV = (
-                                        (self.podPitchDeque[-1][1] - self.podPitchDeque[0][1]) /
-                                        (self.podPitchDeque[-1][0] - self.podPitchDeque[0][0]).total_seconds()
-                                )
-
-                            # print(f'Received state {self.podState0}, camera state {self.podCameraState}, zoom {self.podF}, pitch {self.podPitch}, yaw {self.podYaw}')
-                        # print(f'down zoom: {self.podF:.2f} pitch: {self.podPitch:.2f} yaw: {self.podYaw:.2f}')
+                            self.podZoomLevel = (zoomx10Low8 + ((podState3 & 0x1111) << 8)) / 10
+                            self.podPitch = -podPitchx100 / 100
+                            self.podYaw = -self.round(podYawx100 / 100, 180)
+                            self.podRoll = podRollx100 / 100
+                            self.laserRange = laserRangex10 / 10
+                            print(f'zoom {self.podZoomLevel}, pitch {self.podPitch}, yaw {self.podYaw}, roll {self.podRoll}, range {self.laserRange}, viewType: {self.podBigViewType}, {self.podSmallViewType}')
                         self.state = WAITING_DOWN_FRAME_HEAD_1
 
             if self.state == WAITING_DOWN_FRAME_HEAD_1:
@@ -470,7 +459,6 @@ class POD_COMM:
 
     def spin(self):
         self.startRead()
-        #self.startWrite()
         while not rospy.is_shutdown():
             self.spinOnce()
 
