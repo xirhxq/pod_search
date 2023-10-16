@@ -214,7 +214,7 @@ class Transformer:
             self.rollB2GB = 0
             print(f'{RED}No rB2GB{RESET}')
         else:
-            self.yawB2GB = 0.68
+            self.yawB2GB = 30.68
             self.pitchB2GB = 0
             self.rollB2GB = 0.22
             print(f'{GREEN}With rB2GB on{RESET}')
@@ -434,7 +434,7 @@ class Transformer:
                     f'{RESET}'
                 )
 
-            streamInd = self.clsfy.lowestScoreIndex(threshold=15)
+            streamInd = self.clsfy.lowestScoreIndex(threshold=5)
             if streamInd is not None and 0 <= streamInd < len(t):
                 streamPitch, streamYaw = self.untransform(self.clsfy.targets[streamInd])
                 msg = Float64MultiArray(data=[streamPitch, streamYaw, streamInd])

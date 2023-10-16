@@ -108,7 +108,7 @@ class PodSearch:
         self.dockData = []
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/dock', Float64MultiArray, lambda msg: setattr(self, 'dockData', msg.data))
 
-        self.landFlag = None
+        self.landFlag = -1
         rospy.Subscriber('/usv/suav_land_flag', Int8, lambda msg: setattr(self, 'landFlag', msg.data))
 
         if args.track:
@@ -160,7 +160,7 @@ class PodSearch:
             self.toStepEnd()
         self.streamStartTime = self.getTimeNow()
 
-    def toStepTrack(self, trackName):
+    def toStepTrack(self, trackName='boat'):
         self.state = State.TRACK
         self.trackData[trackName] = []
 
@@ -227,12 +227,13 @@ class PodSearch:
         print('Step Track')
         if self.landFlag == 1:
             self.toStepEnd()
-        if len(self.trackData['usv']) != 4:
+        trackName = 'boat'
+        if len(self.trackData[trackName]) < 4:
             return
-        self.expectedPitch = self.trackData['usv'][0] - 0.5
-        self.expectedYaw = self.trackData['usv'][1]
-        self.expectedHfov = self.getHfovFromPitch(self.trackData['usv'][0])
-        self.maxRate = self.trackData['usv'][3]
+        self.expectedPitch = self.trackData[trackName][0] - 0.5
+        self.expectedYaw = self.trackData[trackName][1]
+        self.expectedHfov = self.getHfovFromPitch(self.trackData[trackName][0])
+        self.maxRate = self.trackData[trackName][3]
         self.pubPYZMaxRate()
 
     def stepDock(self):

@@ -22,10 +22,10 @@ class AutoTra:
         ):
         self.h = self.getVal(str='h', default=(5 if takeoff else 0.3) + 100 - 91.38)
         self.a = self.getVal(str='a', default=200)
-        self.b = self.getVal(str='b', default=200)
-        x = self.getVal(str='x', default=-200)
+        self.b = self.getVal(str='b', default=300)
+        x = self.getVal(str='x', default=-150)
         self.hfovPitchRatio = self.getVal(str='hfov/pitch', default=3)
-        self.theTime = self.getVal(str='THE Time', default=3)
+        self.theTime = self.getVal(str='THE Time', default=10)
 
         self.pos2d = np.array([x, 0])
 
