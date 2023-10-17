@@ -98,6 +98,14 @@ class UP_MSG:
         self.orderY = pack('<h', int(-10 * prate))
         return self.msg()
 
+    def laserOn(self):
+        self.orderB = b'\x2d'
+        return self.msg()
+
+    def laserOff(self):
+        self.orderB = b'\x2e'
+        return self.msg()
+
 
 def timer(tol=1):
     def decorator(func):
@@ -166,6 +174,7 @@ class POD_COMM:
         self.expectedYaw = 0.0
         self.expectedF = 9
         self.expectedZoomLevel = 2
+        self.expectedLaserOn = False
         self.maxRate = 300
 
         # control paras:
@@ -195,10 +204,15 @@ class POD_COMM:
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/maxRate', Float32, lambda msg: (
             setattr(self, 'maxRate', msg.data)
         ))
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/expectedLaserOn', Bool, lambda msg: (
+            setattr(self, 'expectedLaserOn', msg.data)
+        ))
+
         self.pitchPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/pitch', Float32, queue_size=1)
         self.yawPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/yaw', Float32, queue_size=1)
         self.rollPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/roll', Float32, queue_size=1)
         self.hfovPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/hfov', Float32, queue_size=1)
+        self.laserRangePub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/laserRange', Float32, queue_size=1)
         
         self.pNotAtTargetTime = self.getTimeNow()
         self.yNotAtTargetTime = self.getTimeNow()
@@ -230,7 +244,7 @@ class POD_COMM:
 
     def genUpMsg(self):
         up = UP_MSG()
-        # up.manualPYRate(0, 0)
+        up.manualPYRate(0, 0)
 
         if not self.singleViewOn:
             up.changeViewType()
@@ -240,6 +254,14 @@ class POD_COMM:
             self.initTextOff = True
         elif not self.podImageEnhanceOn:
             up.antiFogOn()
+        elif self.expectedLaserOn != self.podLaserOn:
+            if self.expectedLaserOn:
+                if self.args.indoor:
+                    raise AssertionError('Should not turn laser on indoor!')
+                else:
+                    up.laserOn()
+            else:
+                up.laserOff()
         else:
             pitchDiff = self.expectedPitch - self.podPitch
             yawDiff = self.round(self.expectedYaw - self.podYaw, 180)
@@ -253,11 +275,14 @@ class POD_COMM:
 
                 up.manualPYRate(prate, yrate)
 
-                print(f'up pitch {self.podPitch:.2f} -> {self.expectedPitch:.2f} diff: {pitchDiff:.2f} rate: {prate:.2f}')
-                print(f'up yaw {self.podYaw:.2f} -> {self.expectedYaw:.2f} diff: {yawDiff:.2f} rate: {yrate:.2f}')
+                if self.args.controlDebug:
+                    print(f'up pitch {self.podPitch:.2f} -> {self.expectedPitch:.2f} diff: {pitchDiff:.2f} rate: {prate:.2f}')
+                    print(f'up yaw {self.podYaw:.2f} -> {self.expectedYaw:.2f} diff: {yawDiff:.2f} rate: {yrate:.2f}')
 
             elif not self.fAtTarget:
-                print(f'change zoom level {self.podZoomLevel} to {self.expectedZoomLevel}')
+                
+                if self.args.controlDebug:
+                    print(f'change zoom level {self.podZoomLevel} to {self.expectedZoomLevel}')
                 up.changeZoomLevel(self.expectedZoomLevel)
 
         return up.msg()
@@ -383,6 +408,7 @@ class POD_COMM:
         self.yawPub.publish(self.podYaw)
         self.rollPub.publish(self.podRoll)
         self.hfovPub.publish(self.getHfov(self.podF))
+        self.laserRangePub.publish(self.podLaserRange)
 
         self.pAtTargetPub.publish(self.pAtTarget)
         self.yAtTargetPub.publish(self.yAtTarget)
@@ -427,6 +453,7 @@ if __name__ == '__main__':
     parser.add_argument('--read', help='read only', action='store_true')
     parser.add_argument('--serialDebug', help='debug serial read', action='store_true')
     parser.add_argument('--controlDebug', help='control output', action='store_true')
+    parser.add_argument('--indoor', help='indoor test w/o laser', action='store_true')
     args, unknown = parser.parse_known_args()
     print(f'PORT is {PORT}')
     pod_comm = POD_COMM(args)
