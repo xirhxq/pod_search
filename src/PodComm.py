@@ -230,14 +230,6 @@ class POD_COMM:
         else:
             return val
 
-    def deadZone(self, x, z=110):
-        if x == 0:
-            return 0
-        elif -z <= x and x <= z:
-            return z * abs(x) / x
-        else:
-            return x
-
     def genUpMsg(self):
         up = UP_MSG()
         up.manualPYRate(0, 0)
@@ -253,7 +245,6 @@ class POD_COMM:
         elif not self.podImageEnhanceOn:
             up.antiFogOn()
             self.lazyTag = 10
-            print('AntiFog')
         elif self.lazyTag <= 15:
             pitchDiff = self.expectedPitch - self.podPitch
             yawDiff = self.round(self.expectedYaw - self.podYaw, 180)
@@ -276,18 +267,6 @@ class POD_COMM:
                     up.changeZoomLevel(self.expectedZoomLevel)
                     self.lazyTag = max(abs(self.expectedZoomLevel - self.podZoomLevel) * 10, 50)
 
-            # elif relZoomDiff < -self.zTol:
-            #     # print(f'up decrease zoom a bit')
-            #     up.zoomDown()
-            #     if self.lazyTag == 0:
-            #         self.lazyTag = 12
-            #
-            # elif relZoomDiff > self.zTol:
-            #     # print(f'up increase zoom a bit')
-            #     up.zoomUp()
-            #     if self.lazyTag == 0:
-            #         self.lazyTag = 12
-
         if self.lazyTag > 0:
             self.lazyTag -= 1
 
@@ -305,19 +284,22 @@ class POD_COMM:
                         self.state = READING_DATA
                         dataBuf = bytearray()
                 elif self.state == READING_DATA:
-                    # print(f'reading data buffer len {len(dataBuf)}')
                     dataBuf.append(data[0])
                     if len(dataBuf) == FRAME_LEN:
-                        # print('down: ', DOWN_FRAME_HEAD.hex(), dataBuf[:-1].hex(), dataBuf[-1:].hex())
+                        if self.args.serialDebug:
+                            print('down: ', DOWN_FRAME_HEAD.hex(), dataBuf[:-1].hex(), dataBuf[-1:].hex())
                         downData = unpack(DOWN_PROTO, dataBuf)
                         checkSum = downData[-1]
                         realSum = sum(dataBuf[:-1]) + 0xEE + 0x16
                         if checkSum != realSum & 0xFF:
-                            # print('Checksum: ', f'{checkSum:02x}', 'Realsum: ', f'{realSum:02x}')
+                            if self.args.serialDebug:
+                                print('Checksum: ', f'{checkSum:02x}', 'Realsum: ', f'{realSum:02x}')
                             self.checkSumWrongCnt += 1
-                            # raise AssertionError
+                            if self.args.serialDebug:
+                                raise AssertionError
                         else:
-                            # print('Right!!!')
+                            if self.args.serialDebug:
+                                print('Right!!!')
                             self.checkSumRightCnt += 1
                             (podState1, podState2, zoomx10Low8, podState3, 
                              xOffsetDegreex20, yOffsetDegreex20, 
@@ -454,6 +436,7 @@ class POD_COMM:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--read', help='read only', action='store_true')
+    parser.add_argument('--serialDebug', help='debug serial read', action='store_true')
     args, unknown = parser.parse_known_args()
     print(f'PORT is {PORT}')
     pod_comm = POD_COMM(args)
