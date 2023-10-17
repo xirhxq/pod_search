@@ -15,6 +15,7 @@ import serial
 from std_msgs.msg import Float32, Bool
 
 from Utils import *
+import PodParas
 
 HZ = 50
 
@@ -84,7 +85,6 @@ class UP_MSG:
     def changeZoomLevel(self, level):
         self.orderB = b'\x5a'
         self.orderX = pack('<h', int(level * 10))
-        print(f'change to {level:.1f}')
         return self.msg()
 
     def changeViewType(self):
@@ -142,13 +142,11 @@ class POD_COMM:
             bytesize=serial.EIGHTBITS,
             timeout=0.5
         )
+        self.downData = None
 
         # pod constants:
-        self.SENSOR_WIDTH = tan(radians(2.3) / 2) * 2 * 135
-        self.zoomUnit = 4.5
-        self.viewTypeDict = {0: 'EO1', 1: 'EO2', 2: 'IR1', 3: 'IR2'}
         self.pyTol = 0.1
-        self.zTol = 0.1
+        self.zTol = 0.2
 
         # pod states: bool or bit
         self.podImageEnhanceOn = None
@@ -197,11 +195,11 @@ class POD_COMM:
             setattr(self, 'expectedYaw', self.round(msg.data, 180))
         ))
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/expectedHfov', Float32, lambda msg: (
-            setattr(self, 'expectedF', self.getF(msg.data)),
+            setattr(self, 'expectedF', PodParas.getFFromHfov(msg.data)),
             setattr(
                 self,
                 'expectedZoomLevel',
-                self.expectedF / self.zoomUnit
+                PodParas.getZoomLevelFromF(self.expectedF)
             )
         ))
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/maxRate', Float32, lambda msg: (
@@ -226,12 +224,6 @@ class POD_COMM:
 
     def getTimeNow(self):
         return time()
-
-    def getF(self, halfAngle):
-        return self.SENSOR_WIDTH / 2 / tan(radians(halfAngle / 2))
-
-    def getHfov(self, f):
-        return degrees(atan(self.SENSOR_WIDTH / 2 / f)) * 2
 
     def round(self, val, base):
         if val > base:
@@ -284,6 +276,8 @@ class POD_COMM:
                     print(f'change zoom level {self.podZoomLevel} to {self.expectedZoomLevel}')
                 up.changeZoomLevel(self.expectedZoomLevel)
 
+        if self.args.controlDebug:
+            print(f'Up Data: {up.msg().hex()}')
         return up.msg()
 
     def readData(self):
@@ -304,7 +298,7 @@ class POD_COMM:
                             print('down: ', DOWN_FRAME_HEAD.hex(), dataBuf[:-1].hex(), dataBuf[-1:].hex())
                         downData = unpack(DOWN_PROTO, dataBuf)
                         checkSum = downData[-1]
-                        realSum = sum(dataBuf[:-1]) + 0xEE + 0x16
+                        realSum = sum(dataBuf[:-1]) + sum(DOWN_FRAME_HEAD)
                         if checkSum != realSum & 0xFF:
                             if self.args.serialDebug:
                                 print('Checksum: ', f'{checkSum:02x}', 'Realsum: ', f'{realSum:02x}')
@@ -314,6 +308,7 @@ class POD_COMM:
                         else:
                             if self.args.serialDebug:
                                 print('Right!!!')
+                            self.downData = DOWN_FRAME_HEAD + dataBuf
                             self.checkSumRightCnt += 1
                             (podState1, podState2, zoomx10Low8, podState3, 
                              xOffsetDegreex20, yOffsetDegreex20, 
@@ -352,7 +347,7 @@ class POD_COMM:
                                 )
 
                             self.podZoomLevel = (zoomx10Low8 + (zoomx10High4 << 8)) / 10
-                            self.podF = self.podZoomLevel * self.zoomUnit
+                            self.podF = self.podZoomLevel * PodParas.zoomUnit
                             self.podPitch = -podPitchx100 / 100
                             self.podYaw = -self.round(podYawx100 / 100, 180)
                             self.podRoll = podRollx100 / 100
@@ -391,7 +386,7 @@ class POD_COMM:
         print((GREEN if self.podRollControlMode else RED) + 'RollControl ' + RESET, end='')
         print((GREEN if self.podFollowModeOn else RED) + 'Follow ' + RESET, end='')
         print((GREEN if self.podLockModeOn else RED) + 'Lock ' + RESET, end='')
-        print(self.viewTypeDict[self.podBigViewType] + '+' + self.viewTypeDict[self.podSmallViewType], end='')
+        print(PodParas.viewTypeDict[self.podBigViewType] + '+' + PodParas.viewTypeDict[self.podSmallViewType], end='')
         print(' Laser: ' + ((GREEN + f'{self.podLaserRange:.1f}') if self.podLaserOn else (RED + 'Off')) + RESET)
         print(GREEN if self.pAtTarget else RED, end='')
         print(f'Pitch {self.podPitch:.2f} -> {self.expectedPitch:.2f}{RESET}')
@@ -399,14 +394,15 @@ class POD_COMM:
         print(f'Yaw {self.podYaw:.2f} -> {self.expectedYaw:.2f}{RESET}')
         print(GREEN if self.fAtTarget else RED, end='')
         print(f'Zoom {self.podF:.1f}({self.podZoomLevel}) -> {self.expectedF:.1f}({self.expectedZoomLevel:.1f}){RESET}')
-        print(f'Hfov {self.getHfov(self.podF):.2f} -> {self.getHfov(self.expectedF):.2f}')
+        print(f'Hfov {PodParas.getHfovFromF(self.podF):.2f} -> {PodParas.getHfovFromF(self.expectedF):.2f}')
         print(f'CHECKSUM right/wrong: {self.checkSumRightCnt}/{self.checkSumWrongCnt}')
+        print(f'Down Data: {self.downData.hex()}')
 
     def rosPub(self):
         self.pitchPub.publish(self.podPitch)
         self.yawPub.publish(self.podYaw)
         self.rollPub.publish(self.podRoll)
-        self.hfovPub.publish(self.getHfov(self.podF))
+        self.hfovPub.publish(PodParas.getHfovFromF(self.podF))
         self.laserRangePub.publish(self.podLaserRange)
 
         self.pAtTargetPub.publish(self.pAtTarget)
@@ -415,7 +411,7 @@ class POD_COMM:
 
         self.pFeedbackPub.publish(self.expectedPitch)
         self.yFeedbackPub.publish(self.round(self.expectedYaw, 180))
-        self.fFeedbackPub.publish(self.getHfov(self.expectedF))
+        self.fFeedbackPub.publish(PodParas.getHfovFromF(self.expectedF))
         
     @property
     def pAtTarget(self):
@@ -431,7 +427,7 @@ class POD_COMM:
 
     @property
     def fAtTarget(self):
-        if not (abs(self.expectedF - self.podF) < self.zTol):
+        if not (abs(self.expectedZoomLevel - self.podZoomLevel) < self.zTol):
             self.fNotAtTargetTime = self.getTimeNow()
         return self.getTimeNow() - self.fNotAtTargetTime > 0.1
 
