@@ -171,8 +171,6 @@ class POD_COMM:
         # control paras:
         self.initTextOff = False
         self.singleViewOn = False
-        self.lazyTag = 0
-        self.lockCnt = 0
 
         # ros related:
         self.uavName = 'suav'
@@ -232,29 +230,26 @@ class POD_COMM:
 
     def genUpMsg(self):
         up = UP_MSG()
-        up.manualPYRate(0, 0)
+        # up.manualPYRate(0, 0)
 
         if not self.singleViewOn:
             up.changeViewType()
-            self.lazyTag = 10
             self.singleViewOn = True
         elif not self.initTextOff:
             up.textOff()
-            self.lazyTag = 10
             self.initTextOff = True
         elif not self.podImageEnhanceOn:
             up.antiFogOn()
-            self.lazyTag = 10
-        elif self.lazyTag <= 15:
+        else:
             pitchDiff = self.expectedPitch - self.podPitch
             yawDiff = self.round(self.expectedYaw - self.podYaw, 180)
             absZoomDiff = (self.expectedF - self.podF)
             relZoomDiff = absZoomDiff / self.expectedF
 
-            if (not self.pAtTarget or not self.yAtTarget) and self.lazyTag == 0:
+            if (not self.pAtTarget or not self.yAtTarget):
                 prMax, yrMax = self.maxRate, self.maxRate
-                prate = max(-prMax, min(prMax, 2 * pitchDiff))
-                yrate = max(-yrMax, min(yrMax, 2 * yawDiff))
+                prate = max(-prMax, min(prMax, 1 * pitchDiff))
+                yrate = max(-yrMax, min(yrMax, 1 * yawDiff))
 
                 up.manualPYRate(prate, yrate)
 
@@ -262,13 +257,8 @@ class POD_COMM:
                 print(f'up yaw {self.podYaw:.2f} -> {self.expectedYaw:.2f} diff: {yawDiff:.2f} rate: {yrate:.2f}')
 
             elif not self.fAtTarget:
-                if self.lazyTag == 0:
-                    print(f'change zoom level {self.podZoomLevel} to {self.expectedZoomLevel}')
-                    up.changeZoomLevel(self.expectedZoomLevel)
-                    self.lazyTag = max(abs(self.expectedZoomLevel - self.podZoomLevel) * 10, 50)
-
-        if self.lazyTag > 0:
-            self.lazyTag -= 1
+                print(f'change zoom level {self.podZoomLevel} to {self.expectedZoomLevel}')
+                up.changeZoomLevel(self.expectedZoomLevel)
 
         return up.msg()
 
@@ -386,7 +376,6 @@ class POD_COMM:
         print(GREEN if self.fAtTarget else RED, end='')
         print(f'Zoom {self.podF:.1f}({self.podZoomLevel}) -> {self.expectedF:.1f}({self.expectedZoomLevel:.1f}){RESET}')
         print(f'Hfov {self.getHfov(self.podF):.2f} -> {self.getHfov(self.expectedF):.2f}')
-        print('LazyTag: ', self.lazyTag, ' LockCnt: ', self.lockCnt)
         print(f'CHECKSUM right/wrong: {self.checkSumRightCnt}/{self.checkSumWrongCnt}')
 
     def rosPub(self):
@@ -437,6 +426,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--read', help='read only', action='store_true')
     parser.add_argument('--serialDebug', help='debug serial read', action='store_true')
+    parser.add_argument('--controlDebug', help='control output', action='store_true')
     args, unknown = parser.parse_known_args()
     print(f'PORT is {PORT}')
     pod_comm = POD_COMM(args)
