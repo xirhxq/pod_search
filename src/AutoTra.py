@@ -5,6 +5,8 @@ import matplotlib.patches as patches
 from math import degrees, atan, tan, radians, sin, cos, sqrt
 import numpy as np
 
+import PodParas
+
 
 class AutoTra:
     def getVal(self, str='', default=None):
@@ -28,9 +30,6 @@ class AutoTra:
         self.theTime = self.getVal(str='THE Time', default=10)
 
         self.pos2d = np.array([x, 0])
-
-        self.ratio = 16 / 9
-        self.SENSOR_WIDTH = tan(radians(2.3) / 2) * 2 * 129
 
         print(f'a: {self.a:.2f} b:  {self.b:.2f} pos: {self.pos2d} h: {self.h:.2f}')
 
@@ -118,7 +117,6 @@ class AutoTra:
 
     def getRFromPitch(self, pitch):
         pitchCliped = min(self.pRange[0], max(self.pRange[1], pitch))
-        # pitchCliped = pitch
         r = self.h / tan(radians(pitchCliped))
         return r
 
@@ -129,33 +127,20 @@ class AutoTra:
         r = self.getRFromPitch(pitch)
         return np.array([r * cos(radians(yaw)), r * sin(radians(yaw))]) + self.pos2d
 
-    def clipPitch(self, pitch):
-        return min(60, max(2.3, pitch))
-
-    def getFFromHfov(self, hfov):
-        return self.SENSOR_WIDTH / 2 / tan(radians(hfov / 2))
-
-    def getHFovFromF(self, f):
-        return degrees(2 * atan(self.SENSOR_WIDTH / 2 / f))
-
     def getHFovFromPitch(self, pitch):
         if not self.pitchLevelOn:
             return pitch
-        hfovExact = self.clipPitch(self.hfovPitchRatio * pitch)
+        hfovExact = PodParas.clipPitch(self.hfovPitchRatio * pitch)
         # print(f'Pitch: {pitch:.2f} -> Hfov: {hfovExact:.2f}')
-        fExact = self.getFFromHfov(hfovExact)
+        fExact = PodParas.getFFromHfov(hfovExact)
         # print(f'F: {fExact:.2f}')
-        fUnit = 4.3
-        fLevel = round(fExact / fUnit) * fUnit
-        hfovLevel = self.getHFovFromF(fLevel)
+        fLevel = PodParas.getZoomLevelFromF(fExact)
+        hfovLevel = PodParas.getHfovFromF(fLevel)
         # print(f'fLevel: {fLevel:.2f} -> hfovLevel: {hfovLevel:.2f}')
-        return min(60.0, max(hfovLevel, 2.3))
-
-    def getVFovFromHFov(self, hFov):
-        return 2 * degrees(atan(tan(radians(hFov / 2)) / self.ratio))
+        return PodParas.clipPitch(hfovLevel)
 
     def getVFovFromPitch(self, pitch):
-        return self.getVFovFromHFov(self.getHFovFromPitch(pitch))
+        return PodParas.getVFovFromHFov(self.getHFovFromPitch(pitch))
 
     def getYawRangeFromPitch(self, pitch):
         vFov = self.getVFovFromPitch(pitch)

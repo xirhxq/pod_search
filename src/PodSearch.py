@@ -9,6 +9,7 @@ from std_msgs.msg import Float32, Bool, Float64MultiArray, Int8
 
 from AutoTra import AutoTra
 from Utils import *
+import PodParas
 
 
 def signal_handler(sig, frame):
@@ -220,8 +221,8 @@ class PodSearch:
         if endTime >= 3.0:
             exit(0)
 
-    def getHfovFromPitch(self, pitch, minHfov=2.3, maxHfov=60):
-        return min(60, max(2.3, pitch * self.autoTra.hfovPitchRatio))
+    def getHfovFromPitch(self, pitch):
+        return min(PodParas.maxHfov, max(PodParas.minHfov, pitch * self.autoTra.hfovPitchRatio))
 
     def stepTrack(self):
         print('Step Track')

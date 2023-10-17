@@ -19,6 +19,7 @@ from Classifier import Classifier
 from DataLogger import DataLogger
 from QuaternionBuffer import QuaternionBuffer
 from Utils import *
+import PodParas
 
 
 def signal_handler(sig, frame):
@@ -267,7 +268,7 @@ class Transformer:
         pixelX = (pixelX - 0.5) * 2
         pixelY = (pixelY - 0.5) * 2
         cameraAzimuth = -np.degrees(np.arctan(np.tan(np.radians(podHfov) / 2) * pixelX))
-        podVfov = np.degrees(2 * np.arctan(np.tan(np.radians(podHfov) / 2) * 9 / 16))
+        podVfov = PodParas.getVFovFromHFov(podHfov)
         cameraElevation = np.degrees(np.arctan(np.tan(np.radians(podVfov) / 2) * pixelY))
         base = np.sqrt(1 + np.tan(np.radians(cameraElevation)) ** 2 + np.tan(np.radians(cameraAzimuth)) ** 2)
         imgTargetP = np.array([
@@ -319,7 +320,7 @@ class Transformer:
                 hFov = self.podHfovBuffer.getMessageNoDelay().data 
                 self.caliLog.log("podHfov", hFov)
                 self.caliLog.log("podHfovDelayed", podHfov)
-                vFov = degrees(2 * np.arctan(np.tan(radians(hFov) / 2) * 9 / 16))
+                vFov = PodParas.getVFovFromHFov(hFov)
                 self.caliLog.log('podVfov', vFov)
                 self.caliLog.log('podVfovDelayed', podVfov)
                 self.caliLog.log('pixelX', pixelX)
@@ -393,8 +394,8 @@ class Transformer:
         hFovDelayed = self.podHfovBuffer.getMessage(self.podDelay).data 
         self.dtlg.log("podHfov", hFov)
         self.dtlg.log("podHfovDelayed", hFovDelayed)
-        vFov = degrees(2 * np.arctan(np.tan(radians(hFov) / 2) * 9 / 16))
-        vFovDelayed = degrees(2 * np.arctan(np.tan(radians(hFovDelayed) / 2) * 9 / 16))
+        vFov = PodParas.getVFovFromHFov(hFov)
+        vFovDelayed = PodParas.getVFovFromHFov(hFovDelayed)
         self.dtlg.log('podVfov', vFov)
         self.dtlg.log('podVfovDelayed', vFovDelayed)
         self.dtlg.log('selfPos', list(self.selfPos))
