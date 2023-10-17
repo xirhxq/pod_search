@@ -1,9 +1,5 @@
 #! /usr/bin/env python3
 
-# Class Transformer: transform pixel error to absolute position
-# using the onboard pod pitch, yaw, zoom and UAV pitch, yaw, roll
-# assume the UAV is at (0, 0, h)
-
 import argparse
 import time
 from collections import deque
@@ -49,11 +45,6 @@ class TimeBuffer:
     def addMessage(self, msg):
         time = rospy.Time.now()
         self.buffer.append((time, msg))
-
-        # oldestTime = time - rospy.Duration.from_sec(self.maxAge)
-
-        # while self.buffer and self.buffer[0][0] < oldestTime:
-        #     self.buffer.popleft()
 
     def getData(self, x):
         if hasattr(x, 'data'):
@@ -114,10 +105,12 @@ class Transformer:
 
             variable_info = [
                 ('rosTime', 'double'),
-                ("podYaw", "double"),
-                ("podYawDelayed", "double"),
+                ('podRoll', 'double'),
+                ('podRollDelayed', 'double'),
                 ("podPitch", "double"),
                 ("podPitchDelayed", "double"),
+                ("podYaw", "double"),
+                ("podYawDelayed", "double"),
                 ("podHfov", "double"),
                 ("podHfovDelayed", "double"),
                 ("podVfov", "double"),
@@ -146,10 +139,12 @@ class Transformer:
             self.targetsAvailable = 10
             variable_info = [
                 ("rosTime", "double"),
-                ("podYaw", "double"),
-                ("podYawDelayed", "double"),
+                ('podRoll', 'double'),
+                ('podRollDelayed', 'double'),
                 ("podPitch", "double"),
                 ("podPitchDelayed", "double"),
+                ("podYaw", "double"),
+                ("podYawDelayed", "double"),
                 ("podHfov", "double"),
                 ("podHfovDelayed", "double"),
                 ("podVfov", "double"),
@@ -173,6 +168,7 @@ class Transformer:
         self.dockENU = np.array([-20, -10, 0])
         self.usvENU = self.dockENU
 
+        self.podRollBuffer = TimeBuffer('Pod Roll Buffer')
         self.podPitchBuffer = TimeBuffer('Pod Pitch Buffer')
         self.podYawBuffer = TimeBuffer('Pod Yaw Buffer')
         self.podHfovBuffer = TimeBuffer('Pod HFov Buffer')
@@ -187,6 +183,7 @@ class Transformer:
         rospy.Subscriber(self.uavName + '/' + self.osdkName + '/imu' + ('/noData' if self.args.noImu else ''), Imu, self.imuCallback)
         rospy.Subscriber(self.uavName + '/' + self.uwbName + '/filter/odom', Odometry, self.posCallback)
 
+        rospy.Subscriber(self.uavName + '/' + self.podName + '/roll', Float32, self.rollCallback)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/pitch', Float32, self.pitchCallback)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/yaw', Float32, self.yawCallback)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/hfov', Float32, self.hfovCallback)
@@ -229,8 +226,10 @@ class Transformer:
         orientation = msg.orientation
         self.uavQuatBuffer.addMessage(orientation)
 
+    def rollCallback(self, msg):
+        self.podRollBuffer.addMessage(msg)
+
     def pitchCallback(self, msg):
-        msg.data = msg.data
         self.podPitchBuffer.addMessage(msg)
 
     def yawCallback(self, msg):
@@ -254,10 +253,16 @@ class Transformer:
             podHfov = self.podHfovBuffer.getMessage(timeDiff).data
             podYaw = self.podYawBuffer.getMessage(timeDiff).data
             podPitch = self.podPitchBuffer.getMessage(timeDiff).data
-            uavQuat = self.uavQuatBuffer.getMessage()
+            podRoll = self.podRollBuffer.getMessage(timeDiff).data
         except Exception as e:
             print(e)
             return
+
+        try: 
+            uavQuat = self.uavQuatBuffer.getMessage()
+        except Exception as e:
+            print(e)
+            uavQuat = [0, 0, 0, 1]
 
         pixelX = (pixelX - 0.5) * 2
         pixelY = (pixelY - 0.5) * 2
@@ -270,9 +275,10 @@ class Transformer:
             1000 * np.tan(np.radians(cameraAzimuth)) / base,
             -1000 * np.tan(np.radians(cameraElevation)) / base
         ])
+        rPodRoll = R.from_euler('x', podRoll, degrees=True)
         rPodYaw = R.from_euler('z', podYaw, degrees=True)
         rPodPitch = R.from_euler('y', podPitch, degrees=True)
-        rGB2P = rPodYaw * rPodPitch
+        rGB2P = rPodYaw * rPodRoll * rPodPitch
         rI2B = R.from_quat(uavQuat)
         rI2P = rI2B * self.rB2GB * rGB2P
         imgTargetRelI = rI2P.apply(imgTargetP)
@@ -296,7 +302,7 @@ class Transformer:
                 f'h{self.selfPos[2]:.2f}'
                 f'px({pixelX:.2f}, {pixelY:.2f}) '
                 f'c({yprStr["y"]}{cameraAzimuth:.2f}, {yprStr["p"]}{cameraElevation:.2f}) '
-                f'p({yprStr["y"]}{podYaw:.2f}, {yprStr["p"]}{podPitch:.2f}) '
+                f'p({yprStr["y"]}{podYaw:.2f}, {yprStr["p"]}{podPitch:.2f}, {yprStr['r']}{podRoll:.2f}) '
                 f'q{rI2B.as_euler("zyx", degrees=True)}'
                 f'Target GB{realTargetAbsGB[:2]} I{realTargetAbsI[:2]} '
                 f'TtoD ENU{(realTargetAbsI - self.dockENU)[:2]}'
@@ -308,6 +314,8 @@ class Transformer:
                 self.caliLog.log("podYawDelayed", podYaw)
                 self.caliLog.log("podPitch", self.podPitchBuffer.getMessageNoDelay().data)
                 self.caliLog.log("podPitchDelayed", podPitch)
+                self.caliLog.log("podRoll", self.podRollBuffer.getMessageNoDelay().data)
+                self.caliLog.log("podRollDelayed", podRoll)
                 hFov = self.podHfovBuffer.getMessageNoDelay().data 
                 self.caliLog.log("podHfov", hFov)
                 self.caliLog.log("podHfovDelayed", podHfov)
@@ -379,6 +387,8 @@ class Transformer:
         self.dtlg.log("podYawDelayed", self.podYawBuffer.getMessage(self.podDelay).data)
         self.dtlg.log("podPitch", self.podPitchBuffer.getMessageNoDelay().data)
         self.dtlg.log("podPitchDelayed", self.podPitchBuffer.getMessage(self.podDelay).data)
+        self.dtlg.log("podRoll", self.podRollBuffer.getMessageNoDelay().data)
+        self.dtlg.log("podRollDelayed", self.podRollBuffer.getMessage(self.podDelay).data)
         hFov = self.podHfovBuffer.getMessageNoDelay().data 
         hFovDelayed = self.podHfovBuffer.getMessage(self.podDelay).data 
         self.dtlg.log("podHfov", hFov)
@@ -418,7 +428,11 @@ class Transformer:
             # print(f'RelImu: {R.from_quat(self.uavQuat).as_euler("zyx", degrees=True)}')
 
 
-            if self.args.log and not self.podYawBuffer.empty and not self.podPitchBuffer.empty and not self.uavQuatBuffer.empty:
+            if self.args.log and 
+               not self.podYawBuffer.empty and 
+               not self.podPitchBuffer.empty and 
+               not self.podRollBuffer.empty and
+               not self.uavQuatBuffer.empty:
                 self.log()
 
             t = self.clsfy.targets
