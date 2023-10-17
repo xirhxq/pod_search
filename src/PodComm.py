@@ -170,6 +170,7 @@ class POD_COMM:
         self.podPitchRate = 0.0
         self.podYawRate = 0.0
 
+        # control inputs with ros interface
         self.expectedPitch = 0.0
         self.expectedYaw = 0.0
         self.expectedF = 9
@@ -180,11 +181,13 @@ class POD_COMM:
         # control paras:
         self.initTextOff = False
         self.singleViewOn = False
+        self.pNotAtTargetTime = self.getTimeNow()
+        self.yNotAtTargetTime = self.getTimeNow()
+        self.fNotAtTargetTime = self.getTimeNow()
 
         # ros related:
         self.uavName = 'suav'
         self.deviceName = 'pod'
-
         rospy.init_node('pod_comm', anonymous=True)
         rospy.Rate(10)
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/expectedPitch', Float32, lambda msg: (
@@ -213,10 +216,6 @@ class POD_COMM:
         self.rollPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/roll', Float32, queue_size=1)
         self.hfovPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/hfov', Float32, queue_size=1)
         self.laserRangePub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/laserRange', Float32, queue_size=1)
-        
-        self.pNotAtTargetTime = self.getTimeNow()
-        self.yNotAtTargetTime = self.getTimeNow()
-        self.fNotAtTargetTime = self.getTimeNow()
         
         self.pAtTargetPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/pAtTarget', Bool, queue_size=1)
         self.yAtTargetPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/yAtTarget', Bool, queue_size=1)
