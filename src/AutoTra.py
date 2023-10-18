@@ -9,7 +9,9 @@ import PodParas
 
 
 class AutoTra:
-    def getVal(self, str='', default=None):
+    def getVal(self, str='', default=None, skip=False):
+        if skip:
+            return default
         str = input(f'Input {str} (Default: {default:.2f}): ')
         if str == '':
             return default
@@ -20,14 +22,15 @@ class AutoTra:
                  overlapOn=True,
                  pitchLevelOn=True,
                  drawNum=-1,
-                 takeoff=False
+                 takeoff=False,
+                 fast=False
         ):
-        self.h = self.getVal(str='h', default=(5 if takeoff else 0.3) + 100 - 91.38)
-        self.a = self.getVal(str='a', default=200)
-        self.b = self.getVal(str='b', default=300)
-        x = self.getVal(str='x', default=-150)
-        self.hfovPitchRatio = self.getVal(str='hfov/pitch', default=3)
-        self.theTime = self.getVal(str='THE Time', default=10)
+        self.h = self.getVal(str='h', default=(5 if takeoff else 0.3) + 100 - 91.38, skip=fast)
+        self.a = self.getVal(str='a', default=6, skip=fast)
+        self.b = self.getVal(str='b', default=10, skip=fast)
+        x = self.getVal(str='x', default=-10, skip=fast)
+        self.hfovPitchRatio = self.getVal(str='hfov/pitch', default=1, skip=fast)
+        self.theTime = self.getVal(str='THE Time', default=3, skip=fast)
 
         self.pos2d = np.array([x, 0])
 
@@ -49,7 +52,7 @@ class AutoTra:
 
         def overlap(p, m):
             hFov = self.getHFovFromPitch(p)
-            vFov = 2 * degrees(atan(tan(radians(hFov / 2)) * 9 / 16))
+            vFov = PodParas.getVFovFromHFov(hFov)
             overlapRatio = 0.1
             gap = overlapM(m) - p
             # gap = m - p
@@ -135,7 +138,7 @@ class AutoTra:
         fExact = PodParas.getFFromHfov(hfovExact)
         # print(f'F: {fExact:.2f}')
         fLevel = PodParas.getZoomLevelFromF(fExact)
-        hfovLevel = PodParas.getHfovFromF(fLevel)
+        hfovLevel = PodParas.getHfovFromF(fLevel * PodParas.zoomUnit)
         # print(f'fLevel: {fLevel:.2f} -> hfovLevel: {hfovLevel:.2f}')
         return PodParas.clipPitch(hfovLevel)
 

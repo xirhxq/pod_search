@@ -48,11 +48,12 @@ class PodSearch:
         self.expectedHfov = 0
         self.maxRate = 0
 
-        self.autoTra = AutoTra(pitchLevelOn=True, overlapOn=True, drawNum=-1, takeoff=self.args.takeoff)
+        self.autoTra = AutoTra(pitchLevelOn=True, overlapOn=True, drawNum=-1, takeoff=self.args.takeoff, fast=self.args.fast)
 
         self.tra = self.autoTra.theList
 
-        input('Type anything to continue...')
+        if not self.args.fast:
+            input('Type anything to continue...')
 
         self.traCnt = 0
 
@@ -103,7 +104,7 @@ class PodSearch:
         self.uavState = 0
         rospy.Subscriber(self.uavName + '/uavState', Int8, lambda msg: setattr(self, 'uavState', msg.data))
 
-        self.trackData = {}
+        self.trackData = {'boat': [], 'usv': [], 'cup': []}
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/track', Float64MultiArray, self.trackCallback)
 
         self.dockData = []
@@ -307,6 +308,7 @@ if __name__ == '__main__':
     parser.add_argument('--test', help='on ground test', action='store_true')
     parser.add_argument('--track', help='track mode', action='store_true')
     parser.add_argument('--dock', help='look at dock', action='store_true')
+    parser.add_argument('--fast', help='using default paras & skip confirmation', action='store_true')
     args, unknown = parser.parse_known_args()
     
     podSearch = PodSearch(args)
