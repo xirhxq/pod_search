@@ -161,7 +161,7 @@ class Transformer:
             self.dtlg.initialize(variable_info)
             print(self.dtlg.variable_names)
 
-        self.h = 100 - 91.6 + 0.3
+        self.h = 1
         self.a = self.h / 100 * 3000
         self.selfPos = np.array([0, 0, self.h])
         
@@ -189,7 +189,7 @@ class Transformer:
         rospy.Subscriber(self.uavName + '/' + self.podName + '/yaw', Float32, self.yawCallback)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/hfov', Float32, self.hfovCallback)
 
-        rospy.Subscriber(self.uavName + '/' + self.podName + '/vessel_detection', TargetsInFrame, self.vesselDetectionCallback, queue_size=1)
+        rospy.Subscriber(self.uavName + '/' + self.podName + '/vessel_det', TargetsInFrame, self.vesselDetectionCallback, queue_size=1)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/usv_detection', TargetsInFrame, self.usvDetectionCallback, queue_size=1)
 
         self.searchState = -1
@@ -262,8 +262,10 @@ class Transformer:
         try: 
             uavQuat = self.uavQuatBuffer.getMessage()
         except Exception as e:
-            print(e)
-            uavQuat = [0, 0, 0, 1]
+            # print(e)
+            uavQuat = np.array([0, 0, 0, 1])
+        if uavQuat is None:
+            uavQuat = np.array([0, 0, 0, 1])
 
         pixelX = (pixelX - 0.5) * 2
         pixelY = (pixelY - 0.5) * 2
@@ -303,7 +305,7 @@ class Transformer:
                 f'h{self.selfPos[2]:.2f}'
                 f'px({pixelX:.2f}, {pixelY:.2f}) '
                 f'c({yprStr["y"]}{cameraAzimuth:.2f}, {yprStr["p"]}{cameraElevation:.2f}) '
-                f'p({yprStr["y"]}{podYaw:.2f}, {yprStr["p"]}{podPitch:.2f}, {yprStr['r']}{podRoll:.2f}) '
+                f'p({yprStr["y"]}{podYaw:.2f}, {yprStr["p"]}{podPitch:.2f}, {yprStr["r"]}{podRoll:.2f}) '
                 f'q{rI2B.as_euler("zyx", degrees=True)}'
                 f'Target GB{realTargetAbsGB[:2]} I{realTargetAbsI[:2]} '
                 f'TtoD ENU{(realTargetAbsI - self.dockENU)[:2]}'
@@ -348,7 +350,7 @@ class Transformer:
 
         if not self.outOfBound(*realTargetAbs):
             # self.clsfy.newPos(*realTargetAbs)
-            if category == 'boat':
+            if category == 'boat' or category == 'cup':
                 if self.searchState == 1 or self.searchState == 4:
                     self.clsfy.updateTarget(categoryID, list(realTargetAbs), score)
             elif category == 'usv':
@@ -359,8 +361,9 @@ class Transformer:
 
     def untransform(self, pos):
         if self.uavQuatBuffer.empty:
-            return 0, 0
-        rB2I = R.from_quat(self.uavQuatBuffer.getMessageNoDelay()).inv()
+            rB2I = R.from_quat([0, 0, 0, 1])
+        else:
+            rB2I = R.from_quat(self.uavQuatBuffer.getMessageNoDelay()).inv()
         rGB2B = self.rB2GB.inv()
         posRel = pos - self.selfPos
         targetBody = (rGB2B * rB2I).apply(posRel)
@@ -429,10 +432,10 @@ class Transformer:
             # print(f'RelImu: {R.from_quat(self.uavQuat).as_euler("zyx", degrees=True)}')
 
 
-            if self.args.log and 
-               not self.podYawBuffer.empty and 
-               not self.podPitchBuffer.empty and 
-               not self.podRollBuffer.empty and
+            if self.args.log and \
+               not self.podYawBuffer.empty and \
+               not self.podPitchBuffer.empty and \
+               not self.podRollBuffer.empty and \
                not self.uavQuatBuffer.empty:
                 self.log()
 

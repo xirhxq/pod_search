@@ -46,11 +46,11 @@ class Classifier:
         return self.targetsCheck.index(False)
 
     def lowestScoreIndex(self, threshold=0):
-        tS = self.targetsScore
+        tS, tC = self.targetsScore, self.targetsCnt
         res = 1.01
         resInd = -1
         for ind, value in enumerate(tS):
-            if self.targetsCnt[ind] >= threshold and value <= res:
+            if tC[ind] >= threshold and value <= res:
                 res = value
                 resInd = ind
         if resInd == -1:
@@ -81,6 +81,7 @@ class Classifier:
 
     def clear(self):
         self.targets.clear()
+        self.targetsScore.clear()
         self.targetsCnt.clear()
         self.targetsCheck.clear()
         self.targetsReal.clear()
