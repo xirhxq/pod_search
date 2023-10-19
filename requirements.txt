@@ -1,0 +1,2 @@
+pyquaternion==0.9.9
+pyserial==3.5
