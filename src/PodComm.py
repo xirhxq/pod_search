@@ -44,7 +44,7 @@ READING_DATA = 3
 
 from glob import glob
 
-PORT = '/dev/ttyUSB0'
+PORT = '/dev/ttyCH343USB3'
 
 from signal import signal, SIGINT
 
