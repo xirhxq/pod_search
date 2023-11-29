@@ -20,6 +20,7 @@ from DataLogger import DataLogger
 from QuaternionBuffer import QuaternionBuffer
 from Utils import *
 import PodParas
+from LocatingEKF import LocatingEKF
 
 
 def signal_handler(sig, frame):
@@ -124,8 +125,6 @@ class Transformer:
                 ('uavQuatDelayed[4]', 'list'),
                 ('uavEuler[3]', 'list'),
                 ('selfPos[3]', 'list'),
-                ('targetPosAbsGB[3]', 'list'),
-                ('targetPosRel[3]', 'list'),
                 ('targetPosAbs[3]', 'list'),
                 ('targetId', 'int')
             ]
@@ -161,7 +160,7 @@ class Transformer:
             self.dtlg.initialize(variable_info)
             print(self.dtlg.variable_names)
 
-        self.h = 1
+        self.h = 10
         self.a = self.h / 100 * 3000
         self.selfPos = np.array([0, 0, self.h])
         
@@ -173,6 +172,7 @@ class Transformer:
         self.podPitchBuffer = TimeBuffer('Pod Pitch Buffer')
         self.podYawBuffer = TimeBuffer('Pod Yaw Buffer')
         self.podHfovBuffer = TimeBuffer('Pod HFov Buffer')
+        self.podLaserRangeBuffer = TimeBuffer('Laser Range Buffer')
         self.uavQuatBuffer = QuaternionBuffer('IMU Buffer')
         self.podDelay = 0.4
 
@@ -188,6 +188,8 @@ class Transformer:
         rospy.Subscriber(self.uavName + '/' + self.podName + '/pitch', Float32, self.pitchCallback)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/yaw', Float32, self.yawCallback)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/hfov', Float32, self.hfovCallback)
+
+        rospy.Subscriber(self.uavName + '/' + self.podName + '/laserRange', Float32, self.laserRangeCallback)
 
         rospy.Subscriber(self.uavName + '/' + self.podName + '/vessel_det', TargetsInFrame, self.vesselDetectionCallback, queue_size=1)
         rospy.Subscriber(self.uavName + '/' + self.podName + '/usv_detection', TargetsInFrame, self.usvDetectionCallback, queue_size=1)
@@ -218,6 +220,11 @@ class Transformer:
             print(f'{GREEN}With rB2GB on{RESET}')
         self.rB2GB = R.from_euler('zyx', [self.yawB2GB, self.pitchB2GB, self.rollB2GB], degrees=True)
 
+        self.ekfDict = {}
+    
+    def getTimeNow(self):
+        return rospy.Time.now().to_sec() - self.startTime
+
     def posCallback(self, msg):
         # self.selfPos[0] = msg.pose.pose.position.x + 0.6
         # self.selfPos[1] = msg.pose.pose.position.y - 0.3
@@ -239,6 +246,9 @@ class Transformer:
     def hfovCallback(self, msg):
         self.podHfovBuffer.addMessage(msg)
 
+    def laserRangeCallback(self, msg):
+        self.podLaserRangeBuffer.addMessage(msg)
+
     def vesselDetectionCallback(self, msg):
         for target in msg.targets:
             if target.category_id != 100:
@@ -255,6 +265,7 @@ class Transformer:
             podYaw = self.podYawBuffer.getMessage(timeDiff).data
             podPitch = self.podPitchBuffer.getMessage(timeDiff).data
             podRoll = self.podRollBuffer.getMessage(timeDiff).data
+            podLaserRange = self.podLaserRangeBuffer.getMessage(timeDiff).data
         except Exception as e:
             print(e)
             return
@@ -272,25 +283,23 @@ class Transformer:
         cameraAzimuth = -np.degrees(np.arctan(np.tan(np.radians(podHfov) / 2) * pixelX))
         podVfov = PodParas.getVFovFromHFov(podHfov)
         cameraElevation = np.degrees(np.arctan(np.tan(np.radians(podVfov) / 2) * pixelY))
-        base = np.sqrt(1 + np.tan(np.radians(cameraElevation)) ** 2 + np.tan(np.radians(cameraAzimuth)) ** 2)
-        imgTargetP = np.array([
-            1000 * 1 / base,
-            1000 * np.tan(np.radians(cameraAzimuth)) / base,
-            -1000 * np.tan(np.radians(cameraElevation)) / base
-        ])
+
         rPodRoll = R.from_euler('x', podRoll, degrees=True)
         rPodYaw = R.from_euler('z', podYaw, degrees=True)
         rPodPitch = R.from_euler('y', podPitch, degrees=True)
         rGB2P = rPodYaw * rPodRoll * rPodPitch
         rI2B = R.from_quat(uavQuat)
         rI2P = rI2B * self.rB2GB * rGB2P
-        imgTargetRelI = rI2P.apply(imgTargetP)
-        realTargetRelI = imgTargetRelI / imgTargetRelI[2] * (-self.selfPos[2])
-        realTargetAbsI = realTargetRelI + np.array(self.selfPos)
+
+        if podLaserRange < 10 or podLaserRange > 3000:
+            return None
         
-        imgTargetRelGB = rGB2P.apply(imgTargetP)
-        realTargetRelGB = imgTargetRelGB / imgTargetRelGB[2] * (-self.selfPos[2])
-        realTargetAbsGB = realTargetRelGB + np.array(self.selfPos)
+        if categoryID not in self.ekfDict:
+            self.ekfDict[categoryID] = LocatingEKF(initialT=self.getTimeNow())
+        
+        Z = np.array([[podLaserRange], [cameraAzimuth], [cameraElevation], [self.selfPos[2]]])
+        self.ekfDict[categoryID].newFrame(self.getTimeNow(), Z, self.selfPos.reshape(3, 1), rGB2P.as_matrix().T, rI2B.as_matrix().T)
+        realTargetAbsI = self.ekfDict[categoryID].ekf.x[0:3]
 
         trackData = Float64MultiArray(data=[cameraElevation + podPitch, cameraAzimuth + podYaw, podHfov, podPitch])
         trackData.layout.dim = [MultiArrayDimension(label=category)]
@@ -307,12 +316,11 @@ class Transformer:
                 f'c({yprStr["y"]}{cameraAzimuth:.2f}, {yprStr["p"]}{cameraElevation:.2f}) '
                 f'p({yprStr["y"]}{podYaw:.2f}, {yprStr["p"]}{podPitch:.2f}, {yprStr["r"]}{podRoll:.2f}) '
                 f'q{rI2B.as_euler("zyx", degrees=True)}'
-                f'Target GB{realTargetAbsGB[:2]} I{realTargetAbsI[:2]} '
                 f'TtoD ENU{(realTargetAbsI - self.dockENU)[:2]}'
             ))
 
             if self.args.cali:
-                self.caliLog.log("rosTime", rospy.Time.now().to_sec() - self.startTime)
+                self.caliLog.log("rosTime", self.getTimeNow())
                 self.caliLog.log("podYaw", self.podYawBuffer.getMessageNoDelay().data)
                 self.caliLog.log("podYawDelayed", podYaw)
                 self.caliLog.log("podPitch", self.podPitchBuffer.getMessageNoDelay().data)
@@ -333,8 +341,6 @@ class Transformer:
                 self.caliLog.log('uavQuatDelayed', list(uavQuat))
                 self.caliLog.log('uavEuler', list(rI2B.as_euler('zyx', degrees=True)))
                 self.caliLog.log('selfPos', list(self.selfPos))
-                self.caliLog.log('targetPosAbsGB', list(realTargetAbsGB))
-                self.caliLog.log('targetPosRel', list(realTargetRelI))
                 self.caliLog.log('targetPosAbs', list(realTargetAbsI))
                 self.caliLog.log('targetId', categoryID)
                 self.caliLog.newline()
@@ -347,11 +353,10 @@ class Transformer:
         realTargetAbs = self.calTarget(pixelX, pixelY, category, categoryID)
         if realTargetAbs is None:
             return
-
         if not self.outOfBound(*realTargetAbs):
             # self.clsfy.newPos(*realTargetAbs)
-            if category == 'boat' or category == 'cup':
-                if self.searchState == 1 or self.searchState == 4:
+            if category == 'boat' or category == 'usv':
+                if self.searchState == 6 or self.searchState == 4:
                     self.clsfy.updateTarget(categoryID, list(realTargetAbs), score)
             elif category == 'usv':
                 if self.searchState == 6:
@@ -386,7 +391,7 @@ class Transformer:
         return False
 
     def log(self):
-        self.dtlg.log("rosTime", rospy.Time.now().to_sec() - self.startTime)
+        self.dtlg.log("rosTime", self.getTimeNow())
         self.dtlg.log("podYaw", self.podYawBuffer.getMessageNoDelay().data)
         self.dtlg.log("podYawDelayed", self.podYawBuffer.getMessage(self.podDelay).data)
         self.dtlg.log("podPitch", self.podPitchBuffer.getMessageNoDelay().data)
@@ -431,6 +436,10 @@ class Transformer:
             # print(f'My pos: {self.selfPos}')
             # print(f'RelImu: {R.from_quat(self.uavQuat).as_euler("zyx", degrees=True)}')
 
+            for key, ekf in self.ekfDict.items():
+                if ekf.t < self.getTimeNow() - 0.1:
+                    ekf.newFrame(self.getTimeNow(), np.array([0]), 0, 0, 0)
+                    self.clsfy.updateTarget(key, list(ekf.ekf.x[0:3]))
 
             if self.args.log and \
                not self.podYawBuffer.empty and \
@@ -445,7 +454,7 @@ class Transformer:
             tCnt = self.clsfy.targetsCnt
             for i in range(tLen):
                 print(
-                    f'Target[{i}] @ [{t[i][0]:.2f}, {t[i][1]:.2f}], '
+                    f'Target[{i}] @ [{t[i][0][0]:.2f}, {t[i][1][0]:.2f}, {t[i][2][0]:.2f}], '
                     f'{YELLOW if tCnt[i] < 15 else GREEN}'
                     f'{tCnt[i]} Frames{RESET}, '
                     f'Score: {tScore[i]:.2f}'

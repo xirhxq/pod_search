@@ -24,12 +24,13 @@ class Classifier:
         self.targetsCheck.append(False)
         self.targetsReal.append(False)
 
-    def updateTarget(self, ind, pos, score):
+    def updateTarget(self, ind, pos, score=None):
         while len(self.targets) < ind + 1:
             self.newTarget()
-        self.targets[ind] = (np.array(pos) + self.targets[ind] * self.targetsCnt[ind]) / (self.targetsCnt[ind] + 1)
-        self.targetsScore[ind] = max(self.targetsScore[ind], score)
-        self.targetsCnt[ind] += 1
+        self.targets[ind] = np.array(pos)
+        if score is not None:
+            self.targetsScore[ind] = max(self.targetsScore[ind], score)
+            self.targetsCnt[ind] += 1
         if self.targetsCnt[ind] > self.targetThreshold and not self.targetsCheck[ind]:
             self.targetsCheck[ind] = True
             self.targetsReal[ind] = True
