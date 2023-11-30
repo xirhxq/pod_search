@@ -30,93 +30,104 @@ class State:
 
 class PodSearch:
     def __init__(self, args):
-        self.state = State.INIT
+        # arg parsing
         self.args = args
         print(YELLOW + 'ARGS:', self.args, RESET)
-
         if not self.args.takeoff and not self.args.test:
             raise AssertionError("Please add --takeoff or --test arg")
         if self.args.takeoff and self.args.test:
             raise AssertionError("Not two args at the same time!")
-        
-        self.pitch = 0.0
-        self.yaw = 0.0
-        self.hfov = 0.0
 
-        self.expectedPitch = 0
-        self.expectedYaw = 0
-        self.expectedHfov = 0
-        self.maxRate = 0
+        # ros node initialising
+        rospy.init_node('pod_search', anonymous=True)
+        self.rate = rospy.Rate(10)
 
-        self.autoTra = AutoTra(pitchLevelOn=True, overlapOn=True, drawNum=-1, takeoff=self.args.takeoff, fast=self.args.fast)
-
-        self.tra = self.autoTra.theList
-
-        if not self.args.fast:
-            input('Type anything to continue...')
-
-        self.traCnt = 0
-
+        # namespaces
         self.uavName = 'suav'
         self.deviceName = 'pod'
 
-        rospy.init_node('pod_search', anonymous=True)
-        self.startTime = self.getTimeNow()
-        self.taskTime = 0
-        self.rate = rospy.Rate(10)
+        # From PodComm: pod pitch, yaw, hfov
+        self.pitch = 0.0
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/pitch', Float32, lambda msg: setattr(self, 'pitch', msg.data))
+        self.yaw = 0.0
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/yaw', Float32, lambda msg: setattr(self, 'yaw', msg.data))
+        self.hfov = 0.0
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/hfov', Float32, lambda msg: setattr(self, 'hfov', msg.data))
-        self.pitchPub = rospy.Publisher(
-            self.uavName + '/' + self.deviceName + '/expectedPitch', Float32, queue_size=10)
-        self.yawPub = rospy.Publisher(
-            self.uavName + '/' + self.deviceName + '/expectedYaw', Float32, queue_size=10)
-        self.hfovPub = rospy.Publisher(
-            self.uavName + '/' + self.deviceName + '/expectedHfov', Float32, queue_size=10)
-        self.maxRatePub = rospy.Publisher(
-            self.uavName + '/' + self.deviceName + '/maxRate', Float32, queue_size=10)
 
-        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/pAtTarget', Bool, lambda msg: setattr(self, 'pAtTarget', msg.data))
-        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/yAtTarget', Bool, lambda msg: setattr(self, 'yAtTarget', msg.data))
-        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/fAtTarget', Bool, lambda msg: setattr(self, 'fAtTarget', msg.data))
+        # From PodComm: pod pitch, yaw, hfov at target or not
         self.pAtTarget = False
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/pAtTarget', Bool, lambda msg: setattr(self, 'pAtTarget', msg.data))
         self.yAtTarget = False
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/yAtTarget', Bool, lambda msg: setattr(self, 'yAtTarget', msg.data))
         self.fAtTarget = False
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/fAtTarget', Bool, lambda msg: setattr(self, 'fAtTarget', msg.data))
 
+        # From PodComm: pod pitch, yaw, hfov feedback
         self.pFeedback = 0.0
-        self.yFeedback = 0.0
-        self.fFeedback = 0.0
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/pFeedback', Float32, lambda msg: setattr(self, 'pFeedback', msg.data))
+        self.yFeedback = 0.0
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/yFeedback', Float32, lambda msg: setattr(self, 'yFeedback', msg.data))
+        self.fFeedback = 0.0
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/fFeedback', Float32, lambda msg: setattr(self, 'fFeedback', msg.data))
 
-        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/stream', Float64MultiArray, self.streamCallback)
+        # To PodComm: expected pod pitch, yaw, hfov, max spin rate
+        self.expectedPitch = 0
+        self.pitchPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/expectedPitch', Float32, queue_size=10)
+        self.expectedYaw = 0
+        self.yawPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/expectedYaw', Float32, queue_size=10)
+        self.expectedHfov = 0
+        self.hfovPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/expectedHfov', Float32, queue_size=10)
+        self.maxRate = 0
+        self.maxRatePub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/maxRate', Float32, queue_size=10)
+
+        # To others: my state
+        self.state = State.INIT
+        self.searchStatePub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/searchState', Int8, queue_size=1)
+
+        # From suav: suav control state
+        self.uavState = 0
+        rospy.Subscriber(self.uavName + '/uavState', Int8, lambda msg: setattr(self, 'uavState', msg.data))
+
+        # From Transformer: stream data
         self.streamIndex = None
         self.streamPitch = 0
         self.streamYaw = 0
         self.streamFlag = False
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/stream', Float64MultiArray, self.streamCallback)
 
-        self.uavReady = True if self.args.test else False
-
-        self.endBeginTime = None
-
-        self.searchStatePub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/searchState', Int8, queue_size=1)
-        self.uavState = 0
-        rospy.Subscriber(self.uavName + '/uavState', Int8, lambda msg: setattr(self, 'uavState', msg.data))
-
+        # From Transformer: track data
         self.trackData = {'boat': [], 'usv': [], 'cup': []}
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/track', Float64MultiArray, self.trackCallback)
 
+        # From Transformer: dock data
         self.dockData = []
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/dock', Float64MultiArray, lambda msg: setattr(self, 'dockData', msg.data))
 
+        # From usv: land flag
         self.landFlag = -1
         rospy.Subscriber('/usv/suav_land_flag', Int8, lambda msg: setattr(self, 'landFlag', msg.data))
+        
+        # trajectory setting
+        self.autoTra = AutoTra(pitchLevelOn=True, overlapOn=True, drawNum=-1, takeoff=self.args.takeoff, fast=self.args.fast)
+        self.tra = self.autoTra.theList
+        if not self.args.fast:
+            input('Type anything to continue...')
 
+        # trajectory counter
+        self.traCnt = 0
+
+        # timers
+        self.startTime = self.getTimeNow()
+        self.taskTime = 0
+        self.endBeginTime = None
+
+        # ignore uav or not
+        self.uavReady = True if self.args.test else False
+
+        # set initial state
         if args.track:
             self.toStepTrack()
             print('<<<TRACK MODE>>>')
-
         if args.dock:
             self.toStepDock()
             print('<<<DOCK MODE>>>')
@@ -137,9 +148,6 @@ class PodSearch:
                 self.pAtTarget and
                 self.yAtTarget and
                 self.fAtTarget and
-               # abs(self.pitch - self.expectedPitch) < 5 and
-               # abs(self.yaw - self.expectedYaw) < 5 and
-               # abs(self.hfov - self.expectedHfov) / self.expectedHfov < 0.25 and
                 abs(self.pFeedback - self.expectedPitch) < 0.001 and
                 abs(self.yFeedback - self.expectedYaw) < 0.001 and
                 abs(self.fFeedback - self.expectedHfov) < 0.001
