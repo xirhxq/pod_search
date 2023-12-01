@@ -18,7 +18,6 @@ class TimeBuffer:
 
     def addMessage(self, msg):
         time = rospy.Time.now()
-        print(f'{time.to_sec() = }')
         self.buffer.append((time, msg))
 
     def getData(self, x):
