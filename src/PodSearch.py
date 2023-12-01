@@ -143,6 +143,9 @@ class PodSearch:
     def getTimeNow(self):
         return rospy.Time.now().to_sec()
 
+    def getHfovFromPitch(self, pitch):
+        return min(PodParas.maxHfov, max(PodParas.minHfov, pitch * self.autoTra.hfovPitchRatio))
+
     def isAtTarget(self):
         return (
                 self.pAtTarget and
@@ -156,28 +159,6 @@ class PodSearch:
     def toStepInit(self):
         self.state = State.INIT
 
-    def toStepSearch(self):
-        self.state = State.SEARCH
-
-    def toStepEnd(self):
-        self.state = State.END
-        self.endBeginTime = self.getTimeNow()
-
-    def toStepStream(self):
-        self.state = State.STREAM
-        if self.streamIndex == None:
-            print(f'{RED}No targets to stream{RESET}')
-            self.toStepEnd()
-        self.streamStartTime = self.getTimeNow()
-
-    def toStepTrack(self, trackName='boat'):
-        self.state = State.TRACK
-        self.trackData[trackName] = []
-
-    def toStepDock(self):
-        self.state = State.DOCK
-        self.dockTime = self.getTimeNow()
-
     def stepInit(self):
         self.expectedPitch = self.tra[0][0]
         self.expectedYaw = self.tra[0][1]
@@ -186,6 +167,9 @@ class PodSearch:
         self.pubPYZMaxRate()
         if self.isAtTarget() and self.uavReady:
             self.toStepSearch()
+
+    def toStepSearch(self):
+        self.state = State.SEARCH
 
     def stepSearch(self):
         print(f'{GREEN}==> StepSearch @ #{self.traCnt + 1}/{len(self.tra)} <=={RESET}')
@@ -198,6 +182,13 @@ class PodSearch:
             self.traCnt += 1
         if self.traCnt == len(self.tra):
             self.toStepStream()
+            
+    def toStepStream(self):
+        self.state = State.STREAM
+        if self.streamIndex == None:
+            print(f'{RED}No targets to stream{RESET}')
+            self.toStepEnd()
+        self.streamStartTime = self.getTimeNow()
 
     def stepStream(self):
         if not self.streamFlag and self.isAtTarget() and self.getTimeNow() - self.streamStartTime >= 3.0:
@@ -224,27 +215,26 @@ class PodSearch:
         if streamTime >= 10.0:
             self.toStepDock()
 
-    def stepEnd(self):
-        endTime = self.getTimeNow() - self.endBeginTime
-        print(f'StepEnd with {endTime:.2f} seconds')
-        if endTime >= 3.0:
-            exit(0)
-
-    def getHfovFromPitch(self, pitch):
-        return min(PodParas.maxHfov, max(PodParas.minHfov, pitch * self.autoTra.hfovPitchRatio))
+    def toStepTrack(self, trackName='boat'):
+        self.state = State.TRACK
+        self.trackData[trackName] = []
 
     def stepTrack(self):
         print('Step Track')
         if self.landFlag == 1:
             self.toStepEnd()
-        trackName = 'boat'
+        trackName = 'usv'
         if len(self.trackData[trackName]) < 4:
             return
-        self.expectedPitch = self.trackData[trackName][0] - 0.5
+        self.expectedPitch = self.trackData[trackName][0] - 0.3
         self.expectedYaw = self.trackData[trackName][1]
-        self.expectedHfov = self.getHfovFromPitch(self.trackData[trackName][0])
+        self.expectedHfov = 8 # self.getHfovFromPitch(self.trackData[trackName][0])
         self.maxRate = self.trackData[trackName][3]
         self.pubPYZMaxRate()
+
+    def toStepDock(self):
+        self.state = State.DOCK
+        self.dockTime = self.getTimeNow()
 
     def stepDock(self):
         print(
@@ -261,6 +251,16 @@ class PodSearch:
         self.pubPYZMaxRate()
         if self.getTimeNow() - self.dockTime >= 10:
             self.toStepTrack('usv')
+
+    def toStepEnd(self):
+        self.state = State.END
+        self.endBeginTime = self.getTimeNow()
+
+    def stepEnd(self):
+        endTime = self.getTimeNow() - self.endBeginTime
+        print(f'StepEnd with {endTime:.2f} seconds')
+        if endTime >= 3.0:
+            exit(0)
 
     def pubPYZMaxRate(self):
         if self.expectedYaw < -90 or self.expectedYaw > 90:
