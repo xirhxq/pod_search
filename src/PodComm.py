@@ -154,11 +154,11 @@ class POD_COMM:
         self.podFollowModeOn = None
         self.podLockModeOn = None
         self.podLaserOn = None
-        self.podBigViewType = None
-        self.podSmallViewType = None
+        self.podBigViewType = 0
+        self.podSmallViewType = 0
 
         # pod states: float
-        self.podF = 0
+        self.podF = 4.5
         self.podZoomLevel = 0
         self.podRoll = 0.0
         self.podPitch = 0.0
