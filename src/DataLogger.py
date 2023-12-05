@@ -54,6 +54,8 @@ class DataLogger:
                 print("Some value has not been updated!!!")
             timestamp = datetime.datetime.now().strftime("%Y,%m,%d,%H,%M,%S,%f")[:-3]
             line = f"{timestamp}"
+            timestampSecond = datetime.datetime.now().timestamp()
+            line += f',{timestampSecond}'
             for value, updated in zip(self.values, self.value_updated):
                 if not updated:
                     print("Some value has not been updated!!!")
@@ -135,7 +137,7 @@ class DataLogger:
 
     def write_header(self):
         with open(self.filename, "w") as file:
-            file.write("Year,Month,Day,Hour,Minute,Second,Millisecond")
+            file.write("Year,Month,Day,Hour,Minute,Second,Millisecond,TimestampSecond")
             for name in self.variable_names:
                 file.write(f",{name}")
             file.write("\n")
