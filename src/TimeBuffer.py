@@ -49,10 +49,10 @@ class TimeBuffer:
         val1 = self.getData(self.preMsg)
         val2 = self.getData(self.buffer[0][1])
 
-        ret = Float32(data=val1 + (val2 - val1) * (targetTime.to_sec() - t1) / (t2 - t1))
+        ret =val1 + (val2 - val1) * (targetTime.to_sec() - t1) / (t2 - t1)
         return ret
 
-        return self.buffer[0][1]
+        return self.buffer[0][1].data
 
     def getMessageNoDelay(self):
         if not self.buffer:
