@@ -2,12 +2,14 @@ from collections import deque
 import rospy
 from std_msgs.msg import Float32
 
+import PodParas
+
 
 class TimeBuffer:
     def __init__(self, name='Buffer'):
         self.buffer = deque()
         self.name = name
-        self.maxAge = 0.4
+        self.maxAge = PodParas.podDelay
 
         self.preT = None
         self.preMsg = None
@@ -26,7 +28,7 @@ class TimeBuffer:
         else:
             return x
 
-    def getMessage(self, time):
+    def getMessage(self):
         if not self.buffer:
             return None
 
@@ -57,7 +59,14 @@ class TimeBuffer:
     def getMessageNoDelay(self):
         if not self.buffer:
             return None
-        return self.buffer[-1][1]
+        currentTime = rospy.Time.now()
+        targetTime = currentTime - rospy.Duration.from_sec(self.maxAge)
+        while self.buffer and self.buffer[0][0] < targetTime:
+            self.preT = self.buffer[0][0]
+            self.preMsg = self.buffer[0][1]
+            self.buffer.popleft()
+
+        return self.buffer[-1][1].data
 
     def outputBuffer(self):
         print(self.name + ': [')
