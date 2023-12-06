@@ -216,6 +216,7 @@ class POD_COMM:
         self.yawPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/yaw', Float32, queue_size=1)
         self.rollPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/roll', Float32, queue_size=1)
         self.hfovPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/hfov', Float32, queue_size=1)
+        self.laserOnPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/laserOn', Bool, queue_size=1)
         self.laserRangePub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/laserRange', Float32, queue_size=1)
         
         self.pAtTargetPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/pAtTarget', Bool, queue_size=1)
@@ -411,6 +412,7 @@ class POD_COMM:
         self.yawPub.publish(self.podYaw)
         self.rollPub.publish(self.podRoll)
         self.hfovPub.publish(PodParas.getHfovFromF(self.podF))
+        self.laserOnPub.publish(self.podLaserOn)
         self.laserRangePub.publish(self.podLaserRange)
 
         self.pAtTargetPub.publish(self.pAtTarget)
