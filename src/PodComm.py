@@ -26,7 +26,7 @@ UP_FRAME_HEAD = b'\xEB\x90'
 FRAME_LEN = 30
 
 bAny, bS8, bU8, bS16, bU16, bS32, bU32, bF = 'x', 'b', 'B', 'h', 'H', 'i', 'I', 'f'
-DOWN_PROTO = '<' + bU8 * 4 + bS16 * 5 + bU8 * 2 + bAny * 2 + bS16 * 3 + bU16 + bU8 + bAny * 2 + bU8
+DOWN_PROTO = '<' + bU8 * 4 + bS16 * 5 + bS16 * 5 + bU16 + bU8 + bS16 + bU8
 
 def splitByte(byte, bitSizes=[1]*8):
     result = []
@@ -167,6 +167,9 @@ class POD_COMM:
         self.podRollRate = 0.0
         self.podPitchRate = 0.0
         self.podYawRate = 0.0
+        self.podRollIDeg = .0
+        self.podPitchIDeg = .0
+        self.podYawIDeg = .0
 
         # control inputs with ros interface
         self.expectedPitch = 0.0
@@ -313,9 +316,10 @@ class POD_COMM:
                             (podState1, podState2, zoomx10Low8, podState3, 
                              xOffsetDegreex20, yOffsetDegreex20, 
                              podRollx100, podPitchx100, podYawx100,
-                             waveHor, waveVer, 
+                             podRollIDegx100, podPitchIDegx100,
                              podRollRatex100, podPitchRatex100, podYawRatex100,
-                             laserRangex10, selfCheckRes) = downData[:-1]
+                             laserRangex10, selfCheckRes, 
+                             podYawIDegx100) = downData[:-1]
                            
                             podState2Datas = splitByte(podState2)
                             
@@ -355,6 +359,9 @@ class POD_COMM:
                             self.podRollRate = podRollRatex100 / 100
                             self.podPitchRate = podPitchRatex100 / 100
                             self.podYawRate = podYawRatex100 / 100
+                            self.podRollIDeg = podRollIDegx100 / 100
+                            self.podPitchIDeg = podPitchIDegx100 / 100
+                            self.podYawIDeg = podYawIDegx100 / 100
                             
                         self.state = WAITING_DOWN_FRAME_HEAD_1
 
@@ -388,13 +395,14 @@ class POD_COMM:
         print((GREEN if self.podLockModeOn else RED) + 'Lock ' + RESET, end='')
         print(PodParas.viewTypeDict[self.podBigViewType] + '+' + PodParas.viewTypeDict[self.podSmallViewType], end='')
         print(' Laser: ' + ((GREEN + f'{self.podLaserRange:.1f}') if self.podLaserOn else (RED + 'Off')) + RESET)
+        print(f'Roll \t{self.podRoll:6.2f} -> ({self.podRollIDeg:6.2f})')
         print(GREEN if self.pAtTarget else RED, end='')
-        print(f'Pitch {self.podPitch:.2f} -> {self.expectedPitch:.2f}{RESET}')
+        print(f'Pitch \t{self.podPitch:6.2f} -> {self.expectedPitch:6.2f} ({self.podPitchIDeg:6.2f}){RESET}')
         print(GREEN if self.yAtTarget else RED, end='')
-        print(f'Yaw {self.podYaw:.2f} -> {self.expectedYaw:.2f}{RESET}')
+        print(f'Yaw \t{self.podYaw:6.2f} -> {self.expectedYaw:6.2f} ({self.podYawIDeg:6.2f}){RESET}')
         print(GREEN if self.fAtTarget else RED, end='')
-        print(f'Zoom {self.podF:.1f}({self.podZoomLevel}) -> {self.expectedF:.1f}({self.expectedZoomLevel:.1f}){RESET}')
-        print(f'Hfov {PodParas.getHfovFromF(self.podF):.2f} -> {PodParas.getHfovFromF(self.expectedF):.2f}')
+        print(f'Zoom \t{self.podF:6.1f}({self.podZoomLevel:6.1f}) -> {self.expectedF:6.1f}({self.expectedZoomLevel:6.1f}){RESET}')
+        print(f'Hfov {PodParas.getHfovFromF(self.podF):6.2f} -> {PodParas.getHfovFromF(self.expectedF):6.2f}')
         print(f'CHECKSUM right/wrong: {self.checkSumRightCnt}/{self.checkSumWrongCnt}')
         print(f'Down Data: {self.downData.hex()}')
 
