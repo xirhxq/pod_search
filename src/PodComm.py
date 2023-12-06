@@ -94,8 +94,8 @@ class UP_MSG:
 
     def manualPYRate(self, prate, yrate):
         self.orderB = b'\x24'
-        self.orderX = pack('<h', int(-10 * yrate))
-        self.orderY = pack('<h', int(-10 * prate))
+        self.orderX = pack('<h', int(-20 * yrate))
+        self.orderY = pack('<h', int(-20 * prate))
         return self.msg()
 
     def laserOn(self):
@@ -134,18 +134,25 @@ class POD_COMM:
         self.checkSumRightCnt = 0
         self.checkSumWrongCnt = 0
         self.dataBuf = bytearray()
-        self.downSer = serial.Serial(
-            port=PORT,
-            baudrate=115200,
-            parity=serial.PARITY_NONE,
-            stopbits=serial.STOPBITS_ONE,
-            bytesize=serial.EIGHTBITS,
-            timeout=0.5
-        )
+        while True:
+            try:
+                self.downSer = serial.Serial(
+                    port=PORT,
+                    baudrate=115200,
+                    parity=serial.PARITY_NONE,
+                    stopbits=serial.STOPBITS_ONE,
+                    bytesize=serial.EIGHTBITS,
+                    timeout=0.5
+                )
+                break
+            except:
+                print(f'Got some issue, retrying in 1s...')
+                time.sleep(1)
+        
         self.downData = None
 
         # pod constants:
-        self.pyTol = 0.1
+        self.pyTol = 0.05
         self.zTol = 0.2
 
         # pod states: bool or bit
@@ -405,7 +412,6 @@ class POD_COMM:
         print(f'Zoom \t{self.podF:6.1f}({self.podZoomLevel:6.1f}) -> {self.expectedF:6.1f}({self.expectedZoomLevel:6.1f}){RESET}')
         print(f'Hfov {PodParas.getHfovFromF(self.podF):6.2f} -> {PodParas.getHfovFromF(self.expectedF):6.2f}')
         print(f'CHECKSUM right/wrong: {self.checkSumRightCnt}/{self.checkSumWrongCnt}')
-        print(f'Down Data: {self.downData.hex()}')
 
     def rosPub(self):
         self.pitchPub.publish(self.podPitch)
