@@ -468,6 +468,14 @@ class PodSearch:
         print(GREEN if self.podHfovAtTarget else RED, end='')
         print(f'HFov: {self.podHfovDeg:.2f} -> {self.expectedPodHfovDeg:.2f} == {self.podHfovFeedbackDeg:.2f} {RESET}')
         self.controlStateMachine()
+    
+    def signalHandler(self, sig, frame):
+        print('You pressed Ctrl+C!')
+        print('Turning Laser Off...')
+        if self.podLaserOn:
+            self.expectedLaserOnPub.publish(False)
+        print('Laser is Off...')
+        exit(0)
 
     def spin(self):
         while not rospy.is_shutdown():
