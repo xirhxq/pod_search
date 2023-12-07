@@ -5,6 +5,7 @@ import argparse
 import subprocess
 import numpy as np
 from os import system
+from rich import print
 from signal import signal, SIGINT
 
 import rospy
