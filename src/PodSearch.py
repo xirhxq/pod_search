@@ -110,7 +110,7 @@ class PodSearch:
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/usv_detection', TargetsInFrame, self.usvDetectionCallback, queue_size=1)
 
         # From localisation: location
-        self.uavPos = np.array([[0], [0], [10]])
+        self.uavPos = np.array([[0], [0], [8]])
 
         # To others: my state
         self.state = State.INIT
