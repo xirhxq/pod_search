@@ -192,6 +192,7 @@ class POD_COMM:
         self.pNotAtTargetTime = self.getTimeNow()
         self.yNotAtTargetTime = self.getTimeNow()
         self.fNotAtTargetTime = self.getTimeNow()
+        self.toggleZoomControl = False
 
         # ros related:
         self.uavName = 'suav'
@@ -270,7 +271,8 @@ class POD_COMM:
             absZoomDiff = (self.expectedF - self.podF)
             relZoomDiff = absZoomDiff / self.expectedF
 
-            if (not self.pAtTarget or not self.yAtTarget):
+            if self.toggleZoomControl:
+            # if (not self.pAtTarget or not self.yAtTarget):
                 prMax, yrMax = self.maxRate, self.maxRate
                 prate = max(-prMax, min(prMax, 1 * pitchDiff))
                 yrate = max(-yrMax, min(yrMax, 1 * yawDiff))
@@ -281,11 +283,14 @@ class POD_COMM:
                     print(f'up pitch {self.podPitch:.2f} -> {self.expectedPitch:.2f} diff: {pitchDiff:.2f} rate: {prate:.2f}')
                     print(f'up yaw {self.podYaw:.2f} -> {self.expectedYaw:.2f} diff: {yawDiff:.2f} rate: {yrate:.2f}')
 
-            elif not self.fAtTarget:
+            else:
+            # elif not self.fAtTarget:
                 
                 if self.args.controlDebug:
                     print(f'change zoom level {self.podZoomLevel} to {self.expectedZoomLevel}')
                 up.changeZoomLevel(self.expectedZoomLevel)
+            
+            self.toggleZoomControl = not self.toggleZoomControl
 
         if self.args.controlDebug:
             print(f'Up Data: {up.msg().hex()}')
@@ -399,6 +404,7 @@ class POD_COMM:
         print('### PodComm ###')
         print((GREEN if self.podImageEnhanceOn else RED) + 'ImageEnhance ' + RESET, end='')
         print((GREEN if self.podRollControlMode else RED) + 'RollControl ' + RESET, end='')
+        print((GREEN if self.toggleZoomControl else RED) + 'ZoomControl ' + RESET, end='')
         print((GREEN if self.podFollowModeOn else RED) + 'Follow ' + RESET, end='')
         print((GREEN if self.podLockModeOn else RED) + 'Lock ' + RESET, end='')
         print(PodParas.viewTypeDict[self.podBigViewType] + '+' + PodParas.viewTypeDict[self.podSmallViewType], end='')
