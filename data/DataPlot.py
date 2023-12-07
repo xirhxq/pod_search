@@ -4,7 +4,7 @@ import os
 import glob
 import numpy as np
 
-ekfFiles = glob.glob('*_ekf.csv')
+ekfFiles = glob.glob('*_usvekf.csv')
 print(f'{ekfFiles = }')
 for ind, f in enumerate(ekfFiles):
     print(f'[{ind}]: {f}')
@@ -24,10 +24,13 @@ ax.scatter(df['Time'], df['usvEKFx[0][0]'], label='x')
 ax.scatter(df['Time'], df['usvEKFx[1][0]'], label='y')
 ax.scatter(df['Time'], df['usvEKFx[2][0]'], label='z')
 
-df['EKFr'] = np.sqrt()
 
 ax.legend()
 ax.set_title(f)
 fig.savefig(f[:-4] + '.png')
+#plt.show()
+
+fig = plt.figure()
+ax = fig.add_subplot(111)
+ax.scatter(df['usvEKFx[0][0]'], df['usvEKFx[1][0]'], c=df['Time'], cmap='inferno')
 plt.show()
-        

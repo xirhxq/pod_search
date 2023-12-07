@@ -104,6 +104,8 @@ class PodSearch:
         # From spirecv-ros: usv detection
         self.usvCameraAzimuth = None
         self.usvCameraElevation = None
+        self.vesselCameraAzimuth = None
+        self.vesselCameraElevation = None
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/vessel_det', TargetsInFrame, self.vesselDetectionCallback, queue_size=1)
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/usv_detection', TargetsInFrame, self.usvDetectionCallback, queue_size=1)
 
@@ -162,7 +164,21 @@ class PodSearch:
             print('<<<DOCK MODE>>>')
 
         # ekfs for locating
-        self.ekfs = {}
+        self.ekfNames = ['usv', 'boat']
+        self.ekfs = {n: LocatingEKF(initialT=self.getTimeNow()) for n in self.ekfNames}
+        import rospkg
+        pre = rospkg.RosPack().get_path('pod_search')
+        self.ekfLogs = {n: DataLogger(pre, n + 'ekf.csv') for n in self.ekfNames}
+        self.ekfLogs['usv'].initialize([('usvEKFx[6][1]', 'matrix')])
+
+        self.targetPos = np.array([[-200], [200], [0]])
+
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/targetPos', Float64MultiArray, self.targetPosCallback)
+
+        signal(SIGINT, self.signalHandler)
+
+    def targetPosCallback(self, msg):
+        self.targetPos = np.array([[msg.data[0]], [msg.data[1]], [0]])
 
     @property
     def podPitchDeg(self):
@@ -221,7 +237,22 @@ class PodSearch:
         return self.rB2PDelayed.T
 
     def vesselDetectionCallback(self, msg):
-        pass
+        self.vesselCameraAzimuth = None
+        self.vesselCameraElevation = None
+        for target in msg.targets:
+            px = (target.cx - 0.5) * 2
+            py = (target.cy - 0.5) * 2
+            try:
+                self.vesselCameraAzimuth = -np.degrees(np.arctan(np.tan(np.radians(self.podHfovDegDelayed) / 2) * px))
+                self.vesselCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * py))
+                self.trackData['boat'] =[
+                    self.vesselCameraElevation + self.podPitchDegDelayed, 
+                    self.vesselCameraAzimuth + self.podYawDegDelayed, 
+                    PodParas.clipPitch(self.podHfovDegDelayed * target.w / 0.2), 
+                    20
+                ]
+            except Exception as e:
+                print(e)
 
     def usvDetectionCallback(self, msg):
         self.usvCameraAzimuth = None
@@ -239,7 +270,8 @@ class PodSearch:
                     20
                 ]
             except Exception as e:
-                print(e)
+                pass
+                # print(e)
 
     def getTimeNow(self):
         return rospy.Time.now().to_sec()
@@ -320,15 +352,22 @@ class PodSearch:
         self.state = State.TRACK
         self.trackName = trackName
         self.trackData[trackName] = []
-        self.ekfs[trackName] = LocatingEKF(initialT=self.getTimeNow())
-
+        if not self.podLaserOn:
+            self.expectedLaserOn = True
+            self.expectedLaserOnPub.publish(True)
+        print(f'{self.expectedLaserOn = }')
+    
     def stepTrack(self):
         print('Step Track')
         if self.landFlag == 1:
             self.toStepEnd()
+        print(f'{self.expectedLaserOn = }')
         print(f'{self.trackName = }, {self.trackData[self.trackName] = }')
+        if not self.podLaserOn:
+            self.expectedLaserOn = True
+            self.expectedLaserOnPub.publish(True)
         if len(self.trackData[self.trackName]) == 4:
-            self.expectedPodPitchDeg = self.trackData[self.trackName][0] - 0.1
+            self.expectedPodPitchDeg = self.trackData[self.trackName][0]
             self.expectedPodYawDeg = self.trackData[self.trackName][1]
             self.expectedPodHfovDeg = self.trackData[self.trackName][2]
             self.expectedMaxRateDeg = self.trackData[self.trackName][3]
@@ -343,11 +382,15 @@ class PodSearch:
             self.rP2BDelayed,
             R.from_euler('zyx', [180, 0, 0], degrees=True).as_matrix().T
         )
-        usvPos = self.ekfs[self.trackName].ekf.x[:3].reshape((3, 1))
-        targetPoint = np.array([[-400], [400], [0]])
-        usvToTargetENU = targetPoint - usvPos
-        usvToTargetTheta = np.degrees(np.arctan2(usvToTargetENU[1][0], usvToTargetENU[0][0]))
-        self.usvTargetPub.publish(Pose2D(x=usvToTargetENU[0][0], y=usvToTargetENU[1][0], theta=usvToTargetTheta))
+        print(f'{self.ekfs[self.trackName].ekf.x = }')
+        if self.ekfs[self.trackName].ekf.x is not None:
+            usvPos = self.ekfs[self.trackName].ekf.x[:3].reshape((3, 1))
+            self.ekfLogs[self.trackName].log('usvEKFx', self.ekfs[self.trackName].ekf.x)
+            self.ekfLogs[self.trackName].newline()
+            print(f'{self.targetPos = }')
+            usvToTargetENU = self.targetPos - usvPos
+            usvToTargetTheta = np.degrees(np.arctan2(usvToTargetENU[1][0], usvToTargetENU[0][0]))
+            self.usvTargetPub.publish(Pose2D(x=usvToTargetENU[0][0], y=usvToTargetENU[1][0], theta=usvToTargetTheta))
         
 
     def toStepDock(self):
@@ -448,14 +491,16 @@ if __name__ == '__main__':
         command = 'rosbag record -a -x "/suav/pod/main_camera_images.*" -o track'
         process = subprocess.Popen(command, shell=True)
 
-    def signal_handler(sig, frame):
-        print('You pressed Ctrl+C!')
-        exit(0)
-
-    signal(SIGINT, signal_handler)
-
     time.sleep(3)
-        
+    
+    np.set_printoptions(
+        precision=3, 
+        threshold=10, 
+        edgeitems=3, 
+        linewidth=80,
+        suppress=True
+    )
+
     podSearch = PodSearch(args)
 
     podSearch.spin()
