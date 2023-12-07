@@ -16,7 +16,6 @@ class LocatingEKF:
 
     def setFQ(self):
         self.ekf.F = np.eye(6)
-        self.ekf.F[0:3, 3:6] = np.eye(3) * self.dt
 
         sigmaA = 1.
         self.ekf.Q = np.zeros((6, 6))
