@@ -84,11 +84,11 @@ class PodSearch:
 
         # From PodComm: pod pitch, yaw, hfov feedback
         self.podPitchFeedbackDeg = 0.0
-        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/pFeedback', Float32, lambda msg: setattr(self, 'podPitchFeedback', msg.data))
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/pFeedback', Float32, lambda msg: setattr(self, 'podPitchFeedbackDeg', msg.data))
         self.podYawFeedbackDeg = 0.0
-        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/yFeedback', Float32, lambda msg: setattr(self, 'podYawFeedback', msg.data))
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/yFeedback', Float32, lambda msg: setattr(self, 'podYawFeedbackDeg', msg.data))
         self.podHfovFeedbackDeg = 0.0
-        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/fFeedback', Float32, lambda msg: setattr(self, 'podHfovFeedback', msg.data))
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/fFeedback', Float32, lambda msg: setattr(self, 'podHfovFeedbackDeg', msg.data))
 
         # To PodComm: expected pod pitch, yaw, hfov, max spin rate, laser on
         self.expectedPodPitchDeg = 0
