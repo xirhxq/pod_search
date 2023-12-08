@@ -32,6 +32,7 @@ class State:
     END = 5
     TRACK = 6
     DOCK = 7
+    REFIND = 8
 
 def delayStart(method):
     def wrapper(self, *args, **kwargs):
@@ -147,7 +148,8 @@ class PodSearch:
         # timers
         self.startTime = self.getTimeNow()
         self.taskTime = 0
-        self.endBeginTime = None
+        self.tic = self.getTimeNow()
+        self.toc = self.getTimeNow()
 
         # ignore uav or not
         self.uavReady = True if self.args.test else False
@@ -163,6 +165,9 @@ class PodSearch:
             self.toStepDock()
             print('<<<DOCK MODE>>>')
 
+        self.lastUSVCaptureTime = self.getTimeNow()
+        self.lastVesselCaptureTime = self.getTimeNow()
+
         # ekfs for locating
         self.ekfNames = ['usv', 'boat']
         self.ekfs = {n: LocatingEKF(initialT=self.getTimeNow()) for n in self.ekfNames}
@@ -173,9 +178,16 @@ class PodSearch:
 
         self.targetPos = np.array([[-200], [200], [0]])
 
+        self.refindName = None
+        self.refindPitch = None
+        self.refindYaw = None
+        self.refindHfov = None
+
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/targetPos', Float64MultiArray, self.targetPosCallback)
 
         signal(SIGINT, self.signalHandler)
+
+        print('Initialising finished...')
 
     def targetPosCallback(self, msg):
         self.targetPos = np.array([[msg.data[0]], [msg.data[1]], [0]])
@@ -251,6 +263,7 @@ class PodSearch:
                     PodParas.clipHfov(self.podHfovDegDelayed * target.w / 0.2), 
                     20
                 ]
+                self.lastVesselCaptureTime = self.getTimeNow()
             except Exception as e:
                 print(e)
 
@@ -269,6 +282,7 @@ class PodSearch:
                     PodParas.clipHfov(self.podHfovDegDelayed * target.w / 0.2), 
                     20
                 ]
+                self.lastUSVCaptureTime = self.getTimeNow()
             except Exception as e:
                 pass
                 # print(e)
@@ -291,6 +305,7 @@ class PodSearch:
 
     def toStepInit(self):
         self.state = State.INIT
+        self.tic = self.getTimeNow()
 
     def stepInit(self):
         self.expectedPodPitchDeg = self.tra[0][0]
@@ -303,6 +318,7 @@ class PodSearch:
 
     def toStepSearch(self):
         self.state = State.SEARCH
+        self.tic = self.getTimeNow()
 
     def stepSearch(self):
         print(f'{GREEN}==> StepSearch @ #{self.traCnt + 1}/{len(self.tra)} <=={RESET}')
@@ -322,6 +338,7 @@ class PodSearch:
             print(f'{RED}No targets to stream{RESET}')
             self.toStepEnd()
         self.streamStartTime = self.getTimeNow()
+        self.tic = self.getTimeNow()
 
     def stepStream(self):
         if not self.streamFlag and self.isAtTarget() and self.getTimeNow() - self.streamStartTime >= 3.0:
@@ -356,11 +373,14 @@ class PodSearch:
             self.expectedLaserOn = True
             self.expectedLaserOnPub.publish(True)
         print(f'{self.expectedLaserOn = }')
+        self.tic = self.getTimeNow()
     
     def stepTrack(self):
         print('Step Track')
         if self.landFlag == 1:
             self.toStepEnd()
+        if self.getTimeNow() - self.lastUSVCaptureTime >= 5.0:
+            self.toStepRefind('usv')
         print(f'{self.expectedLaserOn = }')
         print(f'{self.trackName = }, {self.trackData[self.trackName] = }')
         if not self.podLaserOn:
@@ -392,14 +412,31 @@ class PodSearch:
             usvToTargetTheta = np.degrees(np.arctan2(usvToTargetENU[1][0], usvToTargetENU[0][0]))
             self.usvTargetPub.publish(Pose2D(x=usvToTargetENU[0][0], y=usvToTargetENU[1][0], theta=usvToTargetTheta))
         
+    def toStepRefind(self, refindName):
+        self.state = State.REFIND
+        self.tic = self.getTimeNow()
+        self.refindPitch = self.podPitchDeg
+        self.refindYaw = self.podYawDeg
+        self.refindHfov = self.podHfovDeg
+        self.refindName = refindName
+
+    def stepRefind(self):
+        print(f'Refinding {self.refindName} @ (p{self.refindPitch:.2f}, y{self.refindYaw:.2f}, hfov{self.refindHfov:.2f})')
+        self.expectedPodPitchDeg = 20 + (self.toc - self.tic) * np.sin((self.toc - self.tic) / 15 * 2 * np.pi)
+        self.expectedPodYawDeg = self.refindYaw + (self.toc - self.tic) * np.cos((self.toc - self.tic) / 15 * 2 * np.pi)
+        self.expectedPodHfovDeg = PodParas.clipHfov(self.refindHfov * 1.5)
+        self.expectedMaxRateDeg = 10
+        self.pubPYZMaxRate()
+        if self.getTimeNow() - self.lastUSVCaptureTime < 0.1:
+            self.toStepTrack('usv')
 
     def toStepDock(self):
         self.state = State.DOCK
-        self.dockTime = self.getTimeNow()
+        self.tic = self.getTimeNow()
 
     def stepDock(self):
         print(
-            f'Dock {self.getTimeNow() - self.dockTime:.2f}, '
+            f'Dock {self.toc - self.tic:.2f}, '
             f'{(GREEN + "At Target" + RESET) if self.isAtTarget() else (RED + "Not At Target" + RESET)}'
         )
         if len(self.dockData) < 4:
@@ -410,17 +447,16 @@ class PodSearch:
         self.expectedPodHfovDeg = self.getHfovFromPitch(self.dockData[1])
         self.expectedMaxRateDeg = 10
         self.pubPYZMaxRate()
-        if self.getTimeNow() - self.dockTime >= 10:
+        if self.toc - self.tic >= 10:
             self.toStepTrack('usv')
 
     def toStepEnd(self):
         self.state = State.END
-        self.endBeginTime = self.getTimeNow()
+        self.tic = self.getTimeNow()
 
     def stepEnd(self):
-        endTime = self.getTimeNow() - self.endBeginTime
-        print(f'StepEnd with {endTime:.2f} seconds')
-        if endTime >= 3.0:
+        print(f'StepEnd with {self.toc - self.tic:.2f} seconds')
+        if self.toc - self.tic >= 3.0:
             exit(0)
 
     def pubPYZMaxRate(self):
@@ -433,6 +469,7 @@ class PodSearch:
         self.expectedLaserOnPub.publish(self.expectedLaserOn)
 
     def controlStateMachine(self):
+        self.toc = self.getTimeNow()
         self.searchStatePub.publish(Int8(self.state))
         if self.uavState >= 4:
             self.uavReady = True
@@ -448,6 +485,8 @@ class PodSearch:
             self.stepTrack()
         elif self.state == State.DOCK:
             self.stepDock()
+        elif self.state == State.REFIND:
+            self.stepRefind()
         else:
             print("Invalid state")
 
