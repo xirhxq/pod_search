@@ -16,6 +16,7 @@ from std_msgs.msg import Float32, Bool
 
 from Utils import *
 import PodParas
+from PID import PID
 
 HZ = 50
 
@@ -193,6 +194,14 @@ class POD_COMM:
         self.yNotAtTargetTime = self.getTimeNow()
         self.fNotAtTargetTime = self.getTimeNow()
         self.toggleZoomControl = False
+        if self.args.pIControl:
+            self.pitchPID = PID(1, 0.01, 0)
+            self.yawPID = PID(1, 0.01, 0)
+        elif self.args.pControl:
+            self.pitchPID = PID(1, 0, 0)
+            self.yawPID = PID(1, 0, 0)
+        else:
+            raise AssertionError('Choose one from PI and P control')
 
         # ros related:
         self.uavName = 'suav'
@@ -274,8 +283,8 @@ class POD_COMM:
             if self.toggleZoomControl:
             # if (not self.pAtTarget or not self.yAtTarget):
                 prMax, yrMax = self.maxRate, self.maxRate
-                prate = max(-prMax, min(prMax, 1 * pitchDiff))
-                yrate = max(-yrMax, min(yrMax, 1 * yawDiff))
+                prate = max(-prMax, min(prMax, self.pitchPID.compute(pitchDiff)))
+                yrate = max(-yrMax, min(yrMax, self.yawPID.compute(yawDiff)))
 
                 up.manualPYRate(prate, yrate)
 
@@ -471,6 +480,8 @@ if __name__ == '__main__':
     parser.add_argument('--serialDebug', help='debug serial read', action='store_true')
     parser.add_argument('--controlDebug', help='control output', action='store_true')
     parser.add_argument('--indoor', help='indoor test w/o laser', action='store_true')
+    parser.add_argument('--pControl', help='kp control', action='store_true')
+    parser.add_argument('--pIControl', help='kp & ki control', action='store_true')
     args, unknown = parser.parse_known_args()
     print(f'PORT is {PORT}')
     pod_comm = POD_COMM(args)
