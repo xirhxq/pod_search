@@ -248,7 +248,7 @@ class PodSearch:
                 self.trackData['boat'] =[
                     self.vesselCameraElevation + self.podPitchDegDelayed, 
                     self.vesselCameraAzimuth + self.podYawDegDelayed, 
-                    PodParas.clipPitch(self.podHfovDegDelayed * target.w / 0.2), 
+                    PodParas.clipHfov(self.podHfovDegDelayed * target.w / 0.2), 
                     20
                 ]
             except Exception as e:
@@ -266,7 +266,7 @@ class PodSearch:
                 self.trackData['usv'] =[
                     self.usvCameraElevation + self.podPitchDegDelayed, 
                     self.usvCameraAzimuth + self.podYawDegDelayed, 
-                    PodParas.clipPitch(self.podHfovDegDelayed * target.w / 0.2), 
+                    PodParas.clipHfov(self.podHfovDegDelayed * target.w / 0.2), 
                     20
                 ]
             except Exception as e:

@@ -147,14 +147,14 @@ class AutoTra:
     def getHFovFromPitch(self, pitch):
         if not self.pitchLevelOn:
             return pitch
-        hfovExact = PodParas.clipPitch(self.hfovPitchRatio * pitch)
+        hfovExact = PodParas.clipHfov(self.hfovPitchRatio * pitch)
         # print(f'Pitch: {pitch:.2f} -> Hfov: {hfovExact:.2f}')
         fExact = PodParas.getFFromHfov(hfovExact)
         # print(f'F: {fExact:.2f}')
         fLevel = PodParas.getZoomLevelFromF(fExact)
         hfovLevel = PodParas.getHfovFromF(fLevel * PodParas.zoomUnit)
         # print(f'fLevel: {fLevel:.2f} -> hfovLevel: {hfovLevel:.2f}')
-        return PodParas.clipPitch(hfovLevel)
+        return PodParas.clipHfov(hfovLevel)
 
     def getVFovFromPitch(self, pitch):
         return PodParas.getVFovFromHFov(self.getHFovFromPitch(pitch))

@@ -26,8 +26,8 @@ def getZoomLevelFromF(zoom):
     return res
 
 
-def clipPitch(pitch):
-    return min(maxHfov, max(minHfov, pitch))
+def clipHfov(hfov):
+    return min(maxHfov, max(minHfov, hfov))
 
 
 def getVFovFromHFov(hFov):
