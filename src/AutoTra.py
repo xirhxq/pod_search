@@ -26,12 +26,12 @@ class AutoTra:
                  fast=False
         ):
         self.height = self.getVal(str='h', default=(5 if takeoff else 0.3) + 100 - 91.38, skip=fast)
-        self.frontLength = self.getVal(str='front length', default=6, skip=fast)
-        self.leftLength = self.getVal(str='left length', default=10, skip=fast)
-        self.rightLength = self.getVal(str='right length', default=10, skip=fast)
-        xFLU = self.getVal(str='x', default=-10, skip=fast)
-        self.hfovPitchRatio = self.getVal(str='hfov/pitch', default=1, skip=fast)
-        self.theTime = self.getVal(str='THE Time', default=3, skip=fast)
+        self.frontLength = self.getVal(str='front length', default=300, skip=fast)
+        self.leftLength = self.getVal(str='left length', default=0, skip=fast)
+        self.rightLength = self.getVal(str='right length', default=300, skip=fast)
+        xFLU = self.getVal(str='x', default=-100, skip=fast)
+        self.hfovPitchRatio = self.getVal(str='hfov/pitch', default=3, skip=fast)
+        self.theTime = self.getVal(str='THE Time', default=6, skip=fast)
 
         self.xyFLU = np.array([xFLU, 0])
 
