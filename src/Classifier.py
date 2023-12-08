@@ -29,7 +29,7 @@ class Classifier:
             self.newTarget()
         self.targets[ind] = np.array(pos)
         if score is not None:
-            self.targetsScore[ind] = max(self.targetsScore[ind], score)
+            self.targetsScore[ind] = min(self.targetsScore[ind], score)
             self.targetsCnt[ind] += 1
         if self.targetsCnt[ind] > self.targetThreshold and not self.targetsCheck[ind]:
             self.targetsCheck[ind] = True
