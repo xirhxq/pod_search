@@ -122,12 +122,11 @@ class PodSearch:
         rospy.Subscriber(self.uavName + '/uavState', Int8, lambda msg: setattr(self, 'uavState', msg.data))
 
         # track data
-        self.trackData = {'boat': [], 'usv': [], 'cup': []}
+        self.trackData = {'usv': []}
         self.trackName = None
 
         # From Transformer: dock data
-        self.dockData = []
-        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/dock', Float64MultiArray, lambda msg: setattr(self, 'dockData', msg.data))
+        self.dockData = [0, 10, 20, 20]
 
         # From usv: land flag
         self.landFlag = -1
@@ -153,20 +152,11 @@ class PodSearch:
 
         # ignore uav or not
         self.uavReady = True if self.args.test else False
-
-        # set initial state
-        if args.trackUSV:
-            self.toStepTrack(trackName='usv')
-            print('<<<TRACK MODE: USV>>>')
-        if args.trackVessel:
-            self.toStepTrack(trackName='boat')
-            print('<<<TRACK MODE: Vessel>>>')
-        if args.dock:
-            self.toStepDock()
-            print('<<<DOCK MODE>>>')
+        self.vesselDict = {}
+        self.targetId = None
 
         self.lastUSVCaptureTime = self.getTimeNow()
-        self.lastVesselCaptureTime = self.getTimeNow()
+        self.lastVesselCaptureTime = {}
 
         # ekfs for locating
         self.ekfNames = ['usv', 'boat']
@@ -186,6 +176,18 @@ class PodSearch:
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/targetPos', Float64MultiArray, self.targetPosCallback)
 
         signal(SIGINT, self.signalHandler)
+
+        # set initial state
+        if args.trackUSV:
+            self.toStepTrack(trackName='usv')
+            print('<<<TRACK MODE: USV>>>')
+        if args.trackVessel:
+            self.toStepTrack(trackName='boat')
+            print('<<<TRACK MODE: Vessel>>>')
+        if args.dock:
+            self.toStepDock()
+            print('<<<DOCK MODE>>>')
+
 
         print('Initialising finished...')
 
@@ -257,13 +259,22 @@ class PodSearch:
             try:
                 self.vesselCameraAzimuth = -np.degrees(np.arctan(np.tan(np.radians(self.podHfovDegDelayed) / 2) * px))
                 self.vesselCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * py))
-                self.trackData['boat'] =[
-                    self.vesselCameraElevation + self.podPitchDegDelayed, 
-                    self.vesselCameraAzimuth + self.podYawDegDelayed, 
-                    PodParas.clipHfov(self.podHfovDegDelayed * target.w / 0.2), 
-                    20
-                ]
-                self.lastVesselCaptureTime = self.getTimeNow()
+                id = str(target.category_id)
+                if id != 100:
+                    self.trackData[id] =[
+                        self.vesselCameraElevation + self.podPitchDegDelayed, 
+                        self.vesselCameraAzimuth + self.podYawDegDelayed, 
+                        PodParas.clipHfov(self.podHfovDegDelayed * target.w / 0.2), 
+                        20
+                    ]
+                    score = target.score
+                    if self.state == State.SEARCH and target.category_id != 100:
+                        if id in self.vesselDict.keys():
+                            self.vesselDict[id] = min(self.vesselDict[id], score)
+                        else:
+                            self.vesselDict[id] = score
+                        self.lastVesselCaptureTime[id] = self.getTimeNow()
+                    
             except Exception as e:
                 print(e)
 
@@ -319,6 +330,7 @@ class PodSearch:
     def toStepSearch(self):
         self.state = State.SEARCH
         self.tic = self.getTimeNow()
+        self.traCnt = 0
 
     def stepSearch(self):
         print(f'{GREEN}==> StepSearch @ #{self.traCnt + 1}/{len(self.tra)} <=={RESET}')
@@ -330,45 +342,17 @@ class PodSearch:
         if self.isAtTarget():
             self.traCnt += 1
         if self.traCnt == len(self.tra):
-            self.toStepStream()
-            
-    def toStepStream(self):
-        self.state = State.STREAM
-        if self.streamIndex == None:
-            print(f'{RED}No targets to stream{RESET}')
-            self.toStepEnd()
-        self.streamStartTime = self.getTimeNow()
-        self.tic = self.getTimeNow()
+            if len(self.vesselDict) > 0:
+                self.targetId, _ = min(self.vesselDict.items(), key=lambda x: x[1])
+            self.toStepInit()
+        if self.targetId is not None and self.getTimeNow() - self.lastVesselCaptureTime[self.targetId] < 0.1:
+            self.toStepTrack(self.targetId)
 
-    def stepStream(self):
-        if not self.streamFlag and self.isAtTarget() and self.getTimeNow() - self.streamStartTime >= 3.0:
-            self.streamFlag = True
-            self.streamStartTime = self.getTimeNow()
-        streamTime = self.getTimeNow() - self.streamStartTime
-        print(f'{YELLOW}==> StepStream @ Target {self.streamIndex} <=={RESET}')
-        print(f'Time: {streamTime:.2f}')
-        print(f'StreamFlag: {self.streamFlag}')
-        if not self.streamFlag:
-            self.expectedPodPitchDeg = self.streamPitch
-            self.expectedPodYawDeg = self.streamYaw
-            self.expectedPodHfovDeg = self.getHfovFromPitch(self.streamPitch)
-            self.expectedMaxRateDeg = 20
-        else:
-            print('Tracking...')
-            if len(self.trackData['boat']) != 4:
-                return
-            self.expectedPodPitchDeg = self.trackData['boat'][0] - 0.5
-            self.expectedPodYawDeg = self.trackData['boat'][1]
-            self.expectedPodHfovDeg = self.getHfovFromPitch(self.trackData['boat'][0], minHfov=4)
-            self.expectedMaxRateDeg = self.trackData['boat'][3]
-        self.pubPYZMaxRate()
-        if streamTime >= 10.0:
-            self.toStepDock()
-
-    def toStepTrack(self, trackName='boat'):
+    def toStepTrack(self, trackName):
         self.state = State.TRACK
         self.trackName = trackName
         self.trackData[trackName] = []
+        self.ekfs[trackName] = LocatingEKF(initialT=self.getTimeNow())
         if not self.podLaserOn:
             self.expectedLaserOn = True
             self.expectedLaserOnPub.publish(True)
@@ -380,7 +364,7 @@ class PodSearch:
         if self.landFlag == 1:
             self.toStepEnd()
         if self.getTimeNow() - self.lastUSVCaptureTime >= 5.0:
-            self.toStepRefind('usv')
+            self.toStepRefind(self.trackName)
         print(f'{self.expectedLaserOn = }')
         print(f'{self.trackName = }, {self.trackData[self.trackName] = }')
         if not self.podLaserOn:
@@ -403,14 +387,19 @@ class PodSearch:
             R.from_euler('zyx', [180, 0, 0], degrees=True).as_matrix().T
         )
         print(f'{self.ekfs[self.trackName].ekf.x = }')
-        if self.ekfs[self.trackName].ekf.x is not None:
-            usvPos = self.ekfs[self.trackName].ekf.x[:3].reshape((3, 1))
-            self.ekfLogs[self.trackName].log('usvEKFx', self.ekfs[self.trackName].ekf.x)
-            self.ekfLogs[self.trackName].newline()
-            print(f'{self.targetPos = }')
-            usvToTargetENU = self.targetPos - usvPos
-            usvToTargetTheta = np.degrees(np.arctan2(usvToTargetENU[1][0], usvToTargetENU[0][0]))
-            self.usvTargetPub.publish(Pose2D(x=usvToTargetENU[0][0], y=usvToTargetENU[1][0], theta=usvToTargetTheta))
+        if self.trackName == 'usv':
+            if self.ekfs[self.trackName].ekf.x is not None:
+                usvPos = self.ekfs[self.trackName].ekf.x[:3].reshape((3, 1))
+                self.ekfLogs[self.trackName].log('usvEKFx', self.ekfs[self.trackName].ekf.x)
+                self.ekfLogs[self.trackName].newline()
+                print(f'{self.targetPos = }')
+                usvToTargetENU = self.targetPos - usvPos
+                usvToTargetTheta = np.degrees(np.arctan2(usvToTargetENU[1][0], usvToTargetENU[0][0]))
+                self.usvTargetPub.publish(Pose2D(x=usvToTargetENU[0][0], y=usvToTargetENU[1][0], theta=usvToTargetTheta))
+        else:
+            if self.toc - self.tic >= 10:
+                self.targetPos = self.ekfs[self.trackName].ekf.x[:3].reshape(3, 1)
+                self.toStepDock()
         
     def toStepRefind(self, refindName):
         self.state = State.REFIND
@@ -428,7 +417,7 @@ class PodSearch:
         self.expectedMaxRateDeg = 10
         self.pubPYZMaxRate()
         if self.getTimeNow() - self.lastUSVCaptureTime < 0.1:
-            self.toStepTrack('usv')
+            self.toStepTrack(self.refindName)
 
     def toStepDock(self):
         self.state = State.DOCK
@@ -442,9 +431,9 @@ class PodSearch:
         if len(self.dockData) < 4:
             print('No dock data!!!')
             return
-        self.expectedPodPitchDeg = self.dockData[1]
-        self.expectedPodYawDeg = self.dockData[2]
-        self.expectedPodHfovDeg = self.getHfovFromPitch(self.dockData[1])
+        self.expectedPodPitchDeg = self.dockData[0]
+        self.expectedPodYawDeg = self.dockData[1]
+        self.expectedPodHfovDeg = self.dockData[2]
         self.expectedMaxRateDeg = 10
         self.pubPYZMaxRate()
         if self.toc - self.tic >= 10:
@@ -507,6 +496,10 @@ class PodSearch:
         print(GREEN if self.podHfovAtTarget else RED, end='')
         print(f'HFov: {self.podHfovDeg:.2f} -> {self.expectedPodHfovDeg:.2f} == {self.podHfovFeedbackDeg:.2f} {RESET}')
         self.controlStateMachine()
+        print(f'{self.vesselDict = }')
+        print(f'{self.targetId = }')
+        print(f'{self.trackData = }')
+        print(f'{self.targetPos = }')
     
     def signalHandler(self, sig, frame):
         print('You pressed Ctrl+C!')
