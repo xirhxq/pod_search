@@ -9,6 +9,7 @@ from os import system, path, readlink
 from struct import pack, unpack
 from sys import exit
 from time import time, sleep
+from signal import signal, SIGINT
 
 import rospy
 import serial
@@ -43,17 +44,10 @@ WAITING_DOWN_FRAME_HEAD_1 = 1
 WAITING_DOWN_FRAME_HEAD_2 = 2
 READING_DATA = 3
 
-from glob import glob
 
 PORT = '/dev/ttyUSB1'
 
-from signal import signal, SIGINT
 
-def signal_handler(sig, frame):
-    print('You pressed Ctrl+C!')
-    exit(0)
-
-signal(SIGINT, signal_handler)
 
 class UP_MSG:
     def __init__(self):
@@ -135,21 +129,14 @@ class POD_COMM:
         self.checkSumRightCnt = 0
         self.checkSumWrongCnt = 0
         self.dataBuf = bytearray()
-        while True:
-            try:
-                self.downSer = serial.Serial(
-                    port=PORT,
-                    baudrate=115200,
-                    parity=serial.PARITY_NONE,
-                    stopbits=serial.STOPBITS_ONE,
-                    bytesize=serial.EIGHTBITS,
-                    timeout=0.5
-                )
-                break
-            except:
-                print(f'Got some issue, retrying in 1s...')
-                time.sleep(1)
-        
+        self.downSer = serial.Serial(
+            port=PORT,
+            baudrate=115200,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            bytesize=serial.EIGHTBITS,
+            timeout=0.5
+        )
         self.downData = None
 
         # pod constants:
@@ -243,6 +230,9 @@ class POD_COMM:
         self.yFeedbackPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/yFeedback', Float32, queue_size=1)
         self.fFeedbackPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/fFeedback', Float32, queue_size=1)
 
+        signal(SIGINT, self.signalHandler)
+        self.readEnd = False
+
     def getTimeNow(self):
         return time()
 
@@ -306,7 +296,7 @@ class POD_COMM:
         return up.msg()
 
     def readData(self):
-        while True:
+        while not self.readEnd:
             data = self.downSer.read(1)
             if data:
                 if self.state == WAITING_DOWN_FRAME_HEAD_1:
@@ -391,21 +381,13 @@ class POD_COMM:
                 dataBuf = bytearray()
 
     def startRead(self):
-        tRead = threading.Thread(target=self.readData)
-        tRead.start()
+        self.tRead = threading.Thread(target=self.readData)
+        self.tRead.start()
 
     @timer(tol=1 / HZ)
     def writeOnce(self):
         upMsg = self.genUpMsg()
         self.downSer.write(upMsg)
-
-    def writeData(self):
-        while True:
-            self.writeOnce()
-
-    def startWrite(self):
-        tWrite = threading.Thread(target=self.writeData)
-        tWrite.start()
 
     def printState(self):
         system('clear')
@@ -468,10 +450,23 @@ class POD_COMM:
         self.rosPub()
         self.writeOnce()
 
+    def signalHandler(self, sig, frame):
+        print('You pressed Ctrl+C!')
+        self.readEnd = True
+        self.tRead.join()
+        self.downSer.close()
+        print('Serial port closed, quitting...')
+        exit(0)
+
     def spin(self):
         self.startRead()
         while not rospy.is_shutdown() and not self.args.read:
             self.spinOnce()
+            if time() - self.startTime > 0.5 and self.checkSumRightCnt < 5:
+                self.readEnd = True
+                self.tRead.join()
+                self.downSer.close()
+                break
 
 
 if __name__ == '__main__':
@@ -484,5 +479,8 @@ if __name__ == '__main__':
     parser.add_argument('--pi', help='kp & ki control', action='store_true')
     args, unknown = parser.parse_known_args()
     print(f'PORT is {PORT}')
-    pod_comm = POD_COMM(args)
-    pod_comm.spin()
+    while not rospy.is_shutdown():
+        pod_comm = POD_COMM(args)
+        pod_comm.spin()
+        print(f'Retrying...')
+        sleep(0.1)
