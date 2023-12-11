@@ -140,7 +140,8 @@ class POD_COMM:
         self.downData = None
 
         # pod constants:
-        self.pyTol = 0.05
+        self.pTol = 0.05
+        self.yTol = 0.05
         self.zTol = 0.2
 
         # pod states: bool or bit
@@ -428,13 +429,13 @@ class POD_COMM:
         
     @property
     def pAtTarget(self):
-        if not (abs(self.podPitch - self.expectedPitch) < self.pyTol):
+        if not (abs(self.podPitch - self.expectedPitch) < self.pTol):
             self.pNotAtTargetTime = self.getTimeNow()
         return self.getTimeNow() - self.pNotAtTargetTime > 0.1
 
     @property
     def yAtTarget(self):
-        if not (abs(self.round(self.podYaw - self.expectedYaw, 180)) < self.pyTol):
+        if not (abs(self.round(self.podYaw - self.expectedYaw, 180)) < self.yTol):
             self.yNotAtTargetTime = self.getTimeNow()
         return self.getTimeNow() - self.yNotAtTargetTime > 0.1
 
