@@ -45,7 +45,7 @@ READING_DATA = 3
 
 from glob import glob
 
-PORT = '/dev/ttyCH343USB3'
+PORT = '/dev/ttyUSB1'
 
 from signal import signal, SIGINT
 
@@ -195,8 +195,8 @@ class POD_COMM:
         self.fNotAtTargetTime = self.getTimeNow()
         self.toggleZoomControl = False
         if self.args.pi:
-            self.pitchPID = PID(1, 0.01, 0)
-            self.yawPID = PID(1, 0.01, 0)
+            self.pitchPID = PID(1.2, 0.01, 0, intMax=5, intMin=-5)
+            self.yawPID = PID(1.2, 0.01, 0, intMax=5, intMin=-5)
         elif self.args.p:
             self.pitchPID = PID(1, 0, 0)
             self.yawPID = PID(1, 0, 0)
