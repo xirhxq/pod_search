@@ -140,8 +140,8 @@ class POD_COMM:
         self.downData = None
 
         # pod constants:
-        self.pTol = 0.05
-        self.yTol = 0.05
+        self.pTol = 0.08
+        self.yTol = 0.08
         self.zTol = 0.2
 
         # pod states: bool or bit
@@ -183,8 +183,8 @@ class POD_COMM:
         self.fNotAtTargetTime = self.getTimeNow()
         self.toggleZoomControl = False
         if self.args.pi:
-            self.pitchPID = PID(1.2, 0.01, 0, intMax=5, intMin=-5)
-            self.yawPID = PID(1.2, 0.01, 0, intMax=5, intMin=-5)
+            self.pitchPID = PID(1.8, 0.01, 0, intMax=5, intMin=-5)
+            self.yawPID = PID(4, 0.01, 0, intMax=5, intMin=-5)
         elif self.args.p:
             self.pitchPID = PID(1, 0, 0)
             self.yawPID = PID(1, 0, 0)
