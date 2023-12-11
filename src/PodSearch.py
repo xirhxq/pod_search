@@ -166,7 +166,7 @@ class PodSearch:
         self.ekfLogs = {n: DataLogger(pre, n + 'ekf.csv') for n in self.ekfNames}
         self.ekfLogs['usv'].initialize([('usvEKFx[6][1]', 'matrix')])
 
-        self.targetPos = np.array([[-200], [200], [0]])
+        self.targetPos = np.array([[-100], [50], [0]])
 
         self.refindName = None
         self.refindPitch = None
