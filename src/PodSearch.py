@@ -127,7 +127,7 @@ class PodSearch:
         self.trackName = None
 
         # From Transformer: dock data
-        self.dockData = [0, 10, 20, 20]
+        self.dockData = [20, -20, 50, 20]
 
         # From usv: land flag
         self.landFlag = -1
@@ -167,7 +167,7 @@ class PodSearch:
         self.ekfLogs = {n: DataLogger(pre, n + 'ekf.csv') for n in self.ekfNames}
         self.ekfLogs['usv'].initialize([('usvEKFx[6][1]', 'matrix')])
 
-        self.targetPos = np.array([[-100], [50], [0]])
+        self.targetPos = np.array([[-156], [218], [0]])
 
         self.refindName = None
         self.refindPitch = None
