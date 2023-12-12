@@ -428,8 +428,8 @@ class PodSearch:
             f'@ (p{self.refindPitch:.2f}, y{self.refindYaw:.2f}, hfov{self.refindHfov:.2f})'
             f' <=={RESET}'
         )
-        self.expectedPodPitchDeg = 20 + (self.toc - self.tic) * np.sin((self.toc - self.tic) / 15 * 2 * np.pi)
-        self.expectedPodYawDeg = self.refindYaw + (self.toc - self.tic) * np.cos((self.toc - self.tic) / 15 * 2 * np.pi)
+        self.expectedPodPitchDeg = self.refindPitch + (self.toc - self.tic) / 3 * np.sin((self.toc - self.tic) / 15 * 2 * np.pi)
+        self.expectedPodYawDeg = self.refindYaw + (self.toc - self.tic) / 3 * np.cos((self.toc - self.tic) / 15 * 2 * np.pi)
         self.expectedPodHfovDeg = PodParas.clipHfov(self.refindHfov * 1.5)
         self.expectedMaxRateDeg = 10
         self.pubPYZMaxRate()
