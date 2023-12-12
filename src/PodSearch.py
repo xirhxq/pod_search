@@ -261,7 +261,7 @@ class PodSearch:
                 self.vesselCameraAzimuth = -np.degrees(np.arctan(np.tan(np.radians(self.podHfovDegDelayed) / 2) * px))
                 self.vesselCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * py))
                 id = str(target.category_id)
-                if id != 100:
+                if id != '100':
                     self.trackData[id] =[
                         self.vesselCameraElevation + self.podPitchDegDelayed, 
                         self.vesselCameraAzimuth + self.podYawDegDelayed, 
