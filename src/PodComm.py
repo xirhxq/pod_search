@@ -45,9 +45,6 @@ WAITING_DOWN_FRAME_HEAD_2 = 2
 READING_DATA = 3
 
 
-PORT = '/dev/ttyUSB1'
-
-
 
 class UP_MSG:
     def __init__(self):
@@ -130,7 +127,7 @@ class POD_COMM:
         self.checkSumWrongCnt = 0
         self.dataBuf = bytearray()
         self.downSer = serial.Serial(
-            port=PORT,
+            port=self.args.port,
             baudrate=115200,
             parity=serial.PARITY_NONE,
             stopbits=serial.STOPBITS_ONE,
@@ -481,8 +478,8 @@ if __name__ == '__main__':
     parser.add_argument('--p', help='kp control', action='store_true')
     parser.add_argument('--pi', help='kp & ki control', action='store_true')
     parser.add_argument('--enhanceOff', help='image enhance off', action='store_true')
+    parser.add_argument('--port', help='serial port of pod', type=str, default='/dev/ttyUSB1')
     args, unknown = parser.parse_known_args()
-    print(f'PORT is {PORT}')
     while not rospy.is_shutdown():
         pod_comm = POD_COMM(args)
         pod_comm.spin()
