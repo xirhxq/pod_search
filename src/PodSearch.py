@@ -268,6 +268,7 @@ class PodSearch:
                         20
                     ]
                     score = target.score
+                    print(f'{BOLD}{BLUE}{id = } {score = }{RESET}')
                     if self.state == State.SEARCH and target.category_id != 100:
                         if id in self.vesselDict.keys():
                             self.vesselDict[id] = min(self.vesselDict[id], score)
@@ -333,7 +334,11 @@ class PodSearch:
         self.traCnt = 0
 
     def stepSearch(self):
-        print(f'{GREEN}==> StepSearch @ #{self.traCnt + 1}/{len(self.tra)} <=={RESET}')
+        print(
+            f'{BOLD}{YELLOW}==> '
+            f'StepSearch @ #{self.traCnt + 1}/{len(self.tra)}'
+            f' <=={RESET}'
+        )
         self.expectedPodPitchDeg = self.tra[self.traCnt][0]
         self.expectedPodYawDeg = self.tra[self.traCnt][1]
         self.expectedPodHfovDeg = self.tra[self.traCnt][2]
@@ -360,7 +365,11 @@ class PodSearch:
         self.tic = self.getTimeNow()
     
     def stepTrack(self):
-        print('Step Track')
+        print(
+            f'{BOLD}{YELLOW}==> '
+            f'Step Track for {self.trackName}'
+            f' <=={RESET}'
+        )
         if self.landFlag == 1:
             self.toStepEnd()
         if self.getTimeNow() - self.lastUSVCaptureTime >= 5.0:
@@ -410,7 +419,12 @@ class PodSearch:
         self.refindName = refindName
 
     def stepRefind(self):
-        print(f'Refinding {self.refindName} @ (p{self.refindPitch:.2f}, y{self.refindYaw:.2f}, hfov{self.refindHfov:.2f})')
+        print(
+            f'{BOLD}{YELLOW}==> '
+            f'Refinding {self.refindName} '
+            f'@ (p{self.refindPitch:.2f}, y{self.refindYaw:.2f}, hfov{self.refindHfov:.2f})'
+            f' <=={RESET}'
+        )
         self.expectedPodPitchDeg = 20 + (self.toc - self.tic) * np.sin((self.toc - self.tic) / 15 * 2 * np.pi)
         self.expectedPodYawDeg = self.refindYaw + (self.toc - self.tic) * np.cos((self.toc - self.tic) / 15 * 2 * np.pi)
         self.expectedPodHfovDeg = PodParas.clipHfov(self.refindHfov * 1.5)
@@ -425,8 +439,10 @@ class PodSearch:
 
     def stepDock(self):
         print(
+            f'***'
             f'Dock {self.toc - self.tic:.2f}, '
             f'{(GREEN + "At Target" + RESET) if self.isAtTarget() else (RED + "Not At Target" + RESET)}'
+            f'***'
         )
         if len(self.dockData) < 4:
             print('No dock data!!!')
