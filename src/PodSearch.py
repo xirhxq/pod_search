@@ -116,6 +116,7 @@ class PodSearch:
         # To others: my state
         self.state = State.INIT
         self.searchStatePub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/searchState', Int8, queue_size=1)
+        self.searchRoundCnt = 0
 
         # From suav: suav control state
         self.uavState = 0
@@ -336,8 +337,8 @@ class PodSearch:
 
     def stepSearch(self):
         print(
-            f'{BOLD}{YELLOW}==> '
-            f'StepSearch @ #{self.traCnt + 1}/{len(self.tra)}'
+            f'{BOLD}{BLUE}==> '
+            f'StepSearch @ #{self.traCnt + 1}/{len(self.tra)}, Round #{self.searchRoundCnt}'
             f' <=={RESET}'
         )
         self.expectedPodPitchDeg = self.tra[self.traCnt][0]
@@ -348,9 +349,10 @@ class PodSearch:
         if self.isAtTarget():
             self.traCnt += 1
         if self.traCnt == len(self.tra):
+            self.searchRoundCnt += 1
             if len(self.vesselDict) > 0:
                 self.targetId, _ = min(self.vesselDict.items(), key=lambda x: x[1])
-            self.toStepInit()
+            self.toStepSearch()
         if self.targetId is not None and self.getTimeNow() - self.lastVesselCaptureTime[self.targetId] < 0.1:
             self.toStepTrack(self.targetId)
 
