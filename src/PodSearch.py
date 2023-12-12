@@ -5,7 +5,7 @@ import argparse
 import subprocess
 import numpy as np
 from os import system
-from rich import print
+# from rich import print
 from signal import signal, SIGINT
 
 import rospy
@@ -46,7 +46,7 @@ class PodSearch:
     def __init__(self, args):
         # arg parsing
         self.args = args
-        print(YELLOW + 'ARGS:', self.args, RESET)
+        print(BLUE + 'ARGS:', self.args, RESET)
         if not self.args.takeoff and not self.args.test:
             raise AssertionError("Please add --takeoff or --test arg")
         if self.args.takeoff and self.args.test:
@@ -277,7 +277,8 @@ class PodSearch:
                         self.lastVesselCaptureTime[id] = self.getTimeNow()
                     
             except Exception as e:
-                print(e)
+                pass
+                # print(e)
 
     def usvDetectionCallback(self, msg):
         self.usvCameraAzimuth = None
@@ -366,8 +367,8 @@ class PodSearch:
     
     def stepTrack(self):
         print(
-            f'{BOLD}{YELLOW}==> '
-            f'Step Track for {self.trackName}'
+            f'{BOLD}{BLUE}==> '
+            f'Step Track for {self.trackName}: {self.toc - self.tic:.2f} seconds'
             f' <=={RESET}'
         )
         if self.landFlag == 1:
@@ -420,7 +421,7 @@ class PodSearch:
 
     def stepRefind(self):
         print(
-            f'{BOLD}{YELLOW}==> '
+            f'{BOLD}{BLUE}==> '
             f'Refinding {self.refindName} '
             f'@ (p{self.refindPitch:.2f}, y{self.refindYaw:.2f}, hfov{self.refindHfov:.2f})'
             f' <=={RESET}'
