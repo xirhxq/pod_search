@@ -255,8 +255,10 @@ class POD_COMM:
         elif not self.initTextOff:
             up.textOff()
             self.initTextOff = True
-        elif not self.podImageEnhanceOn:
+        elif not self.args.enhanceOff and not self.podImageEnhanceOn:
             up.antiFogOn()
+        elif self.args.enhanceOff and self.podImageEnhanceOn:
+            up.antiFogOff()
         elif self.expectedLaserOn != self.podLaserOn:
             if self.expectedLaserOn:
                 if self.args.indoor:
@@ -478,6 +480,7 @@ if __name__ == '__main__':
     parser.add_argument('--indoor', help='indoor test w/o laser', action='store_true')
     parser.add_argument('--p', help='kp control', action='store_true')
     parser.add_argument('--pi', help='kp & ki control', action='store_true')
+    parser.add_argument('--enhanceOff', help='image enhance off', action='store_true')
     args, unknown = parser.parse_known_args()
     print(f'PORT is {PORT}')
     while not rospy.is_shutdown():
