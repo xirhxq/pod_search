@@ -265,8 +265,8 @@ class PodSearch:
                     self.trackData[id] =[
                         self.vesselCameraElevation + self.podPitchDegDelayed, 
                         self.vesselCameraAzimuth + self.podYawDegDelayed, 
-                        PodParas.clipHfov(self.podHfovDegDelayed * target.w / 0.2), 
-                        20
+                        self.podHfovDegDelayed, #PodParas.clipHfov(self.podHfovDegDelayed * target.w / 0.3), 
+                        3
                     ]
                     score = target.score
                     print(f'{BOLD}{BLUE}{id = } {score = }{RESET}')
