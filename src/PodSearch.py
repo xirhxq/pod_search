@@ -294,7 +294,7 @@ class PodSearch:
                     self.usvCameraElevation + self.podPitchDegDelayed, 
                     self.usvCameraAzimuth + self.podYawDegDelayed, 
                     PodParas.clipHfov(self.podHfovDegDelayed * target.w / 0.2), 
-                    20
+                    3
                 ]
                 self.lastUSVCaptureTime = self.getTimeNow()
             except Exception as e:
