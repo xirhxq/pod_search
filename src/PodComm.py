@@ -40,10 +40,11 @@ def splitByte(byte, bitSizes=[1]*8):
         position += size
     return result[::-1]
 
-WAITING_DOWN_FRAME_HEAD_1 = 1
-WAITING_DOWN_FRAME_HEAD_2 = 2
-READING_DATA = 3
 
+class READ_DATA_STATE:
+    WAITING_DOWN_FRAME_HEAD_1 = 1
+    WAITING_DOWN_FRAME_HEAD_2 = 2
+    READING_DATA = 3
 
 
 class UP_MSG:
@@ -122,7 +123,7 @@ class POD_COMM:
         self.startTime = time()
 
         # serial related paras:
-        self.state = WAITING_DOWN_FRAME_HEAD_1
+        self.state = READ_DATA_STATE.WAITING_DOWN_FRAME_HEAD_1
         self.checkSumRightCnt = 0
         self.checkSumWrongCnt = 0
         self.dataBuf = bytearray()
@@ -299,14 +300,14 @@ class POD_COMM:
         while not self.readEnd:
             data = self.downSer.read(1)
             if data:
-                if self.state == WAITING_DOWN_FRAME_HEAD_1:
+                if self.state == READ_DATA_STATE.WAITING_DOWN_FRAME_HEAD_1:
                     if data == DOWN_FRAME_HEAD_1:
-                        self.state = WAITING_DOWN_FRAME_HEAD_2
-                elif self.state == WAITING_DOWN_FRAME_HEAD_2:
+                        self.state = READ_DATA_STATE.WAITING_DOWN_FRAME_HEAD_2
+                elif self.state == READ_DATA_STATE.WAITING_DOWN_FRAME_HEAD_2:
                     if data == DOWN_FRAME_HEAD_2:
-                        self.state = READING_DATA
+                        self.state = READ_DATA_STATE.READING_DATA
                         dataBuf = bytearray()
-                elif self.state == READING_DATA:
+                elif self.state == READ_DATA_STATE.READING_DATA:
                     dataBuf.append(data[0])
                     if len(dataBuf) == FRAME_LEN:
                         if self.args.serialDebug:
@@ -375,9 +376,9 @@ class POD_COMM:
                             self.podPitchIDeg = podPitchIDegx100 / 100
                             self.podYawIDeg = podYawIDegx100 / 100
                             
-                        self.state = WAITING_DOWN_FRAME_HEAD_1
+                        self.state = READ_DATA_STATE.WAITING_DOWN_FRAME_HEAD_1
 
-            if self.state == WAITING_DOWN_FRAME_HEAD_1:
+            if self.state == READ_DATA_STATE.WAITING_DOWN_FRAME_HEAD_1:
                 dataBuf = bytearray()
 
     def startRead(self):
