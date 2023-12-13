@@ -19,6 +19,7 @@ from scipy.spatial.transform import Rotation as R
 import PodParas
 from AutoTra import AutoTra
 from Utils import *
+from PodAngles import PodAngles
 from Classifier import Classifier
 from DataLogger import DataLogger
 from TimeBuffer import TimeBuffer
@@ -84,23 +85,17 @@ class PodSearch:
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/fAtTarget', Bool, lambda msg: setattr(self, 'podHfovAtTarget', msg.data))
 
         # From PodComm: pod pitch, yaw, hfov feedback
-        self.podPitchFeedbackDeg = 0.0
-        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/pFeedback', Float32, lambda msg: setattr(self, 'podPitchFeedbackDeg', msg.data))
-        self.podYawFeedbackDeg = 0.0
-        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/yFeedback', Float32, lambda msg: setattr(self, 'podYawFeedbackDeg', msg.data))
-        self.podHfovFeedbackDeg = 0.0
-        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/fFeedback', Float32, lambda msg: setattr(self, 'podHfovFeedbackDeg', msg.data))
+        self.podCommFeedback = PodAngles(pitchDeg=0.0, yawDeg=0.0, hfovDeg=0.0)
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/pFeedback', Float32, lambda msg: setattr(self.podCommFeedback, 'pitchDeg', msg.data))
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/yFeedback', Float32, lambda msg: setattr(self.podCommFeedback, 'yawDeg', msg.data))
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/fFeedback', Float32, lambda msg: setattr(self.podCommFeedback, 'hfovDeg', msg.data))
 
         # To PodComm: expected pod pitch, yaw, hfov, max spin rate, laser on
-        self.expectedPodPitchDeg = 0
+        self.expectedPodAngles = PodAngles()
         self.pitchPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/expectedPitch', Float32, queue_size=10)
-        self.expectedPodYawDeg = 0
         self.yawPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/expectedYaw', Float32, queue_size=10)
-        self.expectedPodHfovDeg = 0
         self.hfovPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/expectedHfov', Float32, queue_size=10)
-        self.expectedMaxRateDeg = 0
         self.expectedMaxRatePub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/maxRate', Float32, queue_size=10)
-        self.expectedLaserOn = False
         self.expectedLaserOnPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/expectedLaserOn', Bool, queue_size=10)
 
         # From spirecv-ros: usv detection
@@ -124,11 +119,11 @@ class PodSearch:
         rospy.Subscriber(self.uavName + '/uavState', Int8, lambda msg: setattr(self, 'uavState', msg.data))
 
         # track data
-        self.trackData = {'usv': []}
+        self.trackData = {}
         self.trackName = None
 
         # From Transformer: dock data
-        self.dockData = [20, -20, 50, 20]
+        self.dockData = PodAngles(pitchDeg=20, yawDeg=-20, hfovDeg=50, maxRateDeg=10)
 
         # From usv: land flag
         self.landFlag = -1
@@ -171,9 +166,7 @@ class PodSearch:
         self.targetPos = np.array([[-156], [218], [0]])
 
         self.refindName = None
-        self.refindPitch = None
-        self.refindYaw = None
-        self.refindHfov = None
+        self.refindPodAngles = None
 
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/targetPos', Float64MultiArray, self.targetPosCallback)
 
@@ -263,12 +256,12 @@ class PodSearch:
                 self.vesselCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * py))
                 id = str(target.category_id)
                 if id != '100':
-                    self.trackData[id] =[
-                        self.vesselCameraElevation + self.podPitchDegDelayed, 
-                        self.vesselCameraAzimuth + self.podYawDegDelayed, 
-                        self.podHfovDegDelayed, #PodParas.clipHfov(self.podHfovDegDelayed * target.w / 0.3), 
-                        3
-                    ]
+                    self.trackData[id] = PodAngles(
+                        pitchDeg=self.vesselCameraElevation + self.podPitchDegDelayed, 
+                        yawDeg=self.vesselCameraAzimuth + self.podYawDegDelayed, 
+                        hfovDeg=self.podHfovDegDelayed, #PodParas.clipHfov(self.podHfovDegDelayed * target.w / 0.3), 
+                        maxRateDeg=3
+                    )
                     score = target.score
                     print(f'{BOLD}{BLUE}{id = } {score = }{RESET}')
                     if self.state == State.SEARCH and target.category_id != 100:
@@ -291,12 +284,12 @@ class PodSearch:
             try:
                 self.usvCameraAzimuth = -np.degrees(np.arctan(np.tan(np.radians(self.podHfovDegDelayed) / 2) * px))
                 self.usvCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * py))
-                self.trackData['usv'] =[
-                    self.usvCameraElevation + self.podPitchDegDelayed, 
-                    self.usvCameraAzimuth + self.podYawDegDelayed, 
-                    PodParas.clipHfov(self.podHfovDegDelayed * target.w / 0.2), 
-                    3
-                ]
+                self.trackData['usv'] = PodAngles(
+                    pitchDeg=self.usvCameraElevation + self.podPitchDegDelayed, 
+                    yawDeg=self.usvCameraAzimuth + self.podYawDegDelayed, 
+                    hfovDeg=PodParas.clipHfov(self.podHfovDegDelayed * target.w / 0.2), 
+                    maxRateDeg=3
+                )
                 self.lastUSVCaptureTime = self.getTimeNow()
             except Exception as e:
                 pass
@@ -304,6 +297,14 @@ class PodSearch:
 
     def getTimeNow(self):
         return rospy.Time.now().to_sec()
+
+    def getPodAnglesNow(self):
+        return PodAngles(
+            pitchDeg=self.podPitchDeg,
+            yawDeg=self.podYawDeg,
+            hfovDeg=self.podHfovDeg,
+            maxRateDeg=self.expectedPodAngles.maxRateDeg
+        )
 
     def getHfovFromPitch(self, pitch):
         return min(PodParas.maxHfov, max(PodParas.minHfov, pitch * self.autoTra.hfovPitchRatio))
@@ -313,9 +314,7 @@ class PodSearch:
                 self.podPitchAtTarget and
                 self.podYawAtTarget and
                 self.podHfovAtTarget and
-                abs(self.podPitchFeedbackDeg - self.expectedPodPitchDeg) < 0.001 and
-                abs(self.podYawFeedbackDeg - self.expectedPodYawDeg) < 0.001 and
-                abs(self.podHfovFeedbackDeg - self.expectedPodHfovDeg) < 0.001
+                self.podCommFeedback == self.expectedPodAngles
         )
 
     def toStepInit(self):
@@ -323,10 +322,7 @@ class PodSearch:
         self.tic = self.getTimeNow()
 
     def stepInit(self):
-        self.expectedPodPitchDeg = self.tra[0][0]
-        self.expectedPodYawDeg = self.tra[0][1]
-        self.expectedPodHfovDeg = self.tra[0][2]
-        self.expectedMaxRateDeg = self.tra[0][3]
+        self.expectedPodAngles = self.tra[0]
         self.pubPYZMaxRate()
         if self.isAtTarget() and self.uavReady:
             self.toStepSearch()
@@ -339,13 +335,10 @@ class PodSearch:
     def stepSearch(self):
         print(
             f'{BOLD}{BLUE}==> '
-            f'StepSearch @ #{self.traCnt + 1}/{len(self.tra)}, Round #{self.searchRoundCnt}'
+            f'StepSearch @ #{self.traCnt + 1}/{len(self.tra)}, Round #{self.searchRoundCnt + 1}'
             f' <=={RESET}'
         )
-        self.expectedPodPitchDeg = self.tra[self.traCnt][0]
-        self.expectedPodYawDeg = self.tra[self.traCnt][1]
-        self.expectedPodHfovDeg = self.tra[self.traCnt][2]
-        self.expectedMaxRateDeg = self.tra[self.traCnt][3]
+        self.expectedPodAngles = self.tra[self.traCnt]
         self.pubPYZMaxRate()
         if self.isAtTarget():
             self.traCnt += 1
@@ -383,11 +376,8 @@ class PodSearch:
         if not self.podLaserOn:
             self.expectedLaserOn = True
             self.expectedLaserOnPub.publish(True)
-        if len(self.trackData[self.trackName]) == 4:
-            self.expectedPodPitchDeg = self.trackData[self.trackName][0]
-            self.expectedPodYawDeg = self.trackData[self.trackName][1]
-            self.expectedPodHfovDeg = self.trackData[self.trackName][2]
-            self.expectedMaxRateDeg = self.trackData[self.trackName][3]
+        if self.trackName in self.trackData:
+            self.expectedPodAngles = self.trackData[self.trackName]
             self.pubPYZMaxRate()
         ekfZ = np.array([[self.podLaserRange], [self.usvCameraAzimuth], [self.usvCameraElevation], [self.uavPos[2][0]]])
         if not (0 < ekfZ[0][0] < 4000 and ekfZ[1][0] is not None and ekfZ[2][0] is not None):
@@ -417,22 +407,22 @@ class PodSearch:
     def toStepRefind(self, refindName):
         self.state = State.REFIND
         self.tic = self.getTimeNow()
-        self.refindPitch = self.podPitchDeg
-        self.refindYaw = self.podYawDeg
-        self.refindHfov = self.podHfovDeg
+        self.refindPodAngles = self.getPodAnglesNow()
         self.refindName = refindName
 
     def stepRefind(self):
         print(
             f'{BOLD}{BLUE}==> '
             f'Refinding {self.refindName} '
-            f'@ (p{self.refindPitch:.2f}, y{self.refindYaw:.2f}, hfov{self.refindHfov:.2f})'
+            f'@ (p{self.refindPodAngles.pitchDeg:.2f}, y{self.refindPodAngles.yawDeg:.2f}, hfov{self.refindPodAngles.hfovDeg:.2f})'
             f' <=={RESET}'
         )
-        self.expectedPodPitchDeg = self.refindPitch + (self.toc - self.tic) / 3 * np.sin((self.toc - self.tic) / 15 * 2 * np.pi)
-        self.expectedPodYawDeg = self.refindYaw + (self.toc - self.tic) / 3 * np.cos((self.toc - self.tic) / 15 * 2 * np.pi)
-        self.expectedPodHfovDeg = PodParas.clipHfov(self.refindHfov * 1.5)
-        self.expectedMaxRateDeg = 10
+        self.expectedPodAngles = PodAngles(
+            pitchDeg=self.refindPodAngles.pitchDeg + (self.toc - self.tic) / 3 * np.sin((self.toc - self.tic) / 15 * 2 * np.pi),
+            yawDeg=self.refindPodAngles.yawDeg + (self.toc - self.tic) / 3 * np.cos((self.toc - self.tic) / 15 * 2 * np.pi),
+            hfovDeg=PodParas.clipHfov(self.refindPodAngles.hfovDeg * 1.5),
+            maxRateDeg=10
+        )
         self.pubPYZMaxRate()
         if self.getTimeNow() - self.lastUSVCaptureTime < 0.1:
             self.toStepTrack(self.refindName)
@@ -448,13 +438,7 @@ class PodSearch:
             f'{(GREEN + "At Target" + RESET) if self.isAtTarget() else (RED + "Not At Target" + RESET)}'
             f'***'
         )
-        if len(self.dockData) < 4:
-            print('No dock data!!!')
-            return
-        self.expectedPodPitchDeg = self.dockData[0]
-        self.expectedPodYawDeg = self.dockData[1]
-        self.expectedPodHfovDeg = self.dockData[2]
-        self.expectedMaxRateDeg = 10
+        self.expectedPodAngles = self.dockData
         self.pubPYZMaxRate()
         if self.toc - self.tic >= 10:
             self.toStepTrack('usv')
@@ -469,13 +453,11 @@ class PodSearch:
             exit(0)
 
     def pubPYZMaxRate(self):
-        if self.expectedPodYawDeg < -90 or self.expectedPodYawDeg > 90:
-            self.expectedPodYawDeg += 180
-        self.pitchPub.publish(self.expectedPodPitchDeg)
-        self.yawPub.publish(self.expectedPodYawDeg)
-        self.hfovPub.publish(self.expectedPodHfovDeg)
-        self.expectedMaxRatePub.publish(self.expectedMaxRateDeg)
-        self.expectedLaserOnPub.publish(self.expectedLaserOn)
+        self.pitchPub.publish(self.expectedPodAngles.pitchDeg)
+        self.yawPub.publish(self.expectedPodAngles.yawDeg)
+        self.hfovPub.publish(self.expectedPodAngles.hfovDeg)
+        self.expectedMaxRatePub.publish(self.expectedPodAngles.maxRateDeg)
+        self.expectedLaserOnPub.publish(self.expectedPodAngles.laserOn)
 
     def controlStateMachine(self):
         self.toc = self.getTimeNow()
@@ -510,11 +492,11 @@ class PodSearch:
             (GREEN + "At Target" + RESET) if self.isAtTarget() else (RED + "Not at Target" + RESET)
         )
         print(GREEN if self.podPitchAtTarget else RED, end='')
-        print(f'Pitch: {self.podPitchDeg:.2f} -> {self.expectedPodPitchDeg:.2f} == {self.podPitchFeedbackDeg:.2f}{RESET}')
+        print(f'Pitch: {self.podPitchDeg:.2f} -> {self.expectedPodAngles.pitchDeg:.2f} == {self.podCommFeedback.pitchDeg:.2f}{RESET}')
         print(GREEN if self.podYawAtTarget else RED, end='')
-        print(f'Yaw: {self.podYawDeg:.2f} -> {self.expectedPodYawDeg:.2f} == {self.podYawFeedbackDeg:.2f}{RESET}')
+        print(f'Yaw: {self.podYawDeg:.2f} -> {self.expectedPodAngles.yawDeg:.2f} == {self.podCommFeedback.yawDeg:.2f}{RESET}')
         print(GREEN if self.podHfovAtTarget else RED, end='')
-        print(f'HFov: {self.podHfovDeg:.2f} -> {self.expectedPodHfovDeg:.2f} == {self.podHfovFeedbackDeg:.2f} {RESET}')
+        print(f'HFov: {self.podHfovDeg:.2f} -> {self.expectedPodAngles.hfovDeg:.2f} == {self.podCommFeedback.hfovDeg:.2f}{RESET}')
         self.controlStateMachine()
         print(f'{self.vesselDict = }')
         print(f'{self.targetId = }')

@@ -6,6 +6,7 @@ from math import degrees, atan, tan, radians, sin, cos, sqrt
 import numpy as np
 
 import PodParas
+from PodAngles import PodAngles
 
 
 class AutoTra:
@@ -121,12 +122,11 @@ class AutoTra:
             if ind % 2 == 0:
                 yRange = yRange[::-1]
             print(f'[{podP:.6f}, {yRange[0]:.2f}, {hfov:.2f}, 20], [{podP:.6f}, {yRange[1]:.2f}, {hfov:.2f}, {hfov/self.theTime:.2f}]')
-            self.theList.append([podP, yRange[0], hfov, 20])
-            self.theList.append([podP, yRange[1], hfov, hfov / self.theTime])
+            self.theList.append(PodAngles(pitchDeg=podP, yawDeg=yRange[0], hfovDeg=hfov, maxRateDeg=20, laserOn=False))
+            self.theList.append(PodAngles(pitchDeg=podP, yawDeg=yRange[1], hfovDeg=hfov, maxRateDeg=hfov / self.theTime, laserOn=False))
             self.expectedTime += abs(yRange[1] - yRange[0]) / hfov * 4
             print(f'After this round time is {self.expectedTime:.2f}')
 
-        #self.theList.append([0, 0, 20, 20])
         print('### The List ###')
         print(self.theList)
         print('################')
