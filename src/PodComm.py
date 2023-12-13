@@ -161,9 +161,7 @@ class POD_COMM:
         self.podRollRate = 0.0
         self.podPitchRate = 0.0
         self.podYawRate = 0.0
-        self.podRollIDeg = .0
-        self.podPitchIDeg = .0
-        self.podYawIDeg = .0
+        
 
         # control inputs with ros interface
         self.expectedPitch = 0.0
@@ -365,16 +363,17 @@ class POD_COMM:
 
                             self.podZoomLevel = (zoomx10Low8 + (zoomx10High4 << 8)) / 10
                             self.podF = self.podZoomLevel * PodParas.zoomUnit
-                            self.podPitch = -podPitchx100 / 100
+                            if self.args.mode == 'b':
+                                self.podPitch = -podPitchx100 / 100
+                                self.podRoll = podRollx100 / 100
+                            elif self.args.mode == 'i':
+                                self.podPitch = -podPitchIDegx100 / 100
+                                self.podRoll = podRollIDegx100 / 100
                             self.podYaw = -self.round(podYawx100 / 100, 180)
-                            self.podRoll = podRollx100 / 100
                             self.podLaserRange = laserRangex10 / 10
                             self.podRollRate = podRollRatex100 / 100
                             self.podPitchRate = podPitchRatex100 / 100
                             self.podYawRate = podYawRatex100 / 100
-                            self.podRollIDeg = podRollIDegx100 / 100
-                            self.podPitchIDeg = podPitchIDegx100 / 100
-                            self.podYawIDeg = podYawIDegx100 / 100
                             
                         self.state = READ_DATA_STATE.WAITING_DOWN_FRAME_HEAD_1
 
@@ -401,13 +400,13 @@ class POD_COMM:
         print((GREEN if self.podLockModeOn else RED) + 'Lock ' + RESET, end='')
         print(PodParas.viewTypeDict[self.podBigViewType] + '+' + PodParas.viewTypeDict[self.podSmallViewType], end='')
         print(' Laser: ' + ((GREEN + f'{self.podLaserRange:.1f}') if self.podLaserOn else (RED + 'Off')) + RESET)
-        print(f'Roll \t{self.podRoll:6.2f} -> ({self.podRollIDeg:6.2f})')
+        print(f'Roll({self.args.mode}) {self.podRoll:6.2f}')
         print(GREEN if self.pAtTarget else RED, end='')
-        print(f'Pitch \t{self.podPitch:6.2f} -> {self.expectedPitch:6.2f} ({self.podPitchIDeg:6.2f}){RESET}')
+        print(f'Pitch({self.args.mode}) {self.podPitch:6.2f} -> {self.expectedPitch:6.2f}{RESET}')
         print(GREEN if self.yAtTarget else RED, end='')
-        print(f'Yaw \t{self.podYaw:6.2f} -> {self.expectedYaw:6.2f} ({self.podYawIDeg:6.2f}){RESET}')
+        print(f'Yaw {self.podYaw:6.2f} -> {self.expectedYaw:6.2f}{RESET}')
         print(GREEN if self.fAtTarget else RED, end='')
-        print(f'Zoom \t{self.podF:6.1f}({self.podZoomLevel:6.1f}) -> {self.expectedF:6.1f}({self.expectedZoomLevel:6.1f}){RESET}')
+        print(f'Zoom {self.podF:6.1f}({self.podZoomLevel:6.1f}) -> {self.expectedF:6.1f}({self.expectedZoomLevel:6.1f}){RESET}')
         print(f'Hfov {PodParas.getHfovFromF(self.podF):6.2f} -> {PodParas.getHfovFromF(self.expectedF):6.2f}')
         print(f'CHECKSUM right/wrong: {self.checkSumRightCnt}/{self.checkSumWrongCnt}')
 
@@ -479,7 +478,8 @@ if __name__ == '__main__':
     parser.add_argument('--p', help='kp control', action='store_true')
     parser.add_argument('--pi', help='kp & ki control', action='store_true')
     parser.add_argument('--enhanceOff', help='image enhance off', action='store_true')
-    parser.add_argument('--port', help='serial port of pod', type=str, default='/dev/ttyUSB1')
+    parser.add_argument('--port', help='serial port of pod', type=str, default='/dev/ttyUSB0')
+    parser.add_argument('--mode', help='control mode: B or I', choices=['b', 'i'], default='i')
     args, unknown = parser.parse_known_args()
     while not rospy.is_shutdown():
         pod_comm = POD_COMM(args)
