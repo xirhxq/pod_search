@@ -178,10 +178,10 @@ class POD_COMM:
         self.yNotAtTargetTime = self.getTimeNow()
         self.fNotAtTargetTime = self.getTimeNow()
         self.toggleZoomControl = False
-        if self.args.pi:
+        if self.args.control_mode == 'pi':
             self.pitchPID = PID(1.8, 0.01, 0, intMax=5, intMin=-5)
             self.yawPID = PID(4, 0.01, 0, intMax=5, intMin=-5)
-        elif self.args.p:
+        elif self.args.control_mode == 'p':
             self.pitchPID = PID(1, 0, 0)
             self.yawPID = PID(1, 0, 0)
         else:
@@ -251,9 +251,9 @@ class POD_COMM:
         elif not self.initTextOff:
             up.textOff()
             self.initTextOff = True
-        elif not self.args.enhanceOff and not self.podImageEnhanceOn:
+        elif self.args.enhance and not self.podImageEnhanceOn:
             up.antiFogOn()
-        elif self.args.enhanceOff and self.podImageEnhanceOn:
+        elif not self.args.enhance and self.podImageEnhanceOn:
             up.antiFogOff()
         elif self.expectedLaserOn != self.podLaserOn:
             if self.expectedLaserOn:
@@ -363,10 +363,10 @@ class POD_COMM:
 
                             self.podZoomLevel = (zoomx10Low8 + (zoomx10High4 << 8)) / 10
                             self.podF = self.podZoomLevel * PodParas.zoomUnit
-                            if self.args.mode == 'b':
+                            if self.args.frame == 'b':
                                 self.podPitch = -podPitchx100 / 100
                                 self.podRoll = podRollx100 / 100
-                            elif self.args.mode == 'i':
+                            elif self.args.frame == 'i':
                                 self.podPitch = -podPitchIDegx100 / 100
                                 self.podRoll = podRollIDegx100 / 100
                             self.podYaw = -self.round(podYawx100 / 100, 180)
@@ -400,9 +400,9 @@ class POD_COMM:
         print((GREEN if self.podLockModeOn else RED) + 'Lock ' + RESET, end='')
         print(PodParas.viewTypeDict[self.podBigViewType] + '+' + PodParas.viewTypeDict[self.podSmallViewType], end='')
         print(' Laser: ' + ((GREEN + f'{self.podLaserRange:.1f}') if self.podLaserOn else (RED + 'Off')) + RESET)
-        print(f'Roll({self.args.mode}) {self.podRoll:6.2f}')
+        print(f'Roll({self.args.frame}) {self.podRoll:6.2f}')
         print(GREEN if self.pAtTarget else RED, end='')
-        print(f'Pitch({self.args.mode}) {self.podPitch:6.2f} -> {self.expectedPitch:6.2f}{RESET}')
+        print(f'Pitch({self.args.frame}) {self.podPitch:6.2f} -> {self.expectedPitch:6.2f}{RESET}')
         print(GREEN if self.yAtTarget else RED, end='')
         print(f'Yaw {self.podYaw:6.2f} -> {self.expectedYaw:6.2f}{RESET}')
         print(GREEN if self.fAtTarget else RED, end='')
@@ -475,11 +475,10 @@ if __name__ == '__main__':
     parser.add_argument('--serialDebug', help='debug serial read', action='store_true')
     parser.add_argument('--controlDebug', help='control output', action='store_true')
     parser.add_argument('--indoor', help='indoor test w/o laser', action='store_true')
-    parser.add_argument('--p', help='kp control', action='store_true')
-    parser.add_argument('--pi', help='kp & ki control', action='store_true')
-    parser.add_argument('--enhanceOff', help='image enhance off', action='store_true')
+    parser.add_argument('--control-mode', help='control mode', choices=['p', 'pi'], default='pi')
+    parser.add_argument('--no-enhance', dest='enhance', help='image enhance off', action='store_false')
     parser.add_argument('--port', help='serial port of pod', type=str, default='/dev/ttyUSB0')
-    parser.add_argument('--mode', help='control mode: B or I', choices=['b', 'i'], default='i')
+    parser.add_argument('--frame', help='control mode: B or I', choices=['b', 'i'], default='i')
     args, unknown = parser.parse_known_args()
     while not rospy.is_shutdown():
         pod_comm = POD_COMM(args)
