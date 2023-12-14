@@ -23,10 +23,9 @@ class AutoTra:
                  overlapOn=True,
                  pitchLevelOn=True,
                  drawNum=-1,
-                 takeoff=False,
                  fast=False
         ):
-        self.height = self.getVal(str='h', default=(5 if takeoff else 0.3) + 100 - 91.38, skip=fast)
+        self.height = self.getVal(str='h', default=10, skip=fast)
         self.frontLength = self.getVal(str='front length', default=300, skip=fast)
         self.leftLength = self.getVal(str='left length', default=0, skip=fast)
         self.rightLength = self.getVal(str='right length', default=300, skip=fast)

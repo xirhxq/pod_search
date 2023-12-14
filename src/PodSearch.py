@@ -49,10 +49,6 @@ class PodSearch:
         # arg parsing
         self.args = args
         print(BLUE + 'ARGS:', self.args, RESET)
-        if not self.args.takeoff and not self.args.test:
-            raise AssertionError("Please add --takeoff or --test arg")
-        if self.args.takeoff and self.args.test:
-            raise AssertionError("Not two args at the same time!")
 
         # ros node initialising
         rospy.init_node('pod_search', anonymous=True)
@@ -133,7 +129,7 @@ class PodSearch:
         self.usvTargetPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/target_nav_position', Pose2D, queue_size=1)
         
         # trajectory setting
-        self.autoTra = AutoTra(pitchLevelOn=True, overlapOn=True, drawNum=-1, takeoff=self.args.takeoff, fast=self.args.fast)
+        self.autoTra = AutoTra(pitchLevelOn=True, overlapOn=True, drawNum=-1, fast=self.args.fast)
         self.tra = self.autoTra.theList
         if not self.args.fast:
             input('Type anything to continue...')
@@ -148,7 +144,7 @@ class PodSearch:
         self.toc = self.getTimeNow()
 
         # ignore uav or not
-        self.uavReady = True if self.args.test else False
+        self.uavReady = True if self.args.mode == 'test' else False
         self.vesselDict = {}
         self.targetId = None
 
@@ -520,7 +516,7 @@ class PodSearch:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--takeoff', help='takeoff', action="store_true")
+    parser.add_argument('--mode', choices=['test', 'takeoff'], default='takeoff')
     parser.add_argument('--test', help='on ground test', action='store_true')
     parser.add_argument('--trackUSV', help='track usv', action='store_true')
     parser.add_argument('--trackVessel', help='track usv', action='store_true')
