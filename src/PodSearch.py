@@ -52,34 +52,6 @@ def delayStart(method):
             return method(self, *args, **kwargs)
     return wrapper
 
-def intersect_length(polygon_points, ray):
-    ray_x, ray_y, phi = ray
-    phi_rad = np.radians(phi)
-    dir_x, dir_y = np.cos(phi_rad), np.sin(phi_rad)
-    intersects = []
-
-    for i in range(len(polygon_points)):
-        x1, y1 = polygon_points[i]
-        x2, y2 = polygon_points[(i + 1) % len(polygon_points)]
-        edge_dir_x, edge_dir_y = x2 - x1, y2 - y1
-
-        det = dir_x * edge_dir_y - dir_y * edge_dir_x
-        if det != 0:
-            t = -((ray_x - x1) * edge_dir_y - (ray_y - y1) * edge_dir_x) / det
-            u = -((ray_x - x1) * dir_y - (ray_y - y1) * dir_x) / det
-            if t >= 0 and u >= 0 and u <= 1:
-                intersect_x, intersect_y = ray_x + t * dir_x, ray_y + t * dir_y
-                intersects.append((intersect_x, intersect_y))
-
-    min_length = 2000
-    closest_point = None
-    for point in intersects:
-        length = np.sqrt((point[0] - ray_x) ** 2 + (point[1] - ray_y) ** 2)
-        if length < min_length:
-            min_length = length
-            closest_point = point
-    return min_length
-
 
 class PodSearch:
     def __init__(self, args):
@@ -189,18 +161,8 @@ class PodSearch:
                         fast=self.args.fast,
                         config={
                             'height': view['uavPosU'],
-                            'frontLength': intersect_length(
-                                self.searchAreaPoints,
-                                (view['uavPosF'], view['uavPosL'], view['uavYaw']) 
-                            ),
-                            'leftLength': intersect_length(
-                                self.searchAreaPoints,
-                                (view['uavPosF'], view['uavPosL'], view['uavYaw'] + 90) 
-                            ),
-                            'rightLength': intersect_length(
-                                self.searchAreaPoints,
-                                (view['uavPosF'], view['uavPosL'], view['uavYaw'] - 90) 
-                            ),
+                            'areaPoints': self.searchAreaPoints,
+                            'ray': (view['uavPosF'], view['uavPosL'], view['uavYaw']),
                             'xFLU': 0,
                             'hfovPitchRatio': round['hfovPitchRatio'],
                             'theTime': round['theTime']
@@ -276,6 +238,11 @@ class PodSearch:
 
 
         print('Initialising finished...')
+        print(f'{len(self.autoTras) = }')
+        print(BOLD, BLUE, self.autoTras, RESET)
+        print(f'{len(self.searchPoints) = }')
+        print(BOLD, BLUE, self.searchPoints, RESET)
+        input('Type anything to continue...')
 
     def targetPosCallback(self, msg):
         self.targetPos = np.array([[msg.data[0]], [msg.data[1]], [0]])
@@ -427,10 +394,19 @@ class PodSearch:
         if self.searchViewCnt == len(self.searchPoints):
             self.searchViewCnt = 0
             self.searchRoundCnt += 1
+        if self.searchRoundCnt == len(self.autoTras):
+            self.toStepEnd()
+            return
         self.autoTra = self.autoTras[self.searchRoundCnt][self.searchViewCnt]
         self.tra = self.autoTra.theList
 
     def stepPrepare(self):
+        print(
+            f'{BOLD}{BLUE}==> '
+            f'StepPrepare, '
+            f'Round #{self.searchRoundCnt + 1}, View #{self.searchViewCnt + 1}'
+            f' <=={RESET}'
+        )
         self.expectedPodAngles = self.tra[0]
         self.pubPYZMaxRate()
         self.searchPointPub.publish(data=self.searchPoints[self.searchViewCnt].toList())
@@ -454,7 +430,6 @@ class PodSearch:
         if self.isAtTarget():
             self.traCnt += 1
         if self.traCnt == len(self.tra):
-            self.searchRoundCnt += 1
             if len(self.vesselDict) > 0:
                 self.targetId, _ = min(self.vesselDict.items(), key=lambda x: x[1])
             self.toStepPrepare()

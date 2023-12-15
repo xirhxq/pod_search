@@ -8,6 +8,34 @@ import numpy as np
 import PodParas
 from PodAngles import PodAngles
 
+def intersectLength(polygonPoints, ray):
+    rayX, rayY, phi = ray
+    phiRad = np.radians(phi)
+    dirX, dirY = np.cos(phiRad), np.sin(phiRad)
+    intersects = []
+
+    for i in range(len(polygonPoints)):
+        x1, y1 = polygonPoints[i]
+        x2, y2 = polygonPoints[(i + 1) % len(polygonPoints)]
+        edgeDirX, edgeDirY = x2 - x1, y2 - y1
+
+        det = dirX * edgeDirY - dirY * edgeDirX
+        if det != 0:
+            t = -((rayX - x1) * edgeDirY - (rayY - y1) * edgeDirX) / det
+            u = -((rayX - x1) * dirY - (rayY - y1) * dirX) / det
+            if t >= 0 and u >= 0 and u <= 1:
+                intersectX, intersectY = rayX + t * dirX, rayY + t * dirY
+                intersects.append((intersectX, intersectY))
+
+    minLength = 2000
+    closetPoint = None
+    for point in intersects:
+        length = np.sqrt((point[0] - rayX) ** 2 + (point[1] - rayY) ** 2)
+        if length < minLength:
+            minLength = length
+            closetPoint = point
+    return minLength
+
 
 class AutoTra:
     def getVal(self, str='', default=None, skip=False):
@@ -21,12 +49,12 @@ class AutoTra:
         
     def __repr__(self):
         return (
-            f'h={self.height:.0f}, '
+            f'(h={self.height:.0f}, '
             f'f={self.frontLength:.0f}, '
             f'l={self.leftLength:.0f}, '
             f'r={self.rightLength:.0f}, '
             f'h/p={self.hfovPitchRatio:.1f}, '
-            f'T={self.theTime:.1f}'
+            f'T={self.theTime:.1f})'
         )
 
     def __init__(self,
@@ -37,9 +65,30 @@ class AutoTra:
                  config=None
         ):
         self.height = self.getVal(str='h', default=config['height'], skip=fast)
-        self.frontLength = self.getVal(str='front length', default=config['frontLength'], skip=fast)
-        self.leftLength = self.getVal(str='left length', default=config['leftLength'], skip=fast)
-        self.rightLength = self.getVal(str='right length', default=config['rightLength'], skip=fast)
+        self.frontLength = self.getVal(
+            str='front length', 
+            default=intersectLength(
+                config['areaPoints'],
+                (config['ray'][0], config['ray'][1], config['ray'][2])
+            ), 
+            skip=fast
+        )
+        self.leftLength = self.getVal(
+            str='left length', 
+            default=intersectLength(
+                config['areaPoints'],
+                (config['ray'][0], config['ray'][1], config['ray'][2] + 90)
+            ), 
+            skip=fast
+        )
+        self.rightLength = self.getVal(
+            str='right length', 
+            default=intersectLength(
+                config['areaPoints'],
+                (config['ray'][0], config['ray'][1], config['ray'][2] - 90)
+            ), 
+            skip=fast
+        )
         xFLU = self.getVal(str='x', default=config['xFLU'], skip=fast)
         self.hfovPitchRatio = self.getVal(str='hfov/pitch', default=config['hfovPitchRatio'], skip=fast)
         self.theTime = self.getVal(str='THE Time', default=config['theTime'], skip=fast)
