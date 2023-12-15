@@ -31,7 +31,8 @@ from LocatingEKF import LocatingEKF
 
 class State:
     INIT = 0
-    SEARCH = 1
+    PREPARE = 1
+    SEARCH = 2
     STREAM = 4
     END = 5
     TRACK = 6
@@ -51,6 +52,34 @@ def delayStart(method):
             return method(self, *args, **kwargs)
     return wrapper
 
+def intersect_length(polygon_points, ray):
+    ray_x, ray_y, phi = ray
+    phi_rad = np.radians(phi)
+    dir_x, dir_y = np.cos(phi_rad), np.sin(phi_rad)
+    intersects = []
+
+    for i in range(len(polygon_points)):
+        x1, y1 = polygon_points[i]
+        x2, y2 = polygon_points[(i + 1) % len(polygon_points)]
+        edge_dir_x, edge_dir_y = x2 - x1, y2 - y1
+
+        det = dir_x * edge_dir_y - dir_y * edge_dir_x
+        if det != 0:
+            t = -((ray_x - x1) * edge_dir_y - (ray_y - y1) * edge_dir_x) / det
+            u = -((ray_x - x1) * dir_y - (ray_y - y1) * dir_x) / det
+            if t >= 0 and u >= 0 and u <= 1:
+                intersect_x, intersect_y = ray_x + t * dir_x, ray_y + t * dir_y
+                intersects.append((intersect_x, intersect_y))
+
+    min_length = 2000
+    closest_point = None
+    for point in intersects:
+        length = np.sqrt((point[0] - ray_x) ** 2 + (point[1] - ray_y) ** 2)
+        if length < min_length:
+            min_length = length
+            closest_point = point
+    return min_length
+
 
 class PodSearch:
     def __init__(self, args):
@@ -61,10 +90,6 @@ class PodSearch:
         self.packagePath = rospkg.RosPack().get_path('pod_search')
         with open(self.packagePath + '/config/config.yaml', 'r') as config:
             self.config = yaml.safe_load(config)
-
-        self.searchPoints = [SearchPoint(**item) for item in self.config['SearchPoints']]
-
-        print(f'Search Points: {self.searchPoints}')
 
         # ros node initialising
         rospy.init_node('pod_search', anonymous=True)
@@ -134,15 +159,58 @@ class PodSearch:
         self.taskTime = 0
         self.tic = self.getTimeNow()
         self.toc = self.getTimeNow()
+
+        # [StepPrepare] counters
+        self.searchRoundCnt = 0
+        self.searchViewCnt = -1
+
+        # [StepPrepare] search points pub
+        self.searchPoints = [SearchPoint(**item) for item in self.config['SearchPoints']]
+        print(f'Search Points: {self.searchPoints}')
+        self.searchPointPub = rospy.Publisher(self.uavName + '/searchPoint', Float64MultiArray, queue_size=1)
         
         # [StepSearch] trajectory setting
-        self.autoTra = AutoTra(pitchLevelOn=True, overlapOn=True, drawNum=-1, fast=self.args.fast)
-        self.tra = self.autoTra.theList
-        if not self.args.fast:
-            input('Type anything to continue...')
 
-        # [StepSearch] search round counter
-        self.searchRoundCnt = 0
+        self.searchAreaPoints = [
+            (0, self.config['SearchArea']['leftLength']),
+            (self.config['SearchArea']['frontLength'], self.config['SearchArea']['leftLength']),
+            (self.config['SearchArea']['frontLength'], -self.config['SearchArea']['rightLength']),
+            (0, -self.config['SearchArea']['rightLength']),
+        ]
+        self.autoTras = []
+        for round in self.config['searchConfig']:
+            tmpList = []
+            for view in self.config['SearchPoints']:
+                tmpList.append(
+                    AutoTra(
+                        pitchLevelOn=True,
+                        overlapOn=True,
+                        drawNum=-1,
+                        fast=self.args.fast,
+                        config={
+                            'height': view['uavPosU'],
+                            'frontLength': intersect_length(
+                                self.searchAreaPoints,
+                                (view['uavPosF'], view['uavPosL'], view['uavYaw']) 
+                            ),
+                            'leftLength': intersect_length(
+                                self.searchAreaPoints,
+                                (view['uavPosF'], view['uavPosL'], view['uavYaw'] + 90) 
+                            ),
+                            'rightLength': intersect_length(
+                                self.searchAreaPoints,
+                                (view['uavPosF'], view['uavPosL'], view['uavYaw'] - 90) 
+                            ),
+                            'xFLU': 0,
+                            'hfovPitchRatio': round['hfovPitchRatio'],
+                            'theTime': round['theTime']
+                        }
+                    )
+                )
+            self.autoTras.append(tmpList)
+        print(self.autoTras)
+        self.autoTra = self.autoTras[0][0]
+        self.tra = self.autoTra.theList
 
         # [StepSearch] trajectory counter
         self.traCnt = 0
@@ -345,9 +413,28 @@ class PodSearch:
         self.state = State.INIT
 
     def stepInit(self):
-        self.expectedPodAngles = self.tra[0]
+        self.expectedPodAngles = PodAngles(
+            **self.config['podInitialData']
+        )
         self.pubPYZMaxRate()
         if self.isAtTarget() and self.uavReady:
+            self.toStepPrepare()
+
+    @stepEntrance
+    def toStepPrepare(self):
+        self.state = State.PREPARE
+        self.searchViewCnt += 1
+        if self.searchViewCnt == len(self.searchPoints):
+            self.searchViewCnt = 0
+            self.searchRoundCnt += 1
+        self.autoTra = self.autoTras[self.searchRoundCnt][self.searchViewCnt]
+        self.tra = self.autoTra.theList
+
+    def stepPrepare(self):
+        self.expectedPodAngles = self.tra[0]
+        self.pubPYZMaxRate()
+        self.searchPointPub.publish(data=self.searchPoints[self.searchViewCnt].toList())
+        if self.uavState % 10 == 1:
             self.toStepSearch()
 
     @stepEntrance
@@ -358,7 +445,8 @@ class PodSearch:
     def stepSearch(self):
         print(
             f'{BOLD}{BLUE}==> '
-            f'StepSearch @ #{self.traCnt + 1}/{len(self.tra)}, Round #{self.searchRoundCnt + 1}'
+            f'StepSearch @ #{self.traCnt + 1}/{len(self.tra)}, '
+            f'Round #{self.searchRoundCnt + 1}, View #{self.searchViewCnt + 1}'
             f' <=={RESET}'
         )
         self.expectedPodAngles = self.tra[self.traCnt]
@@ -369,7 +457,7 @@ class PodSearch:
             self.searchRoundCnt += 1
             if len(self.vesselDict) > 0:
                 self.targetId, _ = min(self.vesselDict.items(), key=lambda x: x[1])
-            self.toStepSearch()
+            self.toStepPrepare()
         if self.targetId is not None and self.getTimeNow() - self.lastVesselCaptureTime[self.targetId] < 0.1:
             self.toStepTrack(self.targetId)
 
@@ -500,6 +588,8 @@ class PodSearch:
             self.uavReady = True
         if self.state == State.INIT:
             self.stepInit()
+        elif self.state == State.PREPARE:
+            self.stepPrepare()
         elif self.state == State.SEARCH:
             self.stepSearch()
         elif self.state == State.END:

@@ -18,20 +18,31 @@ class AutoTra:
             return default
         else:
             return float(str)
+        
+    def __repr__(self):
+        return (
+            f'h={self.height:.0f}, '
+            f'f={self.frontLength:.0f}, '
+            f'l={self.leftLength:.0f}, '
+            f'r={self.rightLength:.0f}, '
+            f'h/p={self.hfovPitchRatio:.1f}, '
+            f'T={self.theTime:.1f}'
+        )
 
     def __init__(self,
                  overlapOn=True,
                  pitchLevelOn=True,
                  drawNum=-1,
-                 fast=False
+                 fast=False,
+                 config=None
         ):
-        self.height = self.getVal(str='h', default=10, skip=fast)
-        self.frontLength = self.getVal(str='front length', default=300, skip=fast)
-        self.leftLength = self.getVal(str='left length', default=0, skip=fast)
-        self.rightLength = self.getVal(str='right length', default=300, skip=fast)
-        xFLU = self.getVal(str='x', default=-150, skip=fast)
-        self.hfovPitchRatio = self.getVal(str='hfov/pitch', default=3, skip=fast)
-        self.theTime = self.getVal(str='THE Time', default=6, skip=fast)
+        self.height = self.getVal(str='h', default=config['height'], skip=fast)
+        self.frontLength = self.getVal(str='front length', default=config['frontLength'], skip=fast)
+        self.leftLength = self.getVal(str='left length', default=config['leftLength'], skip=fast)
+        self.rightLength = self.getVal(str='right length', default=config['rightLength'], skip=fast)
+        xFLU = self.getVal(str='x', default=config['xFLU'], skip=fast)
+        self.hfovPitchRatio = self.getVal(str='hfov/pitch', default=config['hfovPitchRatio'], skip=fast)
+        self.theTime = self.getVal(str='THE Time', default=config['theTime'], skip=fast)
 
         self.xyFLU = np.array([xFLU, 0])
 

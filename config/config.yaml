@@ -1,21 +1,40 @@
+SearchArea:
+  frontLength: 2000
+  leftLength: 1700
+  rightLength: 1500
+
 SearchPoints:
   - uavPosF: 300
     uavPosL: 0
     uavPosU: 40
-    uavYaw: -90
+    uavYaw: 90
     timeout: 10
   - uavPosF: 300
     uavPosL: 0
     uavPosU: 40
-    uavYaw: 90
+    uavYaw: -90
     timeout: 10
 
 uavInitialPos: [[0], [0], [10]]
 
 targetInitialPos: [[-156], [218], [0]]
 
+podInitialData:
+  pitchDeg: 0
+  yawDeg: 0
+  hfovDeg: 40
+  maxRateDeg: 20
+
 dockData:
   pitchDeg: 20
   yawDeg: -20
   hfovDeg: 50
   maxRateDeg: 10
+
+searchConfig:
+  - hfovPitchRatio: 3
+    theTime: 6
+  - hfovPitchRatio: 3
+    theTime: 10
+  - hfovPitchRatio: 3
+    theTime: 15
