@@ -116,65 +116,77 @@ class PodSearch:
         # From localisation: location
         self.uavPos = np.array(self.config['uavInitialPos'])
 
-        # To others: my state
-        self.state = State.INIT
-        self.searchStatePub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/searchState', Int8, queue_size=1)
-        self.searchRoundCnt = 0
-
         # From suav: suav control state
         self.uavState = 0
         rospy.Subscriber(self.uavName + '/uavState', Int8, lambda msg: setattr(self, 'uavState', msg.data))
 
-        # track data
-        self.trackData = {}
-        self.trackName = None
-
-        # From Transformer: dock data
-        self.dockData = PodAngles(**self.config['dockData'])
-        print(f'{self.dockData = }')
-
-        # From usv: land flag
-        self.landFlag = -1
-        rospy.Subscriber('/usv/suav_land_flag', Int8, lambda msg: setattr(self, 'landFlag', msg.data))
-
-        # To usv: guidance data
-        self.usvTargetPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/target_nav_position', Pose2D, queue_size=1)
-        
-        # trajectory setting
-        self.autoTra = AutoTra(pitchLevelOn=True, overlapOn=True, drawNum=-1, fast=self.args.fast)
-        self.tra = self.autoTra.theList
-        if not self.args.fast:
-            input('Type anything to continue...')
-
-        # trajectory counter
-        self.traCnt = 0
+        # To others: my state
+        self.state = State.INIT
+        self.searchStatePub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/searchState', Int8, queue_size=1)
 
         # timers
         self.startTime = self.getTimeNow()
         self.taskTime = 0
         self.tic = self.getTimeNow()
         self.toc = self.getTimeNow()
+        
+        # [StepSearch] trajectory setting
+        self.autoTra = AutoTra(pitchLevelOn=True, overlapOn=True, drawNum=-1, fast=self.args.fast)
+        self.tra = self.autoTra.theList
+        if not self.args.fast:
+            input('Type anything to continue...')
 
-        # ignore uav or not
-        self.uavReady = True if self.args.mode == 'test' else False
+        # [StepSearch] search round counter
+        self.searchRoundCnt = 0
+
+        # [StepSearch] trajectory counter
+        self.traCnt = 0
+
+        # [StepSearch] target ids & its scores
         self.vesselDict = {}
+
+        # [StepSearch] ignore uav or not
+        self.uavReady = True if self.args.mode == 'test' else False
+
+        # [StepSearch] selected target id
         self.targetId = None
 
-        self.lastUSVCaptureTime = self.getTimeNow()
+        # [StepSearch] last capture time of targets
         self.lastVesselCaptureTime = {}
 
-        # ekfs for locating
+        # [StepDock] pod angles that UAV look back to find USV
+        self.dockData = PodAngles(**self.config['dockData'])
+        print(f'{self.dockData = }')
+
+        # [StepTrack] pod angles used to track targets
+        self.trackData = {}
+        self.trackName = None
+
+        # [StepTrack] land flag
+        self.landFlag = -1
+        rospy.Subscriber('/usv/suav_land_flag', Int8, lambda msg: setattr(self, 'landFlag', msg.data))
+
+        # [StepTrack] guidance data
+        self.usvTargetPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/target_nav_position', Pose2D, queue_size=1)
+
+        # [StepTrack] last capture time of usv
+        self.lastUSVCaptureTime = self.getTimeNow()
+
+        # [StepTrack] ekfs for locating
         self.ekfNames = ['usv', 'boat']
         self.ekfs = {n: LocatingEKF(initialT=self.getTimeNow()) for n in self.ekfNames}
         self.ekfLogs = {n: DataLogger(self.packagePath, n + 'ekf.csv') for n in self.ekfNames}
         self.ekfLogs['usv'].initialize([('usvEKFx[6][1]', 'matrix')])
 
+        # [StepTrack] target vessel position
         self.targetPos = np.array(self.config['targetInitialPos'])
 
+        # [StepTrack] For test: target vessel position subscribing
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/targetPos', Float64MultiArray, self.targetPosCallback)
+
+        # [StepRefind] target name & related pod angles
         self.refindName = None
         self.refindPodAngles = None
-
-        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/targetPos', Float64MultiArray, self.targetPosCallback)
 
         signal(SIGINT, self.signalHandler)
 
