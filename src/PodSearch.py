@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 import time
+import yaml
 import argparse
 import subprocess
 import numpy as np
@@ -9,6 +10,7 @@ from os import system
 from signal import signal, SIGINT
 
 import rospy
+import rospkg
 from std_msgs.msg import Float32, Bool, Float64MultiArray, Int8, MultiArrayDimension
 from geometry_msgs.msg import Pose2D
 from nav_msgs.msg import Odometry
@@ -20,6 +22,7 @@ import PodParas
 from AutoTra import AutoTra
 from Utils import *
 from PodAngles import PodAngles
+from SearchPoint import SearchPoint
 from Classifier import Classifier
 from DataLogger import DataLogger
 from TimeBuffer import TimeBuffer
@@ -49,6 +52,14 @@ class PodSearch:
         # arg parsing
         self.args = args
         print(BLUE + 'ARGS:', self.args, RESET)
+
+        self.packagePath = rospkg.RosPack().get_path('pod_search')
+        with open(self.packagePath + '/config/config.yaml', 'r') as config:
+            self.config = yaml.safe_load(config)
+
+        self.searchPoints = [SearchPoint(**item) for item in self.config['SearchPoints']]
+
+        print(f'Search Points: {self.searchPoints}')
 
         # ros node initialising
         rospy.init_node('pod_search', anonymous=True)
@@ -103,7 +114,7 @@ class PodSearch:
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/usv_detection', TargetsInFrame, self.usvDetectionCallback, queue_size=1)
 
         # From localisation: location
-        self.uavPos = np.array([[0], [0], [8]])
+        self.uavPos = np.array(self.config['uavInitialPos'])
 
         # To others: my state
         self.state = State.INIT
@@ -119,7 +130,8 @@ class PodSearch:
         self.trackName = None
 
         # From Transformer: dock data
-        self.dockData = PodAngles(pitchDeg=20, yawDeg=-20, hfovDeg=50, maxRateDeg=10)
+        self.dockData = PodAngles(**self.config['dockData'])
+        print(f'{self.dockData = }')
 
         # From usv: land flag
         self.landFlag = -1
@@ -154,12 +166,10 @@ class PodSearch:
         # ekfs for locating
         self.ekfNames = ['usv', 'boat']
         self.ekfs = {n: LocatingEKF(initialT=self.getTimeNow()) for n in self.ekfNames}
-        import rospkg
-        pre = rospkg.RosPack().get_path('pod_search')
-        self.ekfLogs = {n: DataLogger(pre, n + 'ekf.csv') for n in self.ekfNames}
+        self.ekfLogs = {n: DataLogger(self.packagePath, n + 'ekf.csv') for n in self.ekfNames}
         self.ekfLogs['usv'].initialize([('usvEKFx[6][1]', 'matrix')])
 
-        self.targetPos = np.array([[-156], [218], [0]])
+        self.targetPos = np.array(self.config['targetInitialPos'])
 
         self.refindName = None
         self.refindPodAngles = None
