@@ -134,7 +134,7 @@ class AutoTra:
             print(f'[{podP:.6f}, {yRange[0]:.2f}, {hfov:.2f}, 20], [{podP:.6f}, {yRange[1]:.2f}, {hfov:.2f}, {hfov/self.theTime:.2f}]')
             self.theList.append(PodAngles(pitchDeg=podP, yawDeg=yRange[0], hfovDeg=hfov, maxRateDeg=20, laserOn=False))
             self.theList.append(PodAngles(pitchDeg=podP, yawDeg=yRange[1], hfovDeg=hfov, maxRateDeg=hfov / self.theTime, laserOn=False))
-            self.expectedTime += abs(yRange[1] - yRange[0]) / hfov * 4
+            self.expectedTime += abs(yRange[1] - yRange[0]) / hfov * self.theTime
             print(f'After this round time is {self.expectedTime:.2f}')
 
         print('### The List ###')
