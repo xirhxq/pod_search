@@ -38,6 +38,11 @@ class State:
     DOCK = 7
     REFIND = 8
     
+def stepEntrance(method):
+    def wrapper(self, *args, **kwargs):
+        self.tic = self.getTimeNow()
+        return method(self, *args, **kwargs)
+    return wrapper
 
 def delayStart(method):
     def wrapper(self, *args, **kwargs):
@@ -335,9 +340,9 @@ class PodSearch:
                 self.podCommFeedback == self.expectedPodAngles
         )
 
+    @stepEntrance
     def toStepInit(self):
         self.state = State.INIT
-        self.tic = self.getTimeNow()
 
     def stepInit(self):
         self.expectedPodAngles = self.tra[0]
@@ -345,9 +350,9 @@ class PodSearch:
         if self.isAtTarget() and self.uavReady:
             self.toStepSearch()
 
+    @stepEntrance
     def toStepSearch(self):
         self.state = State.SEARCH
-        self.tic = self.getTimeNow()
         self.traCnt = 0
 
     def stepSearch(self):
@@ -368,6 +373,7 @@ class PodSearch:
         if self.targetId is not None and self.getTimeNow() - self.lastVesselCaptureTime[self.targetId] < 0.1:
             self.toStepTrack(self.targetId)
 
+    @stepEntrance
     def toStepTrack(self, trackName):
         self.state = State.TRACK
         self.trackName = trackName
@@ -377,7 +383,6 @@ class PodSearch:
             self.expectedLaserOn = True
             self.expectedLaserOnPub.publish(True)
         print(f'{self.expectedLaserOn = }')
-        self.tic = self.getTimeNow()
     
     def stepTrack(self):
         print(
@@ -433,9 +438,9 @@ class PodSearch:
                 self.targetPos = self.ekfs[self.trackName].ekf.x[:3].reshape(3, 1)
                 self.toStepDock()
         
+    @stepEntrance
     def toStepRefind(self, refindName):
         self.state = State.REFIND
-        self.tic = self.getTimeNow()
         self.refindPodAngles = self.getPodAnglesNow()
         self.refindName = refindName
 
@@ -456,9 +461,9 @@ class PodSearch:
         if self.getTimeNow() - self.lastUSVCaptureTime < 0.1:
             self.toStepTrack(self.refindName)
 
+    @stepEntrance
     def toStepDock(self):
         self.state = State.DOCK
-        self.tic = self.getTimeNow()
 
     def stepDock(self):
         print(
@@ -472,9 +477,9 @@ class PodSearch:
         if self.toc - self.tic >= 10:
             self.toStepTrack('usv')
 
+    @stepEntrance
     def toStepEnd(self):
         self.state = State.END
-        self.tic = self.getTimeNow()
 
     def stepEnd(self):
         print(f'StepEnd with {self.toc - self.tic:.2f} seconds')
