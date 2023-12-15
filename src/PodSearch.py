@@ -11,8 +11,8 @@ from signal import signal, SIGINT
 
 import rospy
 import rospkg
-from std_msgs.msg import Float32, Bool, Float64MultiArray, Int8, MultiArrayDimension
-from geometry_msgs.msg import Pose2D
+from std_msgs.msg import Float32, Bool, Float64MultiArray, Int8, Int16, MultiArrayDimension, Header
+from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 from nav_msgs.msg import Odometry
 
 from spirecv_msgs.msg import TargetsInFrame
@@ -118,11 +118,11 @@ class PodSearch:
 
         # From suav: suav control state
         self.uavState = 0
-        rospy.Subscriber(self.uavName + '/uavState', Int8, lambda msg: setattr(self, 'uavState', msg.data))
+        rospy.Subscriber(self.uavName + '/uavState', Int16, lambda msg: setattr(self, 'uavState', msg.data))
 
         # To others: my state
         self.state = State.INIT
-        self.searchStatePub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/searchState', Int8, queue_size=1)
+        self.searchStatePub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/searchState', Int16, queue_size=1)
 
         # timers
         self.startTime = self.getTimeNow()
@@ -167,7 +167,7 @@ class PodSearch:
         rospy.Subscriber('/usv/suav_land_flag', Int8, lambda msg: setattr(self, 'landFlag', msg.data))
 
         # [StepTrack] guidance data
-        self.usvTargetPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/target_nav_position', Pose2D, queue_size=1)
+        self.usvTargetPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/target_nav_position', PoseStamped, queue_size=1)
 
         # [StepTrack] last capture time of usv
         self.lastUSVCaptureTime = self.getTimeNow()
@@ -416,7 +416,18 @@ class PodSearch:
                 print(f'{self.targetPos = }')
                 usvToTargetENU = self.targetPos - usvPos
                 usvToTargetTheta = np.degrees(np.arctan2(usvToTargetENU[1][0], usvToTargetENU[0][0]))
-                self.usvTargetPub.publish(Pose2D(x=usvToTargetENU[0][0], y=usvToTargetENU[1][0], theta=usvToTargetTheta))
+                self.usvTargetPub.publish(
+                    header=Header(frame_id='target'),
+                    pose=Pose(
+                        position=Point(
+                            x=usvToTargetENU[0][0], 
+                            y=usvToTargetENU[1][0]
+                        ), 
+                        orientation=Quaternion(
+                            w=usvToTargetTheta
+                        )
+                    )
+                )
         else:
             if self.toc - self.tic >= 10:
                 self.targetPos = self.ekfs[self.trackName].ekf.x[:3].reshape(3, 1)
@@ -479,7 +490,7 @@ class PodSearch:
 
     def controlStateMachine(self):
         self.toc = self.getTimeNow()
-        self.searchStatePub.publish(Int8(self.state))
+        self.searchStatePub.publish(Int16(self.state))
         if self.uavState >= 4:
             self.uavReady = True
         if self.state == State.INIT:
