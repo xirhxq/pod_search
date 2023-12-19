@@ -608,7 +608,7 @@ class PodSearch:
 
     @delayStart
     def spinOnce(self):
-        system('clear')
+        self.console.clear()
         self.console.rule(
             f'[magenta2]'
             f'PodSearch[/] @ '
