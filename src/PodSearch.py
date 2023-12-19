@@ -2,14 +2,17 @@
 
 import time
 import yaml
+import rich
 import argparse
 import datetime
 import pyfiglet
 import subprocess
 import numpy as np
 from os import system
-# from rich import print
+from enum import Enum
 from signal import signal, SIGINT
+from rich.console import Console
+from rich.table import Table
 
 import rospy
 import rospkg
@@ -31,7 +34,7 @@ from TimeBuffer import TimeBuffer
 from LocatingEKF import LocatingEKF
 
 
-class State:
+class State(Enum):
     INIT = 0
     PREPARE = 1
     SEARCH = 2
@@ -57,6 +60,8 @@ def delayStart(method):
 
 class PodSearch:
     def __init__(self, args):
+        self.console = Console()
+
         # arg parsing
         self.args = args
         print(BLUE + 'ARGS:', self.args, RESET)
@@ -127,12 +132,6 @@ class PodSearch:
         # To others: my state
         self.state = State.INIT
         self.searchStatePub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/searchState', Int16, queue_size=1)
-
-        # timers
-        self.startTime = self.getTimeNow()
-        self.taskTime = 0
-        self.tic = self.getTimeNow()
-        self.toc = self.getTimeNow()
 
         # [StepPrepare] counters
         self.searchRoundCnt = 0
@@ -248,6 +247,12 @@ class PodSearch:
 
         self.waitForStart()
 
+        # timers
+        self.startTime = self.getTimeNow()
+        self.taskTime = 0
+        self.tic = self.getTimeNow()
+        self.toc = self.getTimeNow()
+
     def waitForStart(self):
         startTime = datetime.datetime.now()
         if self.args.start == 'minute':
@@ -257,10 +262,16 @@ class PodSearch:
 
         while datetime.datetime.now() < startTime:
             system('clear')
-            print(RED + BOLD + f'Set start at {startTime}' + RESET)
+            self.console.rule(
+                f'[bold red]'
+                f'Set start at {startTime}'
+            )
             remainingTime = startTime - datetime.datetime.now()
             countDownStr = str(remainingTime).split('.')[0]
-            print(pyfiglet.figlet_format(countDownStr))
+            self.console.print(
+                pyfiglet.figlet_format(countDownStr),
+                justify='center'
+            )
             time.sleep(1)
 
     def targetPosCallback(self, msg):
@@ -420,11 +431,11 @@ class PodSearch:
         self.tra = self.autoTra.theList
 
     def stepPrepare(self):
-        print(
-            f'{BOLD}{BLUE}==> '
-            f'StepPrepare, '
-            f'Round #{self.searchRoundCnt + 1}, View #{self.searchViewCnt + 1}'
-            f' <=={RESET}'
+        self.console.rule(
+            f'[bold blue]'
+            f'Preparing, '
+            f'Round #{self.searchRoundCnt + 1}, View #{self.searchViewCnt + 1}, '
+            f'waiting for {self.searchPoints[self.searchViewCnt].id:d}X1'
         )
         self.expectedPodAngles = self.tra[0]
         self.pubPYZMaxRate()
@@ -438,11 +449,11 @@ class PodSearch:
         self.traCnt = 0
 
     def stepSearch(self):
-        print(
-            f'{BOLD}{BLUE}==> '
-            f'StepSearch @ #{self.traCnt + 1}/{len(self.tra)}, '
-            f'Round #{self.searchRoundCnt + 1}, View #{self.searchViewCnt + 1}'
-            f' <=={RESET}'
+        self.console.rule(
+            f'[bold blue]'
+            f'Searching #{self.traCnt + 1}/{len(self.tra)}, '
+            f'Round #{self.searchRoundCnt + 1}, View #{self.searchViewCnt + 1}, '
+            f'Spend {self.autoTra.expectedTime:.1f}'
         )
         self.expectedPodAngles = self.tra[self.traCnt]
         self.pubPYZMaxRate()
@@ -464,20 +475,20 @@ class PodSearch:
         if not self.podLaserOn:
             self.expectedLaserOn = True
             self.expectedLaserOnPub.publish(True)
-        print(f'{self.expectedLaserOn = }')
     
     def stepTrack(self):
-        print(
-            f'{BOLD}{BLUE}==> '
-            f'Step Track for {self.trackName}: {self.toc - self.tic:.2f} seconds'
-            f' <=={RESET}'
+        self.console.rule(
+            f'[bold blue]'
+            f'Tracking for {self.trackName}... '
+            f"{'[bold red] Laser on' if self.expectedLaserOn else '[bold green]off'}"
+        )
+        self.console.print(
+            f'{self.trackData[self.trackName]}'
         )
         if self.landFlag == 1:
             self.toStepEnd()
         if self.getTimeNow() - self.lastUSVCaptureTime >= 5.0:
             self.toStepRefind(self.trackName)
-        print(f'{self.expectedLaserOn = }')
-        print(f'{self.trackName = }, {self.trackData[self.trackName] = }')
         if not self.podLaserOn:
             self.expectedLaserOn = True
             self.expectedLaserOnPub.publish(True)
@@ -527,11 +538,10 @@ class PodSearch:
         self.refindName = refindName
 
     def stepRefind(self):
-        print(
-            f'{BOLD}{BLUE}==> '
+        self.console.rule(
+            f'[bold blue]'
             f'Refinding {self.refindName} '
             f'@ (p{self.refindPodAngles.pitchDeg:.2f}, y{self.refindPodAngles.yawDeg:.2f}, hfov{self.refindPodAngles.hfovDeg:.2f})'
-            f' <=={RESET}'
         )
         self.expectedPodAngles = PodAngles(
             pitchDeg=self.refindPodAngles.pitchDeg + (self.toc - self.tic) / 3 * np.sin((self.toc - self.tic) / 15 * 2 * np.pi),
@@ -548,12 +558,6 @@ class PodSearch:
         self.state = State.DOCK
 
     def stepDock(self):
-        print(
-            f'***'
-            f'Dock {self.toc - self.tic:.2f}, '
-            f'{(GREEN + "At Target" + RESET) if self.isAtTarget() else (RED + "Not At Target" + RESET)}'
-            f'***'
-        )
         self.expectedPodAngles = self.dockData
         self.pubPYZMaxRate()
         if self.toc - self.tic >= 10:
@@ -564,7 +568,6 @@ class PodSearch:
         self.state = State.END
 
     def stepEnd(self):
-        print(f'StepEnd with {self.toc - self.tic:.2f} seconds')
         if self.toc - self.tic >= 3.0:
             exit(0)
 
@@ -602,24 +605,37 @@ class PodSearch:
     @delayStart
     def spinOnce(self):
         system('clear')
-        print('-' * 20)
-        print(f'### PodSearch ###')
-        print(f'Me @ State #{self.state} sUAV @ State #{self.uavState}')
-        print(
-            f'Time {self.taskTime:.1f} / {self.autoTra.expectedTime:.2f}',
-            (GREEN + "At Target" + RESET) if self.isAtTarget() else (RED + "Not at Target" + RESET)
+        self.console.rule(
+            f'[magenta2]'
+            f'PodSearch[/] @ '
+            f'{self.taskTime:.1f} '
+            f'[blue3]'
+            f'Step{self.state.name}[/] @ '
+            f'{self.toc - self.tic:.1f}, '
+            f'[red3]'
+            f'suav @ #{self.uavState}',
+            style=('green' if self.isAtTarget() else 'red')
         )
-        print(GREEN if self.podPitchAtTarget else RED, end='')
-        print(f'Pitch: {self.podPitchDeg:.2f} -> {self.expectedPodAngles.pitchDeg:.2f} == {self.podCommFeedback.pitchDeg:.2f}{RESET}')
-        print(GREEN if self.podYawAtTarget else RED, end='')
-        print(f'Yaw: {self.podYawDeg:.2f} -> {self.expectedPodAngles.yawDeg:.2f} == {self.podCommFeedback.yawDeg:.2f}{RESET}')
-        print(GREEN if self.podHfovAtTarget else RED, end='')
-        print(f'HFov: {self.podHfovDeg:.2f} -> {self.expectedPodAngles.hfovDeg:.2f} == {self.podCommFeedback.hfovDeg:.2f}{RESET}')
+        self.console.print(
+            f'Pitch: {self.podPitchDeg:.2f} -> {self.expectedPodAngles.pitchDeg:.2f} == {self.podCommFeedback.pitchDeg:.2f}',
+            style='green' if self.podPitchAtTarget else 'red',
+            justify='center'
+        )
+        self.console.print(
+            f'Yaw: {self.podYawDeg:.2f} -> {self.expectedPodAngles.yawDeg:.2f} == {self.podCommFeedback.yawDeg:.2f}',
+            style='green' if self.podYawAtTarget else 'red',
+            justify='center'
+        )
+        self.console.print(
+            f'HFov: {self.podHfovDeg:.2f} -> {self.expectedPodAngles.hfovDeg:.2f} == {self.podCommFeedback.hfovDeg:.2f}',
+            style='green' if self.podHfovAtTarget else 'red',
+            justify='center'
+        )
         self.controlStateMachine()
-        print(f'{self.vesselDict = }')
-        print(f'{self.targetId = }')
-        print(f'{self.trackData = }')
-        print(f'{self.targetPos = }')
+        self.console.print(f'{self.vesselDict = }')
+        self.console.print(f'{self.targetId = }')
+        self.console.print(f'{self.trackData = }')
+        self.console.print(f'{self.targetPos = }')
     
     def signalHandler(self, sig, frame):
         print('You pressed Ctrl+C!')
