@@ -12,7 +12,6 @@ from os import system
 from enum import Enum
 from signal import signal, SIGINT
 from rich.console import Console
-from rich.table import Table
 
 import rospy
 import rospkg
