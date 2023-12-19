@@ -70,6 +70,10 @@ class PodSearch:
         with open(self.packagePath + '/config/config.yaml', 'r') as config:
             self.config = yaml.safe_load(config)
 
+        if not self.args.fast:
+            self.config['SearchPoints'] = [self.config['SearchPoints'][0]]
+            self.config['searchConfig'] = [self.config['searchConfig'][0]]
+
         # ros node initialising
         rospy.init_node('pod_search', anonymous=True)
         self.rate = rospy.Rate(10)

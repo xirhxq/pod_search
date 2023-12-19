@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from math import degrees, atan, tan, radians, sin, cos, sqrt
 import numpy as np
+from rich.prompt import FloatPrompt
 
 import PodParas
 from PodAngles import PodAngles
@@ -38,15 +39,6 @@ def intersectLength(polygonPoints, ray):
 
 
 class AutoTra:
-    def getVal(self, str='', default=None, skip=False):
-        if skip:
-            return default
-        str = input(f'Input {str} (Default: {default:.2f}): ')
-        if str == '':
-            return default
-        else:
-            return float(str)
-        
     def __repr__(self):
         return (
             f'(h={self.height:.0f}, '
@@ -64,36 +56,31 @@ class AutoTra:
                  fast=False,
                  config=None
         ):
-        self.height = self.getVal(str='h', default=config['height'], skip=fast)
-        self.frontLength = self.getVal(
-            str='front length', 
-            default=intersectLength(
-                config['areaPoints'],
-                (config['ray'][0], config['ray'][1], config['ray'][2])
-            ), 
-            skip=fast
+        self.height = float(config['height'])
+        self.frontLength = intersectLength(
+            config['areaPoints'],
+            (config['ray'][0], config['ray'][1], config['ray'][2])
         )
-        self.leftLength = self.getVal(
-            str='left length', 
-            default=intersectLength(
-                config['areaPoints'],
-                (config['ray'][0], config['ray'][1], config['ray'][2] + 90)
-            ), 
-            skip=fast
+        self.leftLength = intersectLength(
+            config['areaPoints'],
+            (config['ray'][0], config['ray'][1], config['ray'][2] + 90)
         )
-        self.rightLength = self.getVal(
-            str='right length', 
-            default=intersectLength(
-                config['areaPoints'],
-                (config['ray'][0], config['ray'][1], config['ray'][2] - 90)
-            ), 
-            skip=fast
+        self.rightLength = intersectLength(
+            config['areaPoints'],
+            (config['ray'][0], config['ray'][1], config['ray'][2] - 90)
         )
-        xFLU = self.getVal(str='x', default=config['xFLU'], skip=fast)
-        self.hfovPitchRatio = self.getVal(str='hfov/pitch', default=config['hfovPitchRatio'], skip=fast)
-        self.theTime = self.getVal(str='THE Time', default=config['theTime'], skip=fast)
-
-        self.xyFLU = np.array([xFLU, 0])
+        self.xFLU = float(config['xFLU'])
+        self.hfovPitchRatio = float(config['hfovPitchRatio'])
+        self.theTime = float(config['theTime'])
+        if not fast:
+            self.height = FloatPrompt.ask('height', default=self.height, show_default=True)
+            self.frontLength = FloatPrompt.ask('front length', default=self.frontLength)
+            self.leftLength = FloatPrompt.ask('left length', default=self.leftLength)
+            self.rightLength = FloatPrompt.ask('right length', default=self.rightLength)
+            self.xFLU = FloatPrompt.ask('x', default=self.xFLU)
+            self.hfovPitchRatio = FloatPrompt.ask('hfov/pitch', default=self.hfovPitchRatio)
+            self.theTime = FloatPrompt.ask('THE Time', default=self.theTime)
+        self.xyFLU = np.array([self.xFLU, 0])
 
         print(
             f'Front length: {self.frontLength:.2f} / m, '
