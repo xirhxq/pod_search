@@ -1,7 +1,8 @@
 import numpy as np
 
 class SearchPoint:
-    def __init__(self, uavPosF=300, uavPosL=0, uavPosU=40, uavYaw=0, timeout=10):
+    def __init__(self, id, uavPosF, uavPosL, uavPosU, uavYaw, timeout):
+        self.id = id
         self.uavPosF = uavPosF
         self.uavPosL = uavPosL
         self.uavPosU = uavPosU

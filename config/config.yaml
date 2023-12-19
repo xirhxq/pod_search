@@ -4,12 +4,14 @@ SearchArea:
   rightLength: 1500
 
 SearchPoints:
-  - uavPosF: 300
+  - id: 0
+    uavPosF: 300
     uavPosL: 0
     uavPosU: 40
     uavYaw: 90
     timeout: 10
-  - uavPosF: 300
+  - id: 1
+    uavPosF: 300
     uavPosL: 0
     uavPosU: 40
     uavYaw: -90

@@ -429,7 +429,7 @@ class PodSearch:
         self.expectedPodAngles = self.tra[0]
         self.pubPYZMaxRate()
         self.searchPointPub.publish(data=self.searchPoints[self.searchViewCnt].toList())
-        if self.uavState % 10 == 1:
+        if self.uavState % 10 == 1 and self.uavState // 100 == self.searchPoints[self.searchViewCnt].id:
             self.toStepSearch()
 
     @stepEntrance
