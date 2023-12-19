@@ -3,6 +3,8 @@
 import time
 import yaml
 import argparse
+import datetime
+import pyfiglet
 import subprocess
 import numpy as np
 from os import system
@@ -243,6 +245,23 @@ class PodSearch:
         print(f'{len(self.searchPoints) = }')
         print(BOLD, BLUE, self.searchPoints, RESET)
         input('Type anything to continue...')
+
+        self.waitForStart()
+
+    def waitForStart(self):
+        startTime = datetime.datetime.now()
+        if self.args.start == 'minute':
+            startTime = (startTime + datetime.timedelta(minutes=1)).replace(second=0, microsecond=0)
+        elif self.args.start == 'hour':
+            startTime = (startTime + datetime.timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+
+        while datetime.datetime.now() < startTime:
+            system('clear')
+            print(RED + BOLD + f'Set start at {startTime}' + RESET)
+            remainingTime = startTime - datetime.datetime.now()
+            countDownStr = str(remainingTime).split('.')[0]
+            print(pyfiglet.figlet_format(countDownStr))
+            time.sleep(1)
 
     def targetPosCallback(self, msg):
         self.targetPos = np.array([[msg.data[0]], [msg.data[1]], [0]])
@@ -626,6 +645,7 @@ if __name__ == '__main__':
     parser.add_argument('--dock', help='look at dock', action='store_true')
     parser.add_argument('--fast', help='using default paras & skip confirmation', action='store_true')
     parser.add_argument('--bag', help='rosbag record', action='store_false')
+    parser.add_argument('--start', choices=['now', 'minute', 'hour'], default='minute')
     args, unknown = parser.parse_known_args()
 
     if args.bag:
