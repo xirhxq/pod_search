@@ -2,7 +2,7 @@
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from math import degrees, atan, tan, radians, sin, cos, sqrt
+from math import degrees, atan, tan, radians, sin, cos, sqrt, asin
 import numpy as np
 from rich.prompt import FloatPrompt
 
@@ -45,8 +45,8 @@ class AutoTra:
             f'f={self.frontLength:.0f}, '
             f'l={self.leftLength:.0f}, '
             f'r={self.rightLength:.0f}, '
-            f'h/p={self.hfovPitchRatio:.1f}, '
-            f'T={self.theTime:.1f})'
+            f'T={self.theTime:.1f}, '
+            f'w={self.widthRatio:.1f})'
         )
 
     def __init__(self,
@@ -70,17 +70,19 @@ class AutoTra:
             (config['ray'][0], config['ray'][1], config['ray'][2] - 90)
         )
         self.xFLU = float(config['xFLU'])
-        self.hfovPitchRatio = float(config['hfovPitchRatio'])
         self.theTime = float(config['theTime'])
+        self.widthRatio = float(config['widthRatio'])
         if not fast:
             self.height = FloatPrompt.ask('height', default=self.height, show_default=True)
             self.frontLength = FloatPrompt.ask('front length', default=self.frontLength)
             self.leftLength = FloatPrompt.ask('left length', default=self.leftLength)
             self.rightLength = FloatPrompt.ask('right length', default=self.rightLength)
             self.xFLU = FloatPrompt.ask('x', default=self.xFLU)
-            self.hfovPitchRatio = FloatPrompt.ask('hfov/pitch', default=self.hfovPitchRatio)
+            self.widthRatio = FloatPrompt.ask('width ratio', default=self.widthRatio)
             self.theTime = FloatPrompt.ask('THE Time', default=self.theTime)
         self.xyFLU = np.array([self.xFLU, 0])
+        self.vesselLength = 10
+        self.horizonLength = self.vesselLength / self.widthRatio
 
         print(
             f'Front length: {self.frontLength:.2f} / m, '
@@ -105,7 +107,7 @@ class AutoTra:
             return self.getPitchFromR(rr)
 
         def overlap(p, m):
-            hFov = self.getHFovFromPitch(p)
+            hFov = self.getHFovFromTopPitch(p)
             vFov = PodParas.getVFovFromHFov(hFov)
             overlapRatio = 0.1
             gap = overlapM(m) - p
@@ -144,7 +146,7 @@ class AutoTra:
         while nowMinP > self.pRange[1]:
             self.pitches.append(getNewP(nowMinP))
             nowP = self.pitches[-1]
-            nowVFov = self.getVFovFromPitch(nowP)
+            nowVFov = self.getVFovFromTopPitch(nowP)
             nowMinP = min(nowMinP, nowP - nowVFov / 2)
             nowMaxP = min(nowMaxP, nowP + nowVFov / 2)
             # print(f'podP: {self.pitches[-1]:.12f} [{nowMinP:.2f}, {nowMaxP:.2f}]')
@@ -152,10 +154,10 @@ class AutoTra:
         print('-' * 10 + 'Pod P Results' + '-' * 10)
         for ind, podP in enumerate(self.pitches):
             print(f'### Round {ind + 1}')
-            print(f'p: {podP:.12f} -> hfov: {self.getHFovFromPitch(podP):.2f}')
+            print(f'p: {podP:.12f} -> hfov: {self.getHFovFromTopPitch(podP):.2f}')
             print(f'yawRange: {self.getYawRangeFromPitch(podP, addHfov=False)}')
-            print(f'p Range: {podP - self.getVFovFromPitch(podP) / 2:.2f} ~ {podP + self.getVFovFromPitch(podP) / 2:.2f}')
-            print(f'R Range: {self.getRFromPitch(podP - self.getVFovFromPitch(podP) / 2):.2f} ~ {self.getRFromPitch(podP + self.getVFovFromPitch(podP) / 2):.2f}')
+            print(f'p Range: {podP - self.getVFovFromTopPitch(podP) / 2:.2f} ~ {podP + self.getVFovFromTopPitch(podP) / 2:.2f}')
+            print(f'R Range: {self.getRFromPitch(podP - self.getVFovFromTopPitch(podP) / 2):.2f} ~ {self.getRFromPitch(podP + self.getVFovFromTopPitch(podP) / 2):.2f}')
             pass
         print('-' * 30)
 
@@ -163,7 +165,7 @@ class AutoTra:
         self.expectedTime = 0
 
         for ind, podP in enumerate(self.pitches):
-            hfov = self.getHFovFromPitch(podP)
+            hfov = self.getHFovFromTopPitch(podP)
             yRange = self.getYawRangeFromPitch(podP, addHfov=False)
             if ind % 2 == 0:
                 yRange = yRange[::-1]
@@ -178,8 +180,11 @@ class AutoTra:
         print('################')
         print(f'Expected Total Time: {self.expectedTime:.2f}')
 
+    def clipPitch(self, pitch):
+        return min(self.pRange[0], max(self.pRange[1], pitch))
+
     def getRFromPitch(self, pitch):
-        pitchCliped = min(self.pRange[0], max(self.pRange[1], pitch))
+        pitchCliped = self.clipPitch(pitch)
         r = self.height / tan(radians(pitchCliped))
         return r
 
@@ -190,11 +195,17 @@ class AutoTra:
         r = self.getRFromPitch(pitch)
         return np.array([r * cos(radians(yaw)), r * sin(radians(yaw))]) + self.xyFLU
 
-    def getHFovFromPitch(self, pitch):
+    def getHfovFromCenterPitch(self, pitch):
         if not self.pitchLevelOn:
             return pitch
-        hfovExact = PodParas.clipHfov(self.hfovPitchRatio * pitch)
-        # print(f'Pitch: {pitch:.2f} -> Hfov: {hfovExact:.2f}')
+        r = self.getRFromPitch(pitch)
+        halfL = min(self.horizonLength / 2, r)
+        hfovExact = PodParas.clipHfov(
+            2 * degrees(asin(
+                halfL / r
+            ))
+        )
+        # print(f'{pitch = :.2f} -> {hfovExact = :.2f}')
         fExact = PodParas.getFFromHfov(hfovExact)
         # print(f'F: {fExact:.2f}')
         fLevel = PodParas.getZoomLevelFromF(fExact)
@@ -202,8 +213,32 @@ class AutoTra:
         # print(f'fLevel: {fLevel:.2f} -> hfovLevel: {hfovLevel:.2f}')
         return PodParas.clipHfov(hfovLevel)
 
-    def getVFovFromPitch(self, pitch):
-        return PodParas.getVFovFromHFov(self.getHFovFromPitch(pitch))
+    def getHFovFromTopPitch(self, pitch):
+        if not self.pitchLevelOn:
+            return pitch
+        hfovExact = PodParas.clipHfov(PodParas.getHfovFromVFov(
+            degrees(atan(
+                sin(radians(pitch)) /
+                (2 * PodParas.imageRatio * self.height / self.horizonLength + cos(radians(pitch)))
+            )) * 2
+        ))
+        # print(f'{pitch = :.2f} -> {hfovExact = :.2f}')
+        fExact = PodParas.getFFromHfov(hfovExact)
+        # print(f'F: {fExact:.2f}')
+        fLevel = PodParas.getZoomLevelFromF(fExact)
+        hfovLevel = PodParas.getHfovFromF(fLevel * PodParas.zoomUnit)
+        # print(f'fLevel: {fLevel:.2f} -> hfovLevel: {hfovLevel:.2f}')
+        return PodParas.clipHfov(hfovLevel)
+
+    def getVFovFromTopPitch(self, pitch):
+        return PodParas.getVFovFromHFov(self.getHFovFromTopPitch(pitch))
+
+    def getVfovFromCenterPitch(self, pitch):
+        return PodParas.getVFovFromHFov(self.getHfovFromCenterPitch(pitch))
+
+    def getHorizonLengthFromPitchHfov(self, pitch, hfov):
+        r = self.getRFromPitch(pitch)
+        return 2 * r * sin(radians(hfov / 2))
 
     def getYawRangeFromPitch(self, pitch, addHfov):
         if addHfov:
@@ -213,12 +248,12 @@ class AutoTra:
             )
         else:
             return (
-                -self.getOneSideMaxYawFromPitch(pitch, self.rightLength) + self.getHFovFromPitch(pitch) / 2,
-                self.getOneSideMaxYawFromPitch(pitch, self.leftLength) - self.getHFovFromPitch(pitch) / 2
+                -self.getOneSideMaxYawFromPitch(pitch, self.rightLength) + self.getHFovFromTopPitch(pitch) / 2,
+                self.getOneSideMaxYawFromPitch(pitch, self.leftLength) - self.getHFovFromTopPitch(pitch) / 2
             )
 
     def getOneSideMaxYawFromPitch(self, pitch, sideLength):
-        vFov = self.getVFovFromPitch(pitch)
+        vFov = self.getVFovFromTopPitch(pitch)
         biggerPitch = pitch + vFov / 2
         rWithBiggerPitch = self.getRFromPitch(biggerPitch)
         smallerPitch = pitch - vFov / 2
@@ -272,8 +307,8 @@ class AutoTra:
         ax.add_artist(arc)
 
     def drawOneGlance(self, ax, pitch, yaw):
-        hFov = self.getHFovFromPitch(pitch)
-        vFov = self.getVFovFromPitch(pitch)
+        hFov = self.getHFovFromTopPitch(pitch)
+        vFov = self.getVFovFromTopPitch(pitch)
         ax.add_artist(
             patches.Wedge(
                 self.xyFLU,
@@ -299,10 +334,10 @@ class AutoTra:
         ax.plot([prePos[0], nxtPos[0]], [prePos[1], nxtPos[1]], color=color, alpha=alpha, linewidth=2)
 
     def drawSearchAnnulus(self, ax, pitch, color='blue', alpha=0.5, rev=False):
-        hFov = self.getHFovFromPitch(pitch)
-        vFov = self.getVFovFromPitch(pitch)
+        hFov = self.getHFovFromTopPitch(pitch)
+        vFov = self.getVFovFromTopPitch(pitch)
         yawRange = self.getYawRangeFromPitch(pitch, addHfov=True)
-        print(f'This round P: {pitch:.2f} Yaw Range: {yawRange} Hfov: {self.getHFovFromPitch(pitch):.2f}')
+        print(f'This round P: {pitch:.2f} Yaw Range: {yawRange} Hfov: {self.getHFovFromTopPitch(pitch):.2f}')
         self.drawSectorRing(
             ax=ax,
             inner_radius=self.getRFromPitch(pitch + vFov / 2),
@@ -338,7 +373,7 @@ class AutoTra:
         ])
 
     def draw(self):
-        self.fig = plt.figure(figsize=(20, 20))
+        self.fig = plt.figure(figsize=(10, 10))
         self.ax = self.fig.add_subplot(111)
         self.ax.set_aspect('equal')
         self.ax.set_xlim(self.inflateInterval([0, self.frontLength], ratio=0.3))
@@ -364,13 +399,60 @@ class AutoTra:
             color = self.cmap(ind)
             self.drawSearchAnnulus(self.ax, p, color=color, alpha=0.3, rev=(ind % 2 == 0))
 
+        self.ax.set_title(f'Auto Tra {self}, Total Time: {self.expectedTime:.2f} seconds')
+        plt.show()
+
+    def drawHorizonLength(self):
+        self.fig = plt.figure(figsize=(14,  6))
+        self.axes = self.fig.subplots(1, 2)
+        for ind, p in enumerate(self.pitches):
+            hfov = self.getHFovFromTopPitch(p)
+            pList = np.linspace(p - self.getVFovFromTopPitch(p) / 2, p + self.getVFovFromTopPitch(p) / 2, 100)
+            rList = [self.getRFromPitch(p) for p in pList]
+            hlList = [self.getHorizonLengthFromPitchHfov(p, hfov) for p in pList]
+            self.axes[0].plot(rList, hlList, color=self.cmap(ind))
+            self.axes[0].plot(self.getRFromPitch(p), self.getHorizonLengthFromPitchHfov(p, hfov), '*', color=self.cmap(ind))
+            self.axes[1].plot(pList, hlList, color=self.cmap(ind))
+            self.axes[1].plot(p, self.getHorizonLengthFromPitchHfov(p, hfov), '*', color=self.cmap(ind))
+
+        self.axes[0].set_xlabel('R / m')
+        self.axes[0].set_ylabel('Horizon Length / m')
+        self.axes[1].set_xlabel('Pitch / deg')
+        self.axes[1].set_ylabel('Horizon Length / m')
+        plt.show()
+
+    def drawHfovFromP(self):
+        pList = np.linspace(self.pRange[1], self.pRange[0], 100)
+        self.fig = plt.figure()
+        self.ax = self.fig.add_subplot(111)
+        self.ax.plot(pList, [self.getHFovFromTopPitch(p) for p in pList], label='Consider Top Horizon')
+        self.ax.plot(pList, [self.getHfovFromCenterPitch(p) for p in pList], label='Consider Centre Horizon')
+        self.ax.set_xlabel('Pitch / deg')
+        self.ax.set_ylabel('Hfov / deg')
+        self.ax.legend()
         plt.show()
 
 
 if __name__ == '__main__':
     autoTra = AutoTra(
         pitchLevelOn=True,
-        overlapOn=True,
-        drawNum=-1
+        overlapOn=False,
+        drawNum=-1,
+        config={
+            'areaPoints': [
+                (0, 1700),
+                (2000, 1700),
+                (2000, -1500),
+                (0, -1500)
+            ],
+            'ray': (1000, 0, 90),
+            'xFLU': 0,
+            'height': 40,
+            'theTime': 3,
+            'widthRatio': 0.06
+        },
+        fast=True
     )
+    # autoTra.drawHfovFromP()
     autoTra.draw()
+    autoTra.drawHorizonLength()
