@@ -32,3 +32,6 @@ def clipHfov(hfov):
 
 def getVFovFromHFov(hFov):
     return 2 * degrees(atan(tan(radians(hFov / 2)) / imageRatio))
+
+def getHfovFromVFov(vFov):
+    return 2 * degrees(atan(tan(radians(vFov / 2)) * imageRatio))
