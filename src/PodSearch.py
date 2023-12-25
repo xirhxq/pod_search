@@ -164,10 +164,10 @@ class PodSearch:
                         drawNum=-1,
                         fast=self.args.fast,
                         config={
-                            'height': view['uavPosU'],
                             'areaPoints': self.searchAreaPoints,
-                            'ray': (view['uavPosF'], view['uavPosL'], view['uavYaw']),
-                            'xFLU': 0,
+                            'uavPos': (view['uavPosF'], view['uavPosL'], view['uavPosU']),
+                            'yaw': view['uavYaw'],
+                            'yawRange': view['yawRange'],
                             'hfovPitchRatio': round['hfovPitchRatio'],
                             'theTime': round['theTime']
                         }
