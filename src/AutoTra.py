@@ -2,51 +2,28 @@
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from math import degrees, atan, tan, radians, sin, cos, sqrt, asin
+from math import degrees, atan, tan, radians, sin, cos, sqrt, asin, atan2
 import numpy as np
 from rich.prompt import FloatPrompt
+from shapely.geometry import Point, Polygon
 
 import PodParas
 from PodAngles import PodAngles
 
-def intersectLength(polygonPoints, ray):
-    rayX, rayY, phi = ray
-    phiRad = np.radians(phi)
-    dirX, dirY = np.cos(phiRad), np.sin(phiRad)
-    intersects = []
 
-    for i in range(len(polygonPoints)):
-        x1, y1 = polygonPoints[i]
-        x2, y2 = polygonPoints[(i + 1) % len(polygonPoints)]
-        edgeDirX, edgeDirY = x2 - x1, y2 - y1
-
-        det = dirX * edgeDirY - dirY * edgeDirX
-        if det != 0:
-            t = -((rayX - x1) * edgeDirY - (rayY - y1) * edgeDirX) / det
-            u = -((rayX - x1) * dirY - (rayY - y1) * dirX) / det
-            if t >= 0 and u >= 0 and u <= 1:
-                intersectX, intersectY = rayX + t * dirX, rayY + t * dirY
-                intersects.append((intersectX, intersectY))
-
-    minLength = 2000
-    closetPoint = None
-    for point in intersects:
-        length = np.sqrt((point[0] - rayX) ** 2 + (point[1] - rayY) ** 2)
-        if length < minLength:
-            minLength = length
-            closetPoint = point
-    return minLength
+def inflateInterval(interval, ratio):
+    return [interval[0] - (interval[1] - interval[0]) * ratio / 2, interval[1] + (interval[1] - interval[0]) * ratio / 2]
 
 
 class AutoTra:
     def __repr__(self):
         return (
-            f'(h={self.height:.0f}, '
-            f'f={self.frontLength:.0f}, '
-            f'l={self.leftLength:.0f}, '
-            f'r={self.rightLength:.0f}, '
+            f'AutoTra('
+            f'uavPos=({self.uavPos.x:.1f}, {self.uavPos.y:.1f}), '
+            f'yaw={self.yaw:.1f}, '
+            f'yawRange={self.config["yawRange"]:.1f}, '
             f'T={self.theTime:.1f}, '
-            f'w={self.widthRatio:.1f})'
+            f'w={self.widthRatio:.2f})'
         )
 
     def __init__(self,
@@ -56,41 +33,41 @@ class AutoTra:
                  fast=False,
                  config=None
         ):
-        self.height = float(config['height'])
-        self.frontLength = intersectLength(
-            config['areaPoints'],
-            (config['ray'][0], config['ray'][1], config['ray'][2])
-        )
-        self.leftLength = intersectLength(
-            config['areaPoints'],
-            (config['ray'][0], config['ray'][1], config['ray'][2] + 90)
-        )
-        self.rightLength = intersectLength(
-            config['areaPoints'],
-            (config['ray'][0], config['ray'][1], config['ray'][2] - 90)
-        )
-        self.xFLU = float(config['xFLU'])
+        self.config = config
+        self.area = Polygon(self.config['areaPoints'])
+        self.uavPos = Point(self.config['uavPos'][0][0], self.config['uavPos'][1][0])
+        self.height = self.config['uavPos'][2][0]
+        self.yaw = self.config['yaw']
+        self.yaws = [self.yaw - self.config['yawRange'] / 2, self.yaw + self.config['yawRange'] / 2]
+        self.yawLinspaceDeg = np.linspace(self.yaws[0], self.yaws[1], 100)
         self.theTime = float(config['theTime'])
         self.widthRatio = float(config['widthRatio'])
         if not fast:
-            self.height = FloatPrompt.ask('height', default=self.height, show_default=True)
-            self.frontLength = FloatPrompt.ask('front length', default=self.frontLength)
-            self.leftLength = FloatPrompt.ask('left length', default=self.leftLength)
-            self.rightLength = FloatPrompt.ask('right length', default=self.rightLength)
-            self.xFLU = FloatPrompt.ask('x', default=self.xFLU)
             self.widthRatio = FloatPrompt.ask('width ratio', default=self.widthRatio)
             self.theTime = FloatPrompt.ask('THE Time', default=self.theTime)
-        self.xyFLU = np.array([self.xFLU, 0])
+
         self.vesselLength = 10
         self.horizonLength = self.vesselLength / self.widthRatio
 
-        print(
-            f'Front length: {self.frontLength:.2f} / m, '
-            f'Left length: {self.leftLength:.2f} / m, '
-            f'Right length: {self.rightLength:.2f} / m, '
-            f'xy FLU: {self.xyFLU}, '
-            f'height: {self.height:.2f}'
-        )
+        self.range2DMax = 0
+        for point in self.area.exterior.coords:
+            self.range2DMax = max(
+                self.range2DMax,
+                sqrt((point[0] - self.uavPos.x) ** 2 + (point[1] - self.uavPos.y) ** 2)
+            ) * 2
+
+        self.raysPolygonPointList = [self.uavPos]
+        for yawDeg in self.yawLinspaceDeg:
+            yaw = radians(yawDeg)
+            self.raysPolygonPointList.append(
+                Point(
+                    self.uavPos.x + self.range2DMax * cos(yaw),
+                    self.uavPos.y + self.range2DMax * sin(yaw)
+                )
+            )
+        self.raysPolygon = Polygon(self.raysPolygonPointList)
+
+        self.searchPolygon = self.raysPolygon.intersection(self.area)
 
         self.cmap = plt.get_cmap('tab10')
 
@@ -124,19 +101,13 @@ class AutoTra:
                     l = mid
             return l
 
-        self.pRange = [90, 0]
-        if self.xyFLU[0] < 0:
-            self.pRange[0] = degrees(atan(self.height / (-self.xyFLU[0])))
-
-        self.pRange[1] = degrees(atan(
-            self.height /
-            sqrt(
-                (self.frontLength - self.xyFLU[0]) ** 2 +
-                max(self.leftLength, self.rightLength) ** 2
-            )
-        ))
-
-        # self.pRange[0] = 50
+        self.distToSearchPolygon = self.uavPos.distance(self.searchPolygon)
+        self.pMax = self.getPitchFromR(self.distToSearchPolygon)
+        self.pRange = [self.pMax, self.pMax]
+        for point in self.searchPolygon.exterior.coords:
+            range2D = sqrt((point[0] - self.uavPos.x) ** 2 + (point[1] - self.uavPos.y) ** 2)
+            p = self.getPitchFromR(range2D)
+            self.pRange[1] = min(self.pRange[1], p)
 
         print('pRange:', self.pRange)
         nowMinP = self.pRange[0]
@@ -151,22 +122,21 @@ class AutoTra:
             nowMaxP = min(nowMaxP, nowP + nowVFov / 2)
             # print(f'podP: {self.pitches[-1]:.12f} [{nowMinP:.2f}, {nowMaxP:.2f}]')
 
-        print('-' * 10 + 'Pod P Results' + '-' * 10)
-        for ind, podP in enumerate(self.pitches):
-            print(f'### Round {ind + 1}')
-            print(f'p: {podP:.12f} -> hfov: {self.getHFovFromTopPitch(podP):.2f}')
-            print(f'yawRange: {self.getYawRangeFromPitch(podP, addHfov=False)}')
-            print(f'p Range: {podP - self.getVFovFromTopPitch(podP) / 2:.2f} ~ {podP + self.getVFovFromTopPitch(podP) / 2:.2f}')
-            print(f'R Range: {self.getRFromPitch(podP - self.getVFovFromTopPitch(podP) / 2):.2f} ~ {self.getRFromPitch(podP + self.getVFovFromTopPitch(podP) / 2):.2f}')
-            pass
-        print('-' * 30)
-
         self.theList = []
         self.expectedTime = 0
 
         for ind, podP in enumerate(self.pitches):
             hfov = self.getHFovFromTopPitch(podP)
             yRange = self.getYawRangeFromPitch(podP, addHfov=False)
+            pRange = (podP - PodParas.getVFovFromHFov(hfov) / 2, podP + PodParas.getVFovFromHFov(hfov) / 2)
+            rRange = [self.getRFromPitch(p) for p in pRange]
+
+            print(f'### Round {ind + 1}')
+            print(f'{podP=:.2f} -> {hfov=:.2f}')
+            print(f'{yRange=}')
+            print(f'{pRange=}')
+            print(f'{rRange=}')
+
             if ind % 2 == 0:
                 yRange = yRange[::-1]
             print(f'[{podP:.6f}, {yRange[0]:.2f}, {hfov:.2f}, 20], [{podP:.6f}, {yRange[1]:.2f}, {hfov:.2f}, {hfov/self.theTime:.2f}]')
@@ -180,6 +150,24 @@ class AutoTra:
         print('################')
         print(f'Expected Total Time: {self.expectedTime:.2f}')
 
+    def adjustAndShow(self, ax):
+        ax.set_xlim(min(self.config['areaPoints'], key=lambda x: x[0])[0], max(self.config['areaPoints'], key=lambda x: x[0])[0])
+        ax.set_ylim(min(self.config['areaPoints'], key=lambda x: x[1])[1], max(self.config['areaPoints'], key=lambda x: x[1])[1])
+        # make sure that xlim & ylim include self.uavPos
+        ax.set_xlim(min(ax.get_xlim()[0], self.uavPos.x), max(ax.get_xlim()[1], self.uavPos.x))
+        ax.set_ylim(min(ax.get_ylim()[0], self.uavPos.y), max(ax.get_ylim()[1], self.uavPos.y))
+        ax.set_xlim(inflateInterval(ax.get_xlim(), 0.1))
+        ax.set_ylim(inflateInterval(ax.get_ylim(), 0.1))
+        ax.set_aspect('equal')
+        plt.show()
+
+    def drawBasic(self, ax):
+        ax.add_patch(patches.Polygon(self.area.exterior.coords, color='k', alpha=0.2))
+
+    def drawPoly(self, ax):
+        # self.ax.add_patch(patches.Polygon(self.raysPolygon.exterior.coords, color='r', alpha=0.2))
+        ax.add_patch(patches.Polygon(self.searchPolygon.exterior.coords, color='b', alpha=0.2))
+
     def clipPitch(self, pitch):
         return min(self.pRange[0], max(self.pRange[1], pitch))
 
@@ -189,11 +177,16 @@ class AutoTra:
         return r
 
     def getPitchFromR(self, r):
+        if r < 1e-3:
+            return 90
         return degrees(atan(self.height / r))
 
     def getPosFromPitchYaw(self, pitch, yaw):
         r = self.getRFromPitch(pitch)
-        return np.array([r * cos(radians(yaw)), r * sin(radians(yaw))]) + self.xyFLU
+        return np.array([
+            r * cos(radians(yaw + self.yaw)) + self.uavPos.x,
+            r * sin(radians(yaw + self.yaw)) + self.uavPos.y
+        ])
 
     def getHfovFromCenterPitch(self, pitch):
         if not self.pitchLevelOn:
@@ -205,13 +198,7 @@ class AutoTra:
                 halfL / r
             ))
         )
-        # print(f'{pitch = :.2f} -> {hfovExact = :.2f}')
-        fExact = PodParas.getFFromHfov(hfovExact)
-        # print(f'F: {fExact:.2f}')
-        fLevel = PodParas.getZoomLevelFromF(fExact)
-        hfovLevel = PodParas.getHfovFromF(fLevel * PodParas.zoomUnit)
-        # print(f'fLevel: {fLevel:.2f} -> hfovLevel: {hfovLevel:.2f}')
-        return PodParas.clipHfov(hfovLevel)
+        return PodParas.getHfovFromExactHfov(hfovExact)
 
     def getHFovFromTopPitch(self, pitch):
         if not self.pitchLevelOn:
@@ -222,13 +209,7 @@ class AutoTra:
                 (2 * PodParas.imageRatio * self.height / self.horizonLength + cos(radians(pitch)))
             )) * 2
         ))
-        # print(f'{pitch = :.2f} -> {hfovExact = :.2f}')
-        fExact = PodParas.getFFromHfov(hfovExact)
-        # print(f'F: {fExact:.2f}')
-        fLevel = PodParas.getZoomLevelFromF(fExact)
-        hfovLevel = PodParas.getHfovFromF(fLevel * PodParas.zoomUnit)
-        # print(f'fLevel: {fLevel:.2f} -> hfovLevel: {hfovLevel:.2f}')
-        return PodParas.clipHfov(hfovLevel)
+        return PodParas.getHfovFromExactHfov(hfovExact)
 
     def getVFovFromTopPitch(self, pitch):
         return PodParas.getVFovFromHFov(self.getHFovFromTopPitch(pitch))
@@ -240,51 +221,71 @@ class AutoTra:
         r = self.getRFromPitch(pitch)
         return 2 * r * sin(radians(hfov / 2))
 
+    def getAbsYawFromPos(self, pos: Point):
+        return degrees(atan2(pos.y - self.uavPos.y, pos.x - self.uavPos.x))
+
+    def getRelYawFromPos(self, pos: Point):
+        return np.mod(self.getAbsYawFromPos(pos) - self.yaw + 180, 360) - 180
+
     def getYawRangeFromPitch(self, pitch, addHfov):
+        # if addHfov:
+        #     return (
+        #         -self.config['yawRange'] / 2,
+        #         self.config['yawRange'] / 2
+        #     )
+        # else:
+        #     return (
+        #         -self.config['yawRange'] / 2 + self.getHFovFromTopPitch(pitch) / 2,
+        #         self.config['yawRange'] / 2 - self.getHFovFromTopPitch(pitch) / 2
+        #     )
+        # r = self.getRFromPitch(pitch)
+        # print(f'{pitch=:.2f} {r=:.2f}')
+        rs = [
+            self.getRFromPitch(pitch),
+            self.getRFromPitch(pitch - self.getVFovFromTopPitch(pitch) / 2),
+            self.getRFromPitch(pitch + self.getVFovFromTopPitch(pitch) / 2)
+        ]
+
+        edgePoints = [
+            Point(
+                self.uavPos.x + r * cos(radians(yaw)),
+                self.uavPos.y + r * sin(radians(yaw))
+            )
+            for yaw in self.yawLinspaceDeg for r in rs
+        ]
+        # print(f'{edgePoints=}')
+
+        edgePoints = [
+            edgePoint
+            for edgePoint in edgePoints
+            if self.searchPolygon.buffer(10).contains(edgePoint)
+        ]
+        # print(f'{edgePoints=}')
+        edgeYaws = [
+            self.getRelYawFromPos(edgePoint)
+            for edgePoint in edgePoints
+        ]
+        # print(f'Rel {edgeYaws=}')
+        print(f'min: {min(edgeYaws):.2f} max: {max(edgeYaws):.2f}')
+
         if addHfov:
             return (
-                -self.getOneSideMaxYawFromPitch(pitch, self.rightLength),
-                self.getOneSideMaxYawFromPitch(pitch, self.leftLength)
+                min(edgeYaws),
+                max(edgeYaws)
             )
         else:
+            hFov = self.getHFovFromTopPitch(pitch)
             return (
-                -self.getOneSideMaxYawFromPitch(pitch, self.rightLength) + self.getHFovFromTopPitch(pitch) / 2,
-                self.getOneSideMaxYawFromPitch(pitch, self.leftLength) - self.getHFovFromTopPitch(pitch) / 2
+                min(edgeYaws) + hFov / 2,
+                max(edgeYaws) - hFov / 2
             )
-
-    def getOneSideMaxYawFromPitch(self, pitch, sideLength):
-        vFov = self.getVFovFromTopPitch(pitch)
-        biggerPitch = pitch + vFov / 2
-        rWithBiggerPitch = self.getRFromPitch(biggerPitch)
-        smallerPitch = pitch - vFov / 2
-        rWithSmallerPitch = self.getRFromPitch(smallerPitch)
-
-        rToCorner = sqrt(self.xyFLU[0] ** 2 + sideLength ** 2)
-
-        r = rToCorner
-        if rWithBiggerPitch < rWithSmallerPitch <= rToCorner:
-            r = rWithSmallerPitch
-        elif rToCorner <= rWithBiggerPitch < rWithSmallerPitch:
-            r = rWithBiggerPitch
-
-        mostFar = np.array([0, sqrt(r ** 2 - self.xyFLU[0] ** 2)])
-        if mostFar[1] > sideLength:
-            mostFar[0] = sqrt(r ** 2 - sideLength ** 2) + self.xyFLU[0]
-            mostFar[1] = sideLength
-
-        rel = mostFar - self.xyFLU
-        if rel[0] == 0:
-            return 90
-        else:
-            yaw = degrees(atan(rel[1] / rel[0]))
-            return yaw
 
     def drawSectorRing(self, ax, inner_radius, outer_radius, start_angle, end_angle, color='blue', alpha=0.2):
         sector = patches.Wedge(
-            self.xyFLU,
+            (self.uavPos.x, self.uavPos.y),
             outer_radius,
-            start_angle,
-            end_angle,
+            start_angle + self.yaw,
+            end_angle + self.yaw,
             width=outer_radius - inner_radius,
             facecolor=color,
             alpha=alpha,
@@ -294,12 +295,12 @@ class AutoTra:
 
     def drawRingTra(self, ax, radius, start_angle, end_angle, color='blue', alpha=1):
         arc = patches.Arc(
-            self.xyFLU,
+            (self.uavPos.x, self.uavPos.y),
             2*radius,
             2*radius,
             angle=0,
-            theta1=start_angle,
-            theta2=end_angle,
+            theta1=start_angle + self.yaw,
+            theta2=end_angle + self.yaw,
             color=color,
             alpha=alpha,
             linewidth=2
@@ -311,7 +312,7 @@ class AutoTra:
         vFov = self.getVFovFromTopPitch(pitch)
         ax.add_artist(
             patches.Wedge(
-                self.xyFLU,
+                (self.uavPos.x, self.uavPos.y),
                 self.getRFromPitch(pitch - vFov / 2),
                 yaw - hFov / 2,
                 yaw + hFov / 2,
@@ -363,44 +364,25 @@ class AutoTra:
         #     yaw=(yawRange[0] + hFov / 2) * (-1 if rev else 1)
         # )
 
-    def inflateInterval(self, interval=None, ratio=0.1):
-        if interval is None:
-            interval = [0, 1]
-        interval = np.array(interval)
-        return np.array([
-            interval[0] - (interval[1] - interval[0]) * ratio,
-            interval[1] + (interval[1] - interval[0]) * ratio
-        ])
+    def draw(self, ax):
+        ax.set_aspect('equal')
 
-    def draw(self):
-        self.fig = plt.figure(figsize=(10, 10))
-        self.ax = self.fig.add_subplot(111)
-        self.ax.set_aspect('equal')
-        self.ax.set_xlim(self.inflateInterval([0, self.frontLength], ratio=0.3))
-        self.ax.set_ylim(self.inflateInterval([-self.leftLength, self.rightLength], ratio=0.3))
-
-        self.ax.add_patch(
-            patches.Rectangle(
-                (0, -self.rightLength),
-                self.frontLength,
-                self.leftLength + self.rightLength,
-                facecolor='gray',
-                alpha=0.5,
-                edgecolor='black'
-            )
-        )
+        # self.drawBasic(ax=ax)
+        self.drawPoly(ax=ax)
 
         for ind, p in enumerate(self.pitches):
             if 0 < self.drawNum <= ind:
                 break
             print(f'--- Round #{ind + 1} ---')
             if ind > 0:
-                self.drawBetweenLine(self.ax, self.pitches[ind - 1], p, rev=(ind % 2 == 0), color='red', alpha=1.0)
+                self.drawBetweenLine(ax, self.pitches[ind - 1], p, rev=(ind % 2 == 0), color='red', alpha=1.0)
             color = self.cmap(ind)
-            self.drawSearchAnnulus(self.ax, p, color=color, alpha=0.3, rev=(ind % 2 == 0))
+            self.drawSearchAnnulus(ax, p, color=color, alpha=0.3, rev=(ind % 2 == 0))
 
-        self.ax.set_title(f'Auto Tra {self}, Total Time: {self.expectedTime:.2f} seconds')
-        plt.show()
+        if ax.get_title() != '':
+            ax.set_title(f'{ax.get_title()}\n{self}, Total Time:{self.expectedTime:.2f} seconds')
+        else:
+            ax.set_title(f'{self}, Total Time: {self.expectedTime:.2f} seconds')
 
     def drawHorizonLength(self):
         self.fig = plt.figure(figsize=(14,  6))
@@ -433,10 +415,12 @@ class AutoTra:
         plt.show()
 
 
-if __name__ == '__main__':
-    autoTra = AutoTra(
+def testMultipleAutoTras(n, baseYawDeg=0):
+    yawUnit = 360 / n
+    yaws = [yawUnit * i + baseYawDeg for i in range(n)]
+    autoTras = [AutoTra(
         pitchLevelOn=True,
-        overlapOn=False,
+        overlapOn=True,
         drawNum=-1,
         config={
             'areaPoints': [
@@ -445,14 +429,62 @@ if __name__ == '__main__':
                 (2000, -1500),
                 (0, -1500)
             ],
-            'ray': (1000, 0, 90),
-            'xFLU': 0,
-            'height': 40,
+            'uavPos': [
+                [1000],
+                [0],
+                [40]
+            ],
+            'yaw': yaw,
+            'yawRange': yawUnit,
             'theTime': 3,
             'widthRatio': 0.06
         },
         fast=True
     )
-    # autoTra.drawHfovFromP()
-    autoTra.draw()
-    autoTra.drawHorizonLength()
+    for yaw in yaws]
+
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(111)
+    autoTras[0].drawBasic(ax)
+    [at.draw(ax) for at in autoTras]
+    plt.show()
+
+
+def testSingleAutoTra():
+    autoTra = AutoTra(
+        pitchLevelOn=True,
+        overlapOn=True,
+        drawNum=-1,
+        config={
+            'areaPoints': [
+                (0, 1700),
+                (2000, 1700),
+                (2000, -1500),
+                (0, -1500)
+            ],
+            'uavPos': [
+                [1000],
+                [0],
+                [40]
+            ],
+            'yaw': 330,
+            'yawRange': 120,
+            'theTime': 3,
+            'widthRatio': 0.06
+        },
+        fast=True
+    )
+
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(111)
+    autoTra.drawBasic(ax)
+    autoTra.draw(ax)
+    plt.show()
+    # autoTra.draw(ax)
+    # autoTra.drawHorizonLength()
+    # print(autoTra.theList)
+
+
+if __name__ == '__main__':
+    testSingleAutoTra()
+    # testMultipleAutoTras(3, baseYawDeg=90)

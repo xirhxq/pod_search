@@ -33,5 +33,30 @@ def clipHfov(hfov):
 def getVFovFromHFov(hFov):
     return 2 * degrees(atan(tan(radians(hFov / 2)) / imageRatio))
 
+
 def getHfovFromVFov(vFov):
     return 2 * degrees(atan(tan(radians(vFov / 2)) * imageRatio))
+
+
+def getHfovFromExactHfov(hfovDeg):
+    return clipHfov(
+        getHfovFromF(
+            getZoomLevelFromF(
+                getFFromHfov(hfovDeg)
+            ) * zoomUnit
+        )
+    )
+
+
+if __name__ == '__main__':
+    import numpy as np
+    import matplotlib.pyplot as plt
+    hfovExactList = np.linspace(2.4, 60, 100)
+    hfovList = [
+        getHfovFromExactHfov(yaw)
+        for yaw in hfovExactList
+    ]
+    plt.plot(hfovExactList, hfovList)
+    plt.xlabel('exact hfov / deg')
+    plt.ylabel('hfov / deg')
+    plt.show()
