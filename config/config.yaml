@@ -45,7 +45,10 @@ dockData:
 searchConfig:
   - hfovPitchRatio: 3
     theTime: 6
+    widthRatio: 0.06
   - hfovPitchRatio: 3
     theTime: 10
+    widthRatio: 0.06
   - hfovPitchRatio: 3
     theTime: 15
+    widthRatio: 0.06

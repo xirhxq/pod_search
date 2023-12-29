@@ -169,7 +169,8 @@ class PodSearch:
                             'yaw': view['uavYaw'],
                             'yawRange': view['yawRange'],
                             'hfovPitchRatio': round['hfovPitchRatio'],
-                            'theTime': round['theTime']
+                            'theTime': round['theTime'],
+                            'widthRatio': round['widthRatio']
                         }
                     )
                 )
@@ -583,7 +584,7 @@ class PodSearch:
 
     def controlStateMachine(self):
         self.toc = self.getTimeNow()
-        self.searchStatePub.publish(Int16(self.state))
+        self.searchStatePub.publish(Int16(self.state.value))
         if self.uavState >= 4:
             self.uavReady = True
         if self.state == State.INIT:
