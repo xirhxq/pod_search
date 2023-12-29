@@ -143,6 +143,8 @@ class PodSearch:
         # [StepPrepare] search points pub
         self.searchPoints = [SearchPoint(**item) for item in self.config['SearchPoints']]
         print(f'Search Points: {self.searchPoints}')
+        self.backPoint = SearchPoint(**self.config['SearchPoints'][0])
+        self.backPoint.id = 6
         self.searchPointPub = rospy.Publisher(self.uavName + '/searchPoint', Float64MultiArray, queue_size=1)
         
         # [StepSearch] trajectory setting
@@ -572,6 +574,7 @@ class PodSearch:
         self.state = State.END
 
     def stepEnd(self):
+        self.searchPointPub.publish(data=self.backPoint.toList())
         if self.toc - self.tic >= 3.0:
             exit(0)
 
