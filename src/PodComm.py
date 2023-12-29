@@ -440,8 +440,13 @@ class POD_COMM:
 
     @property
     def fAtTarget(self):
-        if not (abs(self.expectedZoomLevel - self.podZoomLevel) < self.zTol):
-            self.fNotAtTargetTime = self.getTimeNow()
+        if self.expectedZoomLevel < 20:
+            if not (abs(self.expectedZoomLevel - self.podZoomLevel) < self.zTol):
+                self.fNotAtTargetTime = self.getTimeNow()
+        else:
+            if not (abs(self.expectedZoomLevel - self.podZoomLevel) < 2 * self.zTol):
+                self.fNotAtTargetTime = self.getTimeNow()
+
         return self.getTimeNow() - self.fNotAtTargetTime > 0.1
 
     @timer(tol=1 / HZ)
