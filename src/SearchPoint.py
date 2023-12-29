@@ -20,4 +20,4 @@ class SearchPoint:
         return f'({self.uavPosF}, {self.uavPosL}, {self.uavPosU}), {self.uavYaw} Deg, {self.timeout} seconds'
     
     def toList(self):
-        return [self.uavPosF, self.uavPosL, self.uavPosU, self.uavYaw, self.timeout]
+        return [self.id, self.uavPosF, self.uavPosL, self.uavPosU, self.uavYaw, self.timeout]
