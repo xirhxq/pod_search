@@ -35,8 +35,8 @@ class AutoTra:
         ):
         self.config = config
         self.area = Polygon(self.config['areaPoints'])
-        self.uavPos = Point(self.config['uavPos'][0][0], self.config['uavPos'][1][0])
-        self.height = self.config['uavPos'][2][0]
+        self.uavPos = Point(self.config['uavPos'][0], self.config['uavPos'][1])
+        self.height = self.config['uavPos'][2]
         self.yaw = self.config['yaw']
         self.yaws = [self.yaw - self.config['yawRange'] / 2, self.yaw + self.config['yawRange'] / 2]
         self.yawLinspaceDeg = np.linspace(self.yaws[0], self.yaws[1], 100)
