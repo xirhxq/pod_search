@@ -429,11 +429,7 @@ def testMultipleAutoTras(n, baseYawDeg=0):
                 (2000, -1500),
                 (0, -1500)
             ],
-            'uavPos': [
-                [1000],
-                [0],
-                [40]
-            ],
+            'uavPos': [1000, 0, 40],
             'yaw': yaw,
             'yawRange': yawUnit,
             'theTime': 3,
@@ -462,11 +458,7 @@ def testSingleAutoTra():
                 (2000, -1500),
                 (0, -1500)
             ],
-            'uavPos': [
-                [1000],
-                [0],
-                [40]
-            ],
+            'uavPos': [1000, 0, 40],
             'yaw': 330,
             'yawRange': 120,
             'theTime': 3,
