@@ -15,7 +15,7 @@ from rich.console import Console
 
 import rospy
 import rospkg
-from std_msgs.msg import Float32, Bool, Float64MultiArray, Int8, Int16, MultiArrayDimension, Header
+from std_msgs.msg import Float32, Bool, Float64MultiArray, Int8, Int16, MultiArrayDimension, Header, Float32MultiArray
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 from nav_msgs.msg import Odometry
 
@@ -131,6 +131,10 @@ class PodSearch:
         # From suav: suav control state
         self.uavState = 0
         rospy.Subscriber(self.uavName + '/uavState', Int16, lambda msg: setattr(self, 'uavState', msg.data))
+
+        # From suav: suav yaw
+        self.uavYawDeg = 0
+        rospy.Subscriber(self.uavName + '/xy_fcu/flight_data', Float32MultiArray, lambda msg: setattr(self, 'uavYawDeg', 450 - np.degrees(msg.data[15])))
 
         # To others: my state
         self.state = State.INIT
@@ -509,7 +513,7 @@ class PodSearch:
             ekfZ,
             self.uavPos,
             self.rP2BDelayed,
-            R.from_euler('zyx', [180, 0, 0], degrees=True).as_matrix().T
+            R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T
         )
         print(f'{self.ekfs[self.trackName].ekf.x = }')
         if self.trackName == 'usv':
