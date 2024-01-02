@@ -3,9 +3,11 @@
 import time
 import yaml
 import rich
+import copy
 import argparse
 import datetime
 import pyfiglet
+import itertools
 import subprocess
 import numpy as np
 from os import system
@@ -149,6 +151,11 @@ class PodSearch:
         print(f'Search Points: {self.searchPoints}')
         self.backPoint = SearchPoint(**self.config['SearchPoints'][0])
         self.backPoint.id = 6
+        self.dockPoint = SearchPoint(**self.config['SearchPoints'][0])
+        self.dockPoint.id = 65
+        self.dockPoint.uavYaw = 180
+        self.trackPoint = copy.deepcopy(self.dockPoint)
+        self.idGen = itertools.cycle((i for i in range(66, 89)))
         self.searchPointPub = rospy.Publisher(self.uavName + '/searchPoint', Float64MultiArray, queue_size=1)
         
         # [StepSearch] trajectory setting
@@ -435,7 +442,8 @@ class PodSearch:
             self.searchViewCnt = 0
             self.searchRoundCnt += 1
         if self.searchRoundCnt == len(self.autoTras):
-            self.toStepEnd()
+            self.toStepDock()
+            # self.toStepEnd()
             return
         self.autoTra = self.autoTras[self.searchRoundCnt][self.searchViewCnt]
         self.tra = self.autoTra.theList
@@ -482,9 +490,9 @@ class PodSearch:
         self.trackName = trackName
         self.trackData[trackName] = []
         self.ekfs[trackName] = LocatingEKF(initialT=self.getTimeNow())
-        if not self.podLaserOn:
-            self.expectedLaserOn = True
-            self.expectedLaserOnPub.publish(True)
+        # if not self.podLaserOn:
+        #     self.expectedLaserOn = True
+        #     self.expectedLaserOnPub.publish(True)
     
     def stepTrack(self):
         self.console.rule(
@@ -495,27 +503,33 @@ class PodSearch:
         self.console.print(
             f'{self.trackData[self.trackName]}'
         )
-        if self.landFlag == 1:
-            self.toStepEnd()
-        if self.getTimeNow() - self.lastUSVCaptureTime >= 5.0:
-            self.toStepRefind(self.trackName)
-        if not self.podLaserOn:
-            self.expectedLaserOn = True
-            self.expectedLaserOnPub.publish(True)
-        if self.trackName in self.trackData:
-            self.expectedPodAngles = self.trackData[self.trackName]
-            self.pubPYZMaxRate()
-        ekfZ = np.array([[self.podLaserRange], [self.usvCameraAzimuth], [self.usvCameraElevation], [self.uavPos[2][0]]])
-        if not (0 < ekfZ[0][0] < 4000 and ekfZ[1][0] is not None and ekfZ[2][0] is not None):
-            ekfZ = np.array([[0], [0], [0], [0]])
-        self.ekfs[self.trackName].newFrame(
-            self.getTimeNow(),
-            ekfZ,
-            self.uavPos,
-            self.rP2BDelayed,
-            R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T
-        )
+        # if self.landFlag == 1:
+        #     self.toStepEnd()
+        # if self.getTimeNow() - self.lastUSVCaptureTime >= 5.0:
+        #     self.toStepRefind(self.trackName)
+        # if not self.podLaserOn:
+        #     self.expectedLaserOn = True
+        #     self.expectedLaserOnPub.publish(True)
+        # if self.trackName in self.trackData:
+        #     self.expectedPodAngles = self.trackData[self.trackName]
+        #     self.pubPYZMaxRate()
+        # ekfZ = np.array([[self.podLaserRange], [self.usvCameraAzimuth], [self.usvCameraElevation], [self.uavPos[2][0]]])
+        # if not (0 < ekfZ[0][0] < 4000 and ekfZ[1][0] is not None and ekfZ[2][0] is not None):
+        #     ekfZ = np.array([[0], [0], [0], [0]])
+        # self.ekfs[self.trackName].newFrame(
+        #     self.getTimeNow(),
+        #     ekfZ,
+        #     self.uavPos,
+        #     self.rP2BDelayed,
+        #     R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T
+        # )
         print(f'{self.ekfs[self.trackName].ekf.x = }')
+        self.trackPoint.id = next(self.idGen)
+        self.trackPoint.uavYaw = (self.toc - self.tic) * 3 + self.dockPoint.uavYaw
+        self.searchPointPub.publish(self.trackPoint)
+        if self.toc - self.tic >= 60:
+            self.toStepEnd()
+        return
         if self.trackName == 'usv':
             if self.ekfs[self.trackName].ekf.x is not None:
                 usvPos = self.ekfs[self.trackName].ekf.x[:3].reshape((3, 1))
@@ -528,9 +542,9 @@ class PodSearch:
                     header=Header(frame_id='target'),
                     pose=Pose(
                         position=Point(
-                            x=usvToTargetENU[0][0], 
+                            x=usvToTargetENU[0][0],
                             y=usvToTargetENU[1][0]
-                        ), 
+                        ),
                         orientation=Quaternion(
                             w=usvToTargetTheta
                         )
@@ -570,7 +584,13 @@ class PodSearch:
     def stepDock(self):
         self.expectedPodAngles = self.dockData
         self.pubPYZMaxRate()
-        if self.toc - self.tic >= 10:
+        self.searchPointPub.publish(data=self.dockPoint.toList())
+        if (
+                self.toc - self.tic >= 10 and
+                self.isAtTarget() and
+                self.uavState % 10 == 1 and
+                self.uavState // 100 == self.dockPoint.id
+        ):
             self.toStepTrack('usv')
 
     @stepEntrance
