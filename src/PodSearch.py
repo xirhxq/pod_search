@@ -490,6 +490,7 @@ class PodSearch:
         self.trackName = trackName
         self.trackData[trackName] = []
         self.ekfs[trackName] = LocatingEKF(initialT=self.getTimeNow())
+        self.expectedLaserOn = False
         # if not self.podLaserOn:
         #     self.expectedLaserOn = True
         #     self.expectedLaserOnPub.publish(True)
@@ -526,7 +527,7 @@ class PodSearch:
         print(f'{self.ekfs[self.trackName].ekf.x = }')
         self.trackPoint.id = next(self.idGen)
         self.trackPoint.uavYaw = (self.toc - self.tic) * 3 + self.dockPoint.uavYaw
-        self.searchPointPub.publish(self.trackPoint)
+        self.searchPointPub.publish(data=self.trackPoint.toList())
         if self.toc - self.tic >= 60:
             self.toStepEnd()
         return
@@ -693,6 +694,7 @@ if __name__ == '__main__':
     parser.add_argument('--fast', help='using default paras & skip confirmation', action='store_true')
     parser.add_argument('--bag', help='rosbag record', action='store_false')
     parser.add_argument('--start', choices=['now', 'minute', 'hour'], default='minute')
+    parser.add_argument('--init', help='initial state', default='None')
     args, unknown = parser.parse_known_args()
 
     if args.bag:

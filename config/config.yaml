@@ -5,14 +5,14 @@ SearchArea:
 
 SearchPoints:
   - id: 0
-    uavPosF: 250
+    uavPosF: 200
     uavPosL: 0
     uavPosU: 20
     uavYaw: 0
     yawRange: 120
     timeout: 300
   - id: 1
-    uavPosF: 250
+    uavPosF: 200
     uavPosL: 0
     uavPosU: 20
     uavYaw: 90
@@ -24,21 +24,18 @@ uavInitialPos: [[0], [0], [10]]
 targetInitialPos: [[-156], [218], [0]]
 
 podInitialData:
-  pitchDeg: 0
+  pitchDeg: 30
   yawDeg: 0
   hfovDeg: 40
   maxRateDeg: 20
 
 dockData:
   pitchDeg: 20
-  yawDeg: -20
+  yawDeg: 0
   hfovDeg: 50
   maxRateDeg: 10
 
 searchConfig:
   - hfovPitchRatio: 3
     theTime: 2
-    widthRatio: 0.06
-  - hfovPitchRatio: 3
-    theTime: 3
     widthRatio: 0.06
