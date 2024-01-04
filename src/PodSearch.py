@@ -129,6 +129,7 @@ class PodSearch:
 
         # From localisation: location
         self.uavPos = np.array(self.config['uavInitialPos'])
+        rospy.Subscriber(self.uavName + '/uwb/filter/odom', Odometry, self.uavPosCallback, queue_size=1)
 
         # From suav: suav control state
         self.uavState = 0
@@ -136,7 +137,7 @@ class PodSearch:
 
         # From suav: suav yaw
         self.uavYawDeg = 0
-        rospy.Subscriber(self.uavName + '/xy_fcu/flight_data', Float32MultiArray, lambda msg: setattr(self, 'uavYawDeg', 450 - np.degrees(msg.data[15])))
+        rospy.Subscriber(self.uavName + '/xy_fcu/flight_data', Float32MultiArray, lambda msg: setattr(self, 'uavYawDeg', np.mod(450 - np.degrees(msg.data[15]), 360)))
 
         # To others: my state
         self.state = State.INIT
@@ -291,6 +292,9 @@ class PodSearch:
     def targetPosCallback(self, msg):
         self.targetPos = np.array([[msg.data[0]], [msg.data[1]], [0]])
 
+    def uavPosCallback(self, msg):
+        self.uavPos = np.array([[msg.twist.twist.linear.x], [msg.twist.twist.linear.y], [msg.twist.twist.linear.z]])
+
     @property
     def podPitchDeg(self):
         return self.podPitchBuffer.getMessageNoDelay()
@@ -412,6 +416,8 @@ class PodSearch:
         return min(PodParas.maxHfov, max(PodParas.minHfov, pitch * self.autoTra.hfovPitchRatio))
 
     def isAtTarget(self):
+        if self.args.head_only:
+            return self.toc - self.tic >= 5.0
         return (
                 self.podPitchAtTarget and
                 self.podYawAtTarget and
@@ -493,10 +499,18 @@ class PodSearch:
         #     self.expectedLaserOnPub.publish(True)
     
     def stepTrack(self):
+        self.trackPoint.id = next(self.idGen)
+        self.trackPoint.uavYaw = (self.toc - self.tic) * 3 + self.dockPoint.uavYaw
+        self.searchPointPub.publish(data=self.trackPoint.toList())
         self.console.rule(
             f'[bold blue]'
-            f'Tracking for {self.trackName}... '
-            f"{'[bold red] Laser on' if self.expectedLaserOn else '[bold green]off'}"
+            f'Tracking for {self.trackName}... Laser '
+            f"{'[bold red] on' if self.expectedLaserOn else '[bold green]off'}"
+        )
+        self.console.rule(
+            f'[bold blue]'
+            f'Search Point #{self.trackPoint.id}: '
+            f'{self.trackPoint}'
         )
         self.console.print(
             f'{self.trackData[self.trackName]}'
@@ -522,9 +536,6 @@ class PodSearch:
         #     R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T
         # )
         print(f'{self.ekfs[self.trackName].ekf.x = }')
-        self.trackPoint.id = next(self.idGen)
-        self.trackPoint.uavYaw = (self.toc - self.tic) * 3 + self.dockPoint.uavYaw
-        self.searchPointPub.publish(data=self.trackPoint.toList())
         if self.toc - self.tic >= 60:
             self.toStepEnd()
         return
@@ -583,6 +594,11 @@ class PodSearch:
         self.expectedPodAngles = self.dockData
         self.pubPYZMaxRate()
         self.searchPointPub.publish(data=self.dockPoint.toList())
+        self.console.rule(
+            f'[bold blue]'
+            f'Search Point #{self.dockPoint.id}: '
+            f'{self.dockPoint}'
+        )
         if (
                 self.toc - self.tic >= 10 and
                 self.isAtTarget() and
@@ -638,26 +654,35 @@ class PodSearch:
             f'{self.taskTime:.1f} '
             f'[blue3]'
             f'Step{self.state.name}[/] @ '
-            f'{self.toc - self.tic:.1f}, '
-            f'[red3]'
-            f'suav @ #{self.uavState}',
+            f'{self.toc - self.tic:.1f}',
             style=('green' if self.isAtTarget() else 'red')
         )
-        self.console.print(
-            f'Pitch: {self.podPitchDeg:.2f} -> {self.expectedPodAngles.pitchDeg:.2f} == {self.podCommFeedback.pitchDeg:.2f}',
-            style='green' if self.podPitchAtTarget else 'red',
-            justify='center'
+        self.console.rule(
+            f'[red3]'
+            f'suav in #{self.uavState} '
+            f'@ ({", ".join([f"{self.uavPos[i][0]:.2f}" for i in range(3)])}), {self.uavYawDeg:.2f} Deg'
         )
-        self.console.print(
-            f'Yaw: {self.podYawDeg:.2f} -> {self.expectedPodAngles.yawDeg:.2f} == {self.podCommFeedback.yawDeg:.2f}',
-            style='green' if self.podYawAtTarget else 'red',
-            justify='center'
-        )
-        self.console.print(
-            f'HFov: {self.podHfovDeg:.2f} -> {self.expectedPodAngles.hfovDeg:.2f} == {self.podCommFeedback.hfovDeg:.2f}',
-            style='green' if self.podHfovAtTarget else 'red',
-            justify='center'
-        )
+        if self.args.head_only:
+            self.console.print(
+                pyfiglet.figlet_format('Head Only'),
+                justify='center'
+            )
+        else:
+            self.console.print(
+                f'Pitch: {self.podPitchDeg:.2f} -> {self.expectedPodAngles.pitchDeg:.2f} == {self.podCommFeedback.pitchDeg:.2f}',
+                style='green' if self.podPitchAtTarget else 'red',
+                justify='center'
+            )
+            self.console.print(
+                f'Yaw: {self.podYawDeg:.2f} -> {self.expectedPodAngles.yawDeg:.2f} == {self.podCommFeedback.yawDeg:.2f}',
+                style='green' if self.podYawAtTarget else 'red',
+                justify='center'
+            )
+            self.console.print(
+                f'HFov: {self.podHfovDeg:.2f} -> {self.expectedPodAngles.hfovDeg:.2f} == {self.podCommFeedback.hfovDeg:.2f}',
+                style='green' if self.podHfovAtTarget else 'red',
+                justify='center'
+            )
         self.controlStateMachine()
         self.console.print(f'{self.vesselDict = }')
         self.console.print(f'{self.targetId = }')
@@ -688,6 +713,7 @@ if __name__ == '__main__':
     parser.add_argument('--bag', help='rosbag record', action='store_false')
     parser.add_argument('--start', choices=['now', 'minute', 'hour'], default='minute')
     parser.add_argument('--init', help='initial state', default='None')
+    parser.add_argument('--head-only', help='no pod', action='store_true')
     args, unknown = parser.parse_known_args()
 
     if args.bag:
