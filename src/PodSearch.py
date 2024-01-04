@@ -198,9 +198,6 @@ class PodSearch:
         # [StepSearch] target ids & its scores
         self.vesselDict = {}
 
-        # [StepSearch] ignore uav or not
-        self.uavReady = True if self.args.mode == 'test' else False
-
         # [StepSearch] selected target id
         self.targetId = None
 
@@ -431,7 +428,7 @@ class PodSearch:
             **self.config['podInitialData']
         )
         self.pubPYZMaxRate()
-        if self.isAtTarget() and self.uavReady:
+        if self.isAtTarget():
             self.toStepPrepare()
 
     @stepEntrance
@@ -613,8 +610,6 @@ class PodSearch:
     def controlStateMachine(self):
         self.toc = self.getTimeNow()
         self.searchStatePub.publish(Int16(self.state.value))
-        if self.uavState >= 4:
-            self.uavReady = True
         if self.state == State.INIT:
             self.stepInit()
         elif self.state == State.PREPARE:
@@ -686,8 +681,6 @@ class PodSearch:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--mode', choices=['test', 'takeoff'], default='takeoff')
-    parser.add_argument('--test', help='on ground test', action='store_true')
     parser.add_argument('--trackUSV', help='track usv', action='store_true')
     parser.add_argument('--trackVessel', help='track usv', action='store_true')
     parser.add_argument('--dock', help='look at dock', action='store_true')
