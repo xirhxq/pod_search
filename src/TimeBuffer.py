@@ -12,7 +12,7 @@ class TimeBuffer:
         self.maxAge = PodParas.podDelay
 
         self.preT = None
-        self.preMsg = None
+        self.preMsg = 0.0
 
     @property
     def empty(self):
@@ -30,7 +30,7 @@ class TimeBuffer:
 
     def getMessage(self):
         if not self.buffer:
-            return None
+            return self.getData(self.preMsg)
 
         currentTime = rospy.Time.now()
         targetTime = currentTime - rospy.Duration.from_sec(self.maxAge)
@@ -41,7 +41,7 @@ class TimeBuffer:
             self.buffer.popleft()
 
         if self.preT == None or self.preMsg == None:
-            return None
+            return self.getData(self.preMsg)
 
         if not (self.preT <= targetTime <= self.buffer[0][0]):
             raise AssertionError(f'Buffer not right {self.preT.to_sec():.3f} -- {targetTime.to_sec():3f} -- {self.buffer[0][0]:.3f}')
@@ -51,14 +51,14 @@ class TimeBuffer:
         val1 = self.getData(self.preMsg)
         val2 = self.getData(self.buffer[0][1])
 
-        ret =val1 + (val2 - val1) * (targetTime.to_sec() - t1) / (t2 - t1)
+        ret = val1 + (val2 - val1) * (targetTime.to_sec() - t1) / (t2 - t1)
         return ret
 
         return self.buffer[0][1].data
 
     def getMessageNoDelay(self):
         if not self.buffer:
-            return None
+            return self.getData(self.preMsg)
         currentTime = rospy.Time.now()
         targetTime = currentTime - rospy.Duration.from_sec(self.maxAge)
         while self.buffer and self.buffer[0][0] < targetTime:
@@ -66,6 +66,8 @@ class TimeBuffer:
             self.preMsg = self.buffer[0][1]
             self.buffer.popleft()
 
+        if not self.buffer:
+            return self.getData(self.preMsg)
         return self.buffer[-1][1].data
 
     def outputBuffer(self):
