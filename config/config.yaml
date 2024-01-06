@@ -55,3 +55,15 @@ targetSimilarityThreshold: 0.2
 onReportFaliure: 'next' # 'next' or 'remove'
 
 usvGuideSideLength: 500
+
+others:
+  - 'usv'
+  - 'tuav1'
+  - 'tuav2'
+  - 'tuav3'
+  - 'tuav6'
+  - 'streamer'
+
+related:
+  - 'usv'
+  - 'streamer'

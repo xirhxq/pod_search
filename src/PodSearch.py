@@ -149,6 +149,18 @@ class PodSearch:
         self.state = State.INIT
         self.searchStatePub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/searchState', Int16, queue_size=1)
 
+        # To others: search system state:
+        self.systemState = 'COMM_TEST'
+        self.systemStatePub = rospy.Publisher(self.uavName + '/state', String, queue_size=1)
+
+        # From others: others state
+        for name in self.config['others']:
+            setattr(self, name + 'State', 'NONE')
+            rospy.Subscriber(f'/{name}/state', String, lambda msg, name=name: setattr(self, f'{name}State', msg.data))
+        # rospy.Subscriber('/tuav6/state', String, lambda msg: setattr(self, 'tuav6State', msg.data))
+        # rospy.Subscriber('/tuav1/state', String, lambda msg: setattr(self, 'tuav1State', msg.data))
+        
+
         # To streamer
         self.toStreamerPub = rospy.Publisher(self.uavName + '/toStreamer', Int8, queue_size=1)
 
@@ -288,6 +300,20 @@ class PodSearch:
         self.tic = self.getTimeNow()
         self.toc = self.getTimeNow()
 
+    @property
+    def othersAllReady(self):
+        for name in self.config['others']:
+            if getattr(self, name + 'State', 'NONE') != 'READY':
+                return False
+        return True
+    
+    @property
+    def relatedAllReady(self):
+        for name in self.config['related']:
+            if getattr(self, name + 'State', 'NONE') != 'COMM_TEST' and getattr(self, name + 'State', 'NONE') != 'READY':
+                return False
+        return True
+
     def waitForStart(self):
         startTime = datetime.datetime.now()
         if self.args.start == 'minute':
@@ -295,7 +321,9 @@ class PodSearch:
         elif self.args.start == 'hour':
             startTime = (startTime + datetime.timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
 
-        while datetime.datetime.now() < startTime:
+        while datetime.datetime.now() < startTime or not self.othersAllReady or self.systemState != 'READY':
+            if self.relatedAllReady:
+                self.systemState = 'READY'
             system('clear')
             self.console.rule(
                 f'[bold red]'
@@ -307,6 +335,15 @@ class PodSearch:
                 pyfiglet.figlet_format(countDownStr),
                 justify='center'
             )
+            self.console.rule(
+                self.uavName + ': ' + self.systemState
+            )
+            for name in self.config['others']:
+                self.console.print(
+                    name + ': ' + getattr(self, name + 'State', 'NONE'),
+                    justify='center',
+                    style=('green' if getattr(self, name + 'State', 'NONE') == 'READY' else 'red3')
+                )
             time.sleep(1)
 
     def targetPosCallback(self, msg):
