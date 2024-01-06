@@ -45,6 +45,7 @@ class State(Enum):
     TRACK = 6
     DOCK = 7
     REFIND = 8
+    GUIDE = 9
     
 def stepEntrance(method):
     def wrapper(self, *args, **kwargs):
@@ -251,11 +252,15 @@ class PodSearch:
         self.refindName = None
         self.refindPodAngles = None
 
+        # [StepGuide] fake target position
+        self.fakeTargetPos = None
+        self.guideFake = None
+
         signal(SIGINT, self.signalHandler)
 
         # set initial state
         if args.trackUSV:
-            self.toStepTrack(trackName='usv')
+            self.toStepGuide()
             print('<<<TRACK MODE: USV>>>')
         if args.trackVessel:
             self.toStepTrack(trackName='boat')
@@ -544,6 +549,82 @@ class PodSearch:
         self.console.print(
             f'{self.trackData[self.trackName]}'
         )
+        # if self.getTimeNow() - self.lastUSVCaptureTime >= 5.0:
+        #     self.toStepRefind(self.trackName)
+        # if not self.podLaserOn:
+        #     self.expectedLaserOn = True
+        #     self.expectedLaserOnPub.publish(True)
+        # if self.trackName in self.trackData:
+        #     self.expectedPodAngles = self.trackData[self.trackName]
+        #     self.pubPYZMaxRate()
+        # ekfZ = np.array([[self.podLaserRange], [self.usvCameraAzimuth], [self.usvCameraElevation], [self.uavPos[2][0]]])
+        # if not (0 < ekfZ[0][0] < 4000 and ekfZ[1][0] is not None and ekfZ[2][0] is not None):
+        #     ekfZ = np.array([[0], [0], [0], [0]])
+        # self.ekfs[self.trackName].newFrame(
+        #     self.getTimeNow(),
+        #     ekfZ,
+        #     self.uavPos,
+        #     self.rP2BDelayed,
+        #     R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T
+        # )
+        print(f'{self.ekfs[self.trackName].ekf.x = }')
+        if self.toc - self.tic >= 60:
+            self.toStepEnd()
+        return
+        if self.ksbState == 'TargetConfirmed':
+            self.targetPos = self.ekfs[self.trackName].ekf.x[:3].reshape(3, 1)
+            self.toStepDock()
+        if self.ksbState == 'TargetRejected' or self.toc - self.tic >= 30:
+            self.reportNumber += 1
+            if self.config['onReportFailure'] == 'next':
+                idAndScore = self.getKthScoreTargetIdAndScore(self.reportNumber)[0]
+            elif self.config['onReportFailure'] == 'remove':
+                self.vesselDict.pop(self.targetId)
+                idAndScore = self.getMinScoreTargetIdAndScore()[0]
+            if idAndScore is None:
+                self.vesselDict.clear()
+                self.targetId = None
+                self.toStepPrepare()
+            else:
+                self.targetId = idAndScore[0]
+                self.toStepPrepare()
+                
+    @stepEntrance
+    def toStepGuide(self):
+        self.state = State.GUIDE
+        self.guideFake = self.targetPos[0][0] > self.uavPos[0][0]
+        self.trackName = 'usv'
+        self.trackData[self.trackName] = []
+        self.ekfs[self.trackName] = LocatingEKF(initialT=self.getTimeNow())
+        self.expectedLaserOn = False
+        if self.guideFake:
+            factor = -1 if self.targetPos[1][0] < self.uavPos[1][0] else 1
+            self.fakeTargetPos = np.array([
+                [self.uavPos[0][0]],
+                [self.uavPos[1][0] + factor * self.config['usvGuideSideLength']],
+                [0]
+            ])
+        # if not self.podLaserOn:
+        #     self.expectedLaserOn = True
+        #     self.expectedLaserOnPub.publish(True)
+
+    def stepGuide(self):
+        self.trackPoint.id = next(self.idGen)
+        self.trackPoint.uavYaw = (self.toc - self.tic) * 3 + self.dockPoint.uavYaw
+        self.searchPointPub.publish(data=self.trackPoint.toList())
+        self.console.rule(
+            f'[bold blue]'
+            f'Tracking for {self.trackName}... Laser '
+            f"{'[bold red] on' if self.expectedLaserOn else '[bold green]off'}"
+        )
+        self.console.rule(
+            f'[bold blue]'
+            f'Search Point #{self.trackPoint.id}: '
+            f'{self.trackPoint}'
+        )
+        self.console.print(
+            f'{self.trackData[self.trackName]}'
+        )
         # if self.landFlag == 1:
         #     self.toStepEnd()
         # if self.getTimeNow() - self.lastUSVCaptureTime >= 5.0:
@@ -568,46 +649,33 @@ class PodSearch:
         if self.toc - self.tic >= 60:
             self.toStepEnd()
         return
-        if self.trackName == 'usv':
-            if self.ekfs[self.trackName].ekf.x is not None:
-                usvPos = self.ekfs[self.trackName].ekf.x[:3].reshape((3, 1))
-                self.ekfLogs[self.trackName].log('usvEKFx', self.ekfs[self.trackName].ekf.x)
-                self.ekfLogs[self.trackName].newline()
-                print(f'{self.targetPos = }')
+        if self.ekfs[self.trackName].ekf.x is not None:
+            usvPos = self.ekfs[self.trackName].ekf.x[:3].reshape((3, 1))
+            self.ekfLogs[self.trackName].log('usvEKFx', self.ekfs[self.trackName].ekf.x)
+            self.ekfLogs[self.trackName].newline()
+            print(f'{self.targetPos = }')
+            if self.guideFake:
+                usvToTargetENU = self.fakeTargetPos - usvPos
+                usvToTargetTheta = np.degrees(np.arctan2(usvToTargetENU[1][0], usvToTargetENU[0][0]))
+            else:
                 usvToTargetENU = self.targetPos - usvPos
                 usvToTargetTheta = np.degrees(np.arctan2(usvToTargetENU[1][0], usvToTargetENU[0][0]))
-                self.usvTargetPub.publish(
-                    header=Header(frame_id='target'),
-                    pose=Pose(
-                        position=Point(
-                            x=usvToTargetENU[0][0],
-                            y=usvToTargetENU[1][0]
-                        ),
-                        orientation=Quaternion(
-                            w=usvToTargetTheta
-                        )
+            if self.guideFake:
+                if usvPos[0][0] > self.uavPos[0][0]:
+                    self.guideFake = False
+            self.usvTargetPub.publish(
+                header=Header(frame_id=('fake' if self.guideFake else 'target')),
+                pose=Pose(
+                    position=Point(
+                        x=usvToTargetENU[0][0],
+                        y=usvToTargetENU[1][0]
+                    ),
+                    orientation=Quaternion(
+                        w=usvToTargetTheta
                     )
                 )
-        else:
-            if self.ksbState == 'TargetConfirmed':
-                self.targetPos = self.ekfs[self.trackName].ekf.x[:3].reshape(3, 1)
-                self.toStepDock()
-            if self.ksbState == 'TargetRejected' or self.toc - self.tic >= 30:
-                self.reportNumber += 1
-                if self.config['onReportFailure'] == 'next':
-                    idAndScore = self.getKthScoreTargetIdAndScore(self.reportNumber)[0]
-                elif self.config['onReportFailure'] == 'remove':
-                    self.vesselDict.pop(self.targetId)
-                    idAndScore = self.getMinScoreTargetIdAndScore()[0]
-                if idAndScore is None:
-                    self.vesselDict.clear()
-                    self.targetId = None
-                    self.toStepPrepare()
-                else:
-                    self.targetId = idAndScore[0]
-                    self.toStepPrepare()
-                
-        
+            )
+
     @stepEntrance
     def toStepRefind(self, refindName):
         self.state = State.REFIND
@@ -628,7 +696,10 @@ class PodSearch:
         )
         self.pubPYZMaxRate()
         if self.getTimeNow() - self.lastUSVCaptureTime < 0.1:
-            self.toStepTrack(self.refindName)
+            if self.refindName == 'usv':
+                self.toStepGuide()
+            else:
+                self.toStepTrack(self.refindName)
 
     @stepEntrance
     def toStepDock(self):
@@ -649,7 +720,7 @@ class PodSearch:
                 self.uavState % 10 == 1 and
                 self.uavState // 100 == self.dockPoint.id
         ):
-            self.toStepTrack('usv')
+            self.toStepGuide()
 
     @stepEntrance
     def toStepEnd(self):
@@ -688,6 +759,8 @@ class PodSearch:
             self.stepDock()
         elif self.state == State.REFIND:
             self.stepRefind()
+        elif self.state == State.GUIDE:
+            self.stepGuide()
         else:
             print("Invalid state")
 
