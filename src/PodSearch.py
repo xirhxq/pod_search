@@ -389,6 +389,9 @@ class PodSearch:
                 pass
                 # print(e)
 
+    def getMinScoreTargetIdAndScore(self):
+        return min(self.vesselDict.items(), key=lambda x: x[1])
+
     def usvDetectionCallback(self, msg):
         self.usvCameraAzimuth = None
         self.usvCameraElevation = None
@@ -471,6 +474,10 @@ class PodSearch:
             self.pubPYZMaxRate()
             if self.isAtTarget():
                 self.preSearchCnt = next(self.preSearchCntGen)
+            idAndScore = self.getMinScoreTargetIdAndScore()
+            if idAndScore is not None and idAndScore[1] < self.config['targetSimilarityThreshold']: 
+                self.targetId = idAndScore[0]
+                self.toStepTrack(self.targetId)
         else:
             self.expectedPodAngles = self.tra[0]
             self.pubPYZMaxRate()
@@ -496,7 +503,7 @@ class PodSearch:
             self.traCnt += 1
         if self.traCnt == len(self.tra):
             if len(self.vesselDict) > 0:
-                self.targetId, _ = min(self.vesselDict.items(), key=lambda x: x[1])
+                self.targetId = self.getMinScoreTargetIdAndScore()[0]
             self.toStepPrepare()
         if self.targetId is not None and self.getTimeNow() - self.lastVesselCaptureTime[self.targetId] < 0.1:
             self.toStepTrack(self.targetId)

@@ -49,3 +49,5 @@ searchConfig:
   - hfovPitchRatio: 3
     theTime: 2
     widthRatio: 0.06
+
+targetSimilarityThreshold: 0.2
