@@ -230,10 +230,10 @@ class PodSearch:
         self.landFlag = -1
         rospy.Subscriber('/usv/suav_land_flag', Int8, lambda msg: setattr(self, 'landFlag', msg.data))
 
-        # [StepTrack] guidance data
+        # [StepGuide] guidance data
         self.usvTargetPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/target_nav_position', PoseStamped, queue_size=1)
 
-        # [StepTrack] last capture time of usv
+        # [StepGuide] last capture time of usv
         self.lastUSVCaptureTime = self.getTimeNow()
 
         # [StepTrack] ekfs for locating
