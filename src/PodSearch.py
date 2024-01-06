@@ -147,6 +147,10 @@ class PodSearch:
         self.state = State.INIT
         self.searchStatePub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/searchState', Int16, queue_size=1)
 
+        # [StepPrepare: pre-search] pre-search counter
+        self.preSearchCnt = 0
+        self.preSearchCntGen = itertools.cycle(range(len(self.config['preSearchData'])))
+
         # [StepPrepare] counters
         self.searchRoundCnt = 0
         self.searchViewCnt = -1
@@ -160,7 +164,7 @@ class PodSearch:
         self.dockPoint.id = 65
         self.dockPoint.uavYaw = 180
         self.trackPoint = copy.deepcopy(self.dockPoint)
-        self.idGen = itertools.cycle((i for i in range(66, 89)))
+        self.idGen = itertools.cycle(range(66, 89))
         self.searchPointPub = rospy.Publisher(self.uavName + '/searchPoint', Float64MultiArray, queue_size=1)
         
         # [StepSearch] trajectory setting
@@ -462,8 +466,14 @@ class PodSearch:
             f'Round #{self.searchRoundCnt + 1}, View #{self.searchViewCnt + 1}, '
             f'waiting for {self.searchPoints[self.searchViewCnt].id:d}X1'
         )
-        self.expectedPodAngles = self.tra[0]
-        self.pubPYZMaxRate()
+        if self.searchRoundCnt == 0 and self.searchViewCnt == 0:
+            self.expectedPodAngles = PodAngles(**self.config['preSearchData'][self.preSearchCnt])
+            self.pubPYZMaxRate()
+            if self.isAtTarget():
+                self.preSearchCnt = next(self.preSearchCntGen)
+        else:
+            self.expectedPodAngles = self.tra[0]
+            self.pubPYZMaxRate()
         self.searchPointPub.publish(data=self.searchPoints[self.searchViewCnt].toList())
         if self.uavState % 10 == 1 and self.uavState // 100 == self.searchPoints[self.searchViewCnt].id:
             self.toStepSearch()

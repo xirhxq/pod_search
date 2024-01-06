@@ -29,6 +29,16 @@ podInitialData:
   hfovDeg: 40
   maxRateDeg: 20
 
+preSearchData:
+  - pitchDeg: 30
+    yawDeg: -50
+    hfovDeg: 40
+    maxRateDeg: 5
+  - pitchDeg: 30
+    yawDeg: 50
+    hfovDeg: 40
+    maxRateDeg: 5
+
 dockData:
   pitchDeg: 20
   yawDeg: 0
