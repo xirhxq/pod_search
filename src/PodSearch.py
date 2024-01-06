@@ -670,7 +670,7 @@ class PodSearch:
     def controlStateMachine(self):
         self.toc = self.getTimeNow()
         self.searchStatePub.publish(Int16(self.state.value))
-        if self.ksbState == 'GoHome':
+        if self.ksbState == 'GoHome' and self.state != State.END:
             self.toStepEnd()
         elif self.state == State.INIT:
             self.stepInit()
