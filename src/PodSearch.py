@@ -302,6 +302,8 @@ class PodSearch:
 
     @property
     def othersAllReady(self):
+        if not self.args.check:
+            return True
         for name in self.config['others']:
             if getattr(self, name + 'State', 'NONE') != 'READY':
                 return False
@@ -309,6 +311,8 @@ class PodSearch:
     
     @property
     def relatedAllReady(self):
+        if not self.args.check:
+            return True
         for name in self.config['related']:
             if getattr(self, name + 'State', 'NONE') != 'COMM_TEST' and getattr(self, name + 'State', 'NONE') != 'READY':
                 return False
@@ -324,6 +328,9 @@ class PodSearch:
         while datetime.datetime.now() < startTime or not self.othersAllReady or self.systemState != 'READY':
             if self.relatedAllReady:
                 self.systemState = 'READY'
+            if self.systemState == 'READY' and self.othersAllReady:
+                self.systemState = 'COUNTDOWN'
+            self.systemStatePub.publish(self.systemState)
             system('clear')
             self.console.rule(
                 f'[bold red]'
@@ -345,6 +352,8 @@ class PodSearch:
                     style=('green' if getattr(self, name + 'State', 'NONE') == 'READY' else 'red3')
                 )
             time.sleep(1)
+
+        self.systemState = 'START'
 
     def targetPosCallback(self, msg):
         self.targetPos = np.array([[msg.data[0]], [msg.data[1]], [0]])
@@ -853,6 +862,7 @@ class PodSearch:
                 justify='center'
             )
         self.toStreamerPub.publish(Int8(data=(1 if self.state == State.TRACK else 0)))
+        self.systemStatePub.publish(self.systemState)
         self.controlStateMachine()
         self.console.print(f'{self.vesselDict = }')
         self.console.print(f'{self.targetId = }')
@@ -884,6 +894,7 @@ if __name__ == '__main__':
     parser.add_argument('--start', choices=['now', 'minute', 'hour'], default='minute')
     parser.add_argument('--init', help='initial state', default='None')
     parser.add_argument('--head-only', help='no pod', action='store_true')
+    parser.add_argument('--check', help='check other system state', action='store_true')
     args, unknown = parser.parse_known_args()
 
     if args.bag:
