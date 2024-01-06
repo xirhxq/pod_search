@@ -712,6 +712,12 @@ class PodSearch:
             f'[cyan3]'
             f'KSB state: {self.ksbState}'
         )
+        if (self.targetId is not None and self.searchRoundCnt > 0) or (self.searchRoundCnt == len(self.config['searchConfig']) - 1 and len(self.vesselDict) == 0):
+            self.console.rule(
+                f'[red3]'
+                f'RESET ' * 50,
+                style='red3'
+            )
         if self.args.head_only:
             self.console.print(
                 pyfiglet.figlet_format('Head Only'),
