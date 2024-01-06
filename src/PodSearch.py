@@ -149,6 +149,9 @@ class PodSearch:
         self.state = State.INIT
         self.searchStatePub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/searchState', Int16, queue_size=1)
 
+        # To streamer
+        self.toStreamerPub = rospy.Publisher(self.uavName + '/toStreamer', Int8, queue_size=1)
+
         # [StepPrepare: pre-search] pre-search counter
         self.preSearchCnt = 0
         self.preSearchCntGen = itertools.cycle(range(len(self.config['preSearchData'])))
@@ -812,6 +815,7 @@ class PodSearch:
                 style='green' if self.podHfovAtTarget else 'red',
                 justify='center'
             )
+        self.toStreamerPub.publish(Int8(data=(1 if self.state == State.TRACK else 0)))
         self.controlStateMachine()
         self.console.print(f'{self.vesselDict = }')
         self.console.print(f'{self.targetId = }')
