@@ -448,9 +448,13 @@ class PodSearch:
                 # print(e)
 
     def getMinScoreTargetIdAndScore(self):
+        if len(self.vesselDict) == 0:
+            return None
         return min(self.vesselDict.items(), key=lambda x: x[1])
     
     def getKthScoreTargetIdAndScore(self, k):
+        if len(self.vesselDict) < k:
+            return None
         item = heapq.nsmallest(k, self.vesselDict.items(), key=lambda x: x[1])
         return item[-1] if len(item) == k else None
 
@@ -559,7 +563,13 @@ class PodSearch:
             f'Round #{self.searchRoundCnt + 1}, View #{self.searchViewCnt + 1}, '
             f'Spend {self.autoTra.expectedTime:.1f}'
         )
-        self.expectedPodAngles = self.tra[self.traCnt]
+        self.expectedPodAngles = copy.deepcopy(self.tra[self.traCnt])
+        if self.uavState % 10 == 0:
+            self.expectedPodAngles.maxRateDeg = 0
+            self.console.rule(
+                f'[red3]'
+                f'FREEZING!!!!'
+            )
         self.pubPYZMaxRate()
         if self.isAtTarget():
             self.traCnt += 1
