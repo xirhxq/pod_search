@@ -4,6 +4,7 @@ import time
 import yaml
 import rich
 import copy
+import heapq
 import argparse
 import datetime
 import pyfiglet
@@ -221,6 +222,9 @@ class PodSearch:
         self.trackData = {}
         self.trackName = None
 
+        # [StepTrack] report target number
+        self.reportNumber = 1
+
         # [StepTrack] land flag
         self.landFlag = -1
         rospy.Subscriber('/usv/suav_land_flag', Int8, lambda msg: setattr(self, 'landFlag', msg.data))
@@ -391,6 +395,10 @@ class PodSearch:
 
     def getMinScoreTargetIdAndScore(self):
         return min(self.vesselDict.items(), key=lambda x: x[1])
+    
+    def getKthScoreTargetIdAndScore(self, k):
+        item = heapq.nsmallest(k, self.vesselDict.items(), key=lambda x: x[1])
+        return item[-1] if len(item) == k else None
 
     def usvDetectionCallback(self, msg):
         self.usvCameraAzimuth = None
@@ -581,9 +589,24 @@ class PodSearch:
                     )
                 )
         else:
-            if self.toc - self.tic >= 10:
+            if self.ksbState == 'TargetConfirmed':
                 self.targetPos = self.ekfs[self.trackName].ekf.x[:3].reshape(3, 1)
                 self.toStepDock()
+            if self.ksbState == 'TargetRejected' or self.toc - self.tic >= 30:
+                self.reportNumber += 1
+                if self.config['onReportFailure'] == 'next':
+                    idAndScore = self.getKthScoreTargetIdAndScore(self.reportNumber)[0]
+                elif self.config['onReportFailure'] == 'remove':
+                    self.vesselDict.pop(self.targetId)
+                    idAndScore = self.getMinScoreTargetIdAndScore()[0]
+                if idAndScore is None:
+                    self.vesselDict.clear()
+                    self.targetId = None
+                    self.toStepPrepare()
+                else:
+                    self.targetId = idAndScore[0]
+                    self.toStepPrepare()
+                
         
     @stepEntrance
     def toStepRefind(self, refindName):
@@ -647,7 +670,9 @@ class PodSearch:
     def controlStateMachine(self):
         self.toc = self.getTimeNow()
         self.searchStatePub.publish(Int16(self.state.value))
-        if self.state == State.INIT:
+        if self.ksbState == 'GoHome':
+            self.toStepEnd()
+        elif self.state == State.INIT:
             self.stepInit()
         elif self.state == State.PREPARE:
             self.stepPrepare()

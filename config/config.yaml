@@ -51,3 +51,5 @@ searchConfig:
     widthRatio: 0.06
 
 targetSimilarityThreshold: 0.2
+
+onReportFaliure: 'next' # 'next' or 'remove'
