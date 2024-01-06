@@ -17,7 +17,7 @@ from rich.console import Console
 
 import rospy
 import rospkg
-from std_msgs.msg import Float32, Bool, Float64MultiArray, Int8, Int16, MultiArrayDimension, Header, Float32MultiArray
+from std_msgs.msg import Float32, Bool, Float64MultiArray, Int8, Int16, MultiArrayDimension, Header, Float32MultiArray, String
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 from nav_msgs.msg import Odometry
 
@@ -138,6 +138,10 @@ class PodSearch:
         # From suav: suav yaw
         self.uavYawDeg = 0
         rospy.Subscriber(self.uavName + '/xy_fcu/flight_data', Float32MultiArray, lambda msg: setattr(self, 'uavYawDeg', np.mod(450 - np.degrees(msg.data[15]), 360)))
+
+        # From KSB: KSB state
+        self.ksbState = 'None'
+        rospy.Subscriber('/ksb/state', String, lambda msg: setattr(self, 'ksbState', msg.data)) 
 
         # To others: my state
         self.state = State.INIT
@@ -661,6 +665,10 @@ class PodSearch:
             f'[red3]'
             f'suav in #{self.uavState} '
             f'@ ({", ".join([f"{self.uavPos[i][0]:.2f}" for i in range(3)])}), {self.uavYawDeg:.2f} Deg'
+        )
+        self.console.rule(
+            f'[cyan3]'
+            f'KSB state: {self.ksbState}'
         )
         if self.args.head_only:
             self.console.print(
