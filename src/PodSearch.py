@@ -584,7 +584,7 @@ class PodSearch:
     def toStepTrack(self, trackName):
         self.state = State.TRACK
         self.trackName = trackName
-        self.trackData[trackName] = []
+        self.trackData[trackName] = PodAngles()
         self.ekfs[trackName] = LocatingEKF(initialT=self.getTimeNow())
         self.expectedLaserOn = False
         # if not self.podLaserOn:
@@ -653,7 +653,7 @@ class PodSearch:
         self.state = State.GUIDE
         self.guideFake = self.targetPos[0][0] > self.uavPos[0][0]
         self.trackName = 'usv'
-        self.trackData[self.trackName] = []
+        self.trackData[self.trackName] = PodAngles()
         self.ekfs[self.trackName] = LocatingEKF(initialT=self.getTimeNow())
         self.expectedLaserOn = False
         if self.guideFake:
