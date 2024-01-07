@@ -325,7 +325,7 @@ class PodSearch:
         elif self.args.start == 'hour':
             startTime = (startTime + datetime.timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
 
-        while datetime.datetime.now() < startTime or not self.othersAllReady or self.systemState != 'READY':
+        while datetime.datetime.now() < startTime or not self.othersAllReady or self.systemState != 'COUNTDOWN':
             if self.relatedAllReady:
                 self.systemState = 'READY'
             if self.systemState == 'READY' and self.othersAllReady:
