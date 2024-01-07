@@ -796,6 +796,8 @@ class PodSearch:
 
     def stepEnd(self):
         self.searchPointPub.publish(data=self.backPoint.toList())
+        if self.podLaserOn:
+            self.expectedLaserOnPub.publish(False)
         if self.toc - self.tic >= 3.0:
             exit(0)
 
