@@ -67,3 +67,19 @@ others:
 related:
   - 'usv'
   - 'streamer'
+
+laserOn: True
+
+guideWidth:
+  min: 0.15
+  max: 0.25
+  avg: 0.2
+
+guideMaxRateDeg: 2
+
+trackWidth:
+  min: 0.15
+  max: 0.25
+  avg: 0.2
+
+trackMaxRateDeg: 2

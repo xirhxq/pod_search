@@ -428,11 +428,15 @@ class PodSearch:
                 self.vesselCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * py))
                 id = str(target.category_id)
                 if id != '100':
+                    expectedHfovDeg = self.podHfovDegDelayed
+                    if target.w < self.config['trackWidth']['min'] or target.w > self.config['trackWidth']['max']:
+                        expectedHfovDeg = PodParas.clipHfov(self.podHfovDegDelayed * target.w / self.config['trackWidth']['avg'])
                     self.trackData[id] = PodAngles(
                         pitchDeg=self.vesselCameraElevation + self.podPitchDegDelayed, 
                         yawDeg=self.vesselCameraAzimuth + self.podYawDegDelayed, 
-                        hfovDeg=self.podHfovDegDelayed, #PodParas.clipHfov(self.podHfovDegDelayed * target.w / 0.3), 
-                        maxRateDeg=3
+                        hfovDeg=expectedHfovDeg, 
+                        maxRateDeg=self.config['trackMaxRateDeg'],
+                        laserOn=self.config['laserOn']
                     )
                     score = target.score
                     print(f'{BOLD}{BLUE}{id = } {score = }{RESET}')
@@ -467,11 +471,15 @@ class PodSearch:
             try:
                 self.usvCameraAzimuth = -np.degrees(np.arctan(np.tan(np.radians(self.podHfovDegDelayed) / 2) * px))
                 self.usvCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * py))
+                expectedHfov = self.podHfovDegDelayed
+                if target.w < self.config['guideWidth']['min'] or target.w > self.config['guidewidth']['max']:
+                    expectedHfovDeg = PodParas.clipHfov(self.podHfovDegDelayed * target.w / self.config['guideWidth']['avg'])
                 self.trackData['usv'] = PodAngles(
                     pitchDeg=self.usvCameraElevation + self.podPitchDegDelayed, 
                     yawDeg=self.usvCameraAzimuth + self.podYawDegDelayed, 
-                    hfovDeg=PodParas.clipHfov(self.podHfovDegDelayed * target.w / 0.2), 
-                    maxRateDeg=3
+                    hfovDeg=expectedHfovDeg, 
+                    maxRateDeg=self.config['guideMaxRateDeg'],
+                    laserOn=self.config['laserOn']
                 )
                 self.lastUSVCaptureTime = self.getTimeNow()
             except Exception as e:
@@ -586,10 +594,9 @@ class PodSearch:
         self.trackName = trackName
         self.trackData[trackName] = PodAngles()
         self.ekfs[trackName] = LocatingEKF(initialT=self.getTimeNow())
-        self.expectedLaserOn = False
-        # if not self.podLaserOn:
-        #     self.expectedLaserOn = True
-        #     self.expectedLaserOnPub.publish(True)
+        if not self.podLaserOn and self.config['laserOn']:
+            self.expectedLaserOn = True
+            self.expectedLaserOnPub.publish(True)
     
     def stepTrack(self):
         self.trackPoint.id = next(self.idGen)
@@ -608,24 +615,24 @@ class PodSearch:
         self.console.print(
             f'{self.trackData[self.trackName]}'
         )
-        # if self.getTimeNow() - self.lastUSVCaptureTime >= 5.0:
-        #     self.toStepRefind(self.trackName)
-        # if not self.podLaserOn:
-        #     self.expectedLaserOn = True
-        #     self.expectedLaserOnPub.publish(True)
-        # if self.trackName in self.trackData:
-        #     self.expectedPodAngles = self.trackData[self.trackName]
-        #     self.pubPYZMaxRate()
-        # ekfZ = np.array([[self.podLaserRange], [self.usvCameraAzimuth], [self.usvCameraElevation], [self.uavPos[2][0]]])
-        # if not (0 < ekfZ[0][0] < 4000 and ekfZ[1][0] is not None and ekfZ[2][0] is not None):
-        #     ekfZ = np.array([[0], [0], [0], [0]])
-        # self.ekfs[self.trackName].newFrame(
-        #     self.getTimeNow(),
-        #     ekfZ,
-        #     self.uavPos,
-        #     self.rP2BDelayed,
-        #     R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T
-        # )
+        if self.getTimeNow() - self.lastUSVCaptureTime >= 5.0:
+            self.toStepRefind(self.trackName)
+        if not self.podLaserOn and self.config['laserOn']:
+            self.expectedLaserOn = True
+            self.expectedLaserOnPub.publish(True)
+        if self.trackName in self.trackData:
+            self.expectedPodAngles = self.trackData[self.trackName]
+            self.pubPYZMaxRate()
+        ekfZ = np.array([[self.podLaserRange], [self.usvCameraAzimuth], [self.usvCameraElevation], [self.uavPos[2][0]]])
+        if not (0 < ekfZ[0][0] < 4000 and ekfZ[1][0] is not None and ekfZ[2][0] is not None):
+            ekfZ = np.array([[0], [0], [0], [0]])
+        self.ekfs[self.trackName].newFrame(
+            self.getTimeNow(),
+            ekfZ,
+            self.uavPos,
+            self.rP2BDelayed,
+            R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T
+        )
         print(f'{self.ekfs[self.trackName].ekf.x = }')
         if self.toc - self.tic >= 60:
             self.toStepEnd()
@@ -663,9 +670,9 @@ class PodSearch:
                 [self.uavPos[1][0] + factor * self.config['usvGuideSideLength']],
                 [0]
             ])
-        # if not self.podLaserOn:
-        #     self.expectedLaserOn = True
-        #     self.expectedLaserOnPub.publish(True)
+        if not self.podLaserOn and self.config['laserOn']:
+            self.expectedLaserOn = True
+            self.expectedLaserOnPub.publish(True)
 
     def stepGuide(self):
         self.trackPoint.id = next(self.idGen)
@@ -684,26 +691,28 @@ class PodSearch:
         self.console.print(
             f'{self.trackData[self.trackName]}'
         )
-        # if self.landFlag == 1:
-        #     self.toStepEnd()
-        # if self.getTimeNow() - self.lastUSVCaptureTime >= 5.0:
-        #     self.toStepRefind(self.trackName)
-        # if not self.podLaserOn:
-        #     self.expectedLaserOn = True
-        #     self.expectedLaserOnPub.publish(True)
-        # if self.trackName in self.trackData:
-        #     self.expectedPodAngles = self.trackData[self.trackName]
-        #     self.pubPYZMaxRate()
-        # ekfZ = np.array([[self.podLaserRange], [self.usvCameraAzimuth], [self.usvCameraElevation], [self.uavPos[2][0]]])
-        # if not (0 < ekfZ[0][0] < 4000 and ekfZ[1][0] is not None and ekfZ[2][0] is not None):
-        #     ekfZ = np.array([[0], [0], [0], [0]])
-        # self.ekfs[self.trackName].newFrame(
-        #     self.getTimeNow(),
-        #     ekfZ,
-        #     self.uavPos,
-        #     self.rP2BDelayed,
-        #     R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T
-        # )
+        if self.landFlag == 1:
+            self.toStepEnd()
+        if self.getTimeNow() - self.lastUSVCaptureTime >= 5.0:
+            self.toStepRefind(self.trackName)
+        if not self.podLaserOn and self.config['laserOn']:
+            self.expectedLaserOn = True
+            self.expectedLaserOnPub.publish(True)
+        if self.trackName in self.trackData:
+            self.expectedPodAngles = self.trackData[self.trackName]
+            if not self.podLaserOn and self.config['laserOn']:
+                self.expectedLaserOn = True
+            self.pubPYZMaxRate()
+        ekfZ = np.array([[self.podLaserRange], [self.usvCameraAzimuth], [self.usvCameraElevation], [self.uavPos[2][0]]])
+        if not (0 < ekfZ[0][0] < 4000 and ekfZ[1][0] is not None and ekfZ[2][0] is not None):
+            ekfZ = np.array([[0], [0], [0], [0]])
+        self.ekfs[self.trackName].newFrame(
+            self.getTimeNow(),
+            ekfZ,
+            self.uavPos,
+            self.rP2BDelayed,
+            R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T
+        )
         print(f'{self.ekfs[self.trackName].ekf.x = }')
         if self.toc - self.tic >= 60:
             self.toStepEnd()
@@ -795,7 +804,7 @@ class PodSearch:
         self.yawPub.publish(self.expectedPodAngles.yawDeg)
         self.hfovPub.publish(self.expectedPodAngles.hfovDeg)
         self.expectedMaxRatePub.publish(self.expectedPodAngles.maxRateDeg)
-        self.expectedLaserOnPub.publish(self.expectedPodAngles.laserOn)
+        self.expectedLaserOnPub.publish(self.expectedPodAngles.laserOn if self.config['laserOn'] else False)
 
     def controlStateMachine(self):
         self.toc = self.getTimeNow()
