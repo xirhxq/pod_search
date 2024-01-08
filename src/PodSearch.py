@@ -471,8 +471,8 @@ class PodSearch:
             try:
                 self.usvCameraAzimuth = -np.degrees(np.arctan(np.tan(np.radians(self.podHfovDegDelayed) / 2) * px))
                 self.usvCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * py))
-                expectedHfov = self.podHfovDegDelayed
-                if target.w < self.config['guideWidth']['min'] or target.w > self.config['guidewidth']['max']:
+                expectedHfovDeg = self.podHfovDegDelayed
+                if target.w < self.config['guideWidth']['min'] or target.w > self.config['guideWidth']['max'] or True:
                     expectedHfovDeg = PodParas.clipHfov(self.podHfovDegDelayed * target.w / self.config['guideWidth']['avg'])
                 self.trackData['usv'] = PodAngles(
                     pitchDeg=self.usvCameraElevation + self.podPitchDegDelayed, 
@@ -483,8 +483,7 @@ class PodSearch:
                 )
                 self.lastUSVCaptureTime = self.getTimeNow()
             except Exception as e:
-                pass
-                # print(e)
+                print(e)
 
     def getTimeNow(self):
         return rospy.Time.now().to_sec()
@@ -660,7 +659,7 @@ class PodSearch:
         self.state = State.GUIDE
         self.guideFake = self.targetPos[0][0] > self.uavPos[0][0]
         self.trackName = 'usv'
-        self.trackData[self.trackName] = PodAngles()
+        self.trackData[self.trackName] = None
         self.ekfs[self.trackName] = LocatingEKF(initialT=self.getTimeNow())
         self.expectedLaserOn = False
         if self.guideFake:
@@ -698,7 +697,7 @@ class PodSearch:
         if not self.podLaserOn and self.config['laserOn']:
             self.expectedLaserOn = True
             self.expectedLaserOnPub.publish(True)
-        if self.trackName in self.trackData:
+        if self.trackName in self.trackData and self.trackData[self.trackName] is not None:
             self.expectedPodAngles = self.trackData[self.trackName]
             if not self.podLaserOn and self.config['laserOn']:
                 self.expectedLaserOn = True
