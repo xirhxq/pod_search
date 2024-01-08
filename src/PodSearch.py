@@ -693,8 +693,8 @@ class PodSearch:
         )
         if self.landFlag == 1:
             self.toStepEnd()
-        if self.getTimeNow() - self.lastUSVCaptureTime >= 5.0:
-            self.toStepRefind(self.trackName)
+        # if self.getTimeNow() - self.lastUSVCaptureTime >= 5.0:
+        #     self.toStepRefind(self.trackName)
         if not self.podLaserOn and self.config['laserOn']:
             self.expectedLaserOn = True
             self.expectedLaserOnPub.publish(True)
@@ -710,13 +710,14 @@ class PodSearch:
             self.getTimeNow(),
             ekfZ,
             self.uavPos,
+
             self.rP2BDelayed,
             R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T
         )
         print(f'{self.ekfs[self.trackName].ekf.x = }')
-        if self.toc - self.tic >= 60:
-            self.toStepEnd()
-        return
+        # if self.toc - self.tic >= 60:
+        #     self.toStepEnd()
+        # return
         if self.ekfs[self.trackName].ekf.x is not None:
             usvPos = self.ekfs[self.trackName].ekf.x[:3].reshape((3, 1))
             self.ekfLogs[self.trackName].log('usvEKFx', self.ekfs[self.trackName].ekf.x)
