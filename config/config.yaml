@@ -49,7 +49,7 @@ preSearchData:
 dockData:
   pitchDeg: 2
   yawDeg: 4
-  hfovDeg: 10
+  hfovDeg: 5
   maxRateDeg: 10
 
 searchConfig:
@@ -85,7 +85,7 @@ guideWidth:
   max: 0.25
   avg: 0.2
 
-guideMaxRateDeg: 0.4
+guideMaxRateDeg: 2
 
 trackWidth:
   min: 0.15
