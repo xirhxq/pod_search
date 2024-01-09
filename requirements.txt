@@ -7,3 +7,4 @@ scipy==1.5.4
 shapely==2.0.2
 rich==13.7.0
 pyfiglet==0.8.post1
+pandas==2.0.3
