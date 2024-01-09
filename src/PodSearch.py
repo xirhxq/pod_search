@@ -471,9 +471,12 @@ class PodSearch:
             try:
                 self.usvCameraAzimuth = -np.degrees(np.arctan(np.tan(np.radians(self.podHfovDegDelayed) / 2) * px))
                 self.usvCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * py))
-                expectedHfovDeg = self.podHfovDegDelayed
-                if target.w < self.config['guideWidth']['min'] or target.w > self.config['guideWidth']['max'] or True:
+                if target.w < self.config['guideWidth']['min'] or target.w > self.config['guideWidth']['max']:
                     expectedHfovDeg = PodParas.clipHfov(self.podHfovDegDelayed * target.w / self.config['guideWidth']['avg'])
+                elif self.trackData['usv'] is not None:
+                    expectedHfovDeg = self.trackData['usv'].hfovDeg
+                else:
+                    expectedHfovDeg = self.hfovDeg
                 self.trackData['usv'] = PodAngles(
                     pitchDeg=self.usvCameraElevation + self.podPitchDegDelayed, 
                     yawDeg=self.usvCameraAzimuth + self.podYawDegDelayed, 
