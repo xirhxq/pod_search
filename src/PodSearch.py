@@ -757,7 +757,7 @@ class PodSearch:
             f'@ (p{self.refindPodAngles.pitchDeg:.2f}, y{self.refindPodAngles.yawDeg:.2f}, hfov{self.refindPodAngles.hfovDeg:.2f})'
         )
         self.expectedPodAngles = PodAngles(
-            pitchDeg=self.refindPodAngles.pitchDeg + (self.toc - self.tic) / 3 * np.sin((self.toc - self.tic) / 15 * 2 * np.pi),
+            pitchDeg=self.refindPodAngles.pitchDeg + (self.toc - self.tic) / 10 * np.sin((self.toc - self.tic) / 15 * 2 * np.pi),
             yawDeg=self.refindPodAngles.yawDeg + (self.toc - self.tic) / 3 * np.cos((self.toc - self.tic) / 15 * 2 * np.pi),
             hfovDeg=PodParas.clipHfov(self.refindPodAngles.hfovDeg * 1.5),
             maxRateDeg=10
