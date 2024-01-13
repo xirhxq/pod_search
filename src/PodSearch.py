@@ -428,10 +428,12 @@ class PodSearch:
                 self.vesselCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * py))
                 id = str(target.category_id)
                 if id != '100':
-                    expectedHfovDeg = self.podHfovDegDelayed
+                    id = 'boat'
                     if target.w < self.config['trackWidth']['min'] or target.w > self.config['trackWidth']['max']:
                         expectedHfovDeg = PodParas.clipHfov(self.podHfovDegDelayed * target.w / self.config['trackWidth']['avg'])
-                    self.trackData['boat'] = PodAngles(
+                    else:
+                        expectedHfovDeg = self.trackData[id]
+                    self.trackData[id] = PodAngles(
                         pitchDeg=self.vesselCameraElevation + self.podPitchDegDelayed, 
                         yawDeg=self.vesselCameraAzimuth + self.podYawDegDelayed, 
                         hfovDeg=expectedHfovDeg, 
@@ -627,7 +629,8 @@ class PodSearch:
         if self.trackName in self.trackData:
             self.expectedPodAngles = self.trackData[self.trackName]
             self.pubPYZMaxRate()
-        ekfZ = np.array([[self.podLaserRange], [self.usvCameraAzimuth], [self.usvCameraElevation], [self.uavPos[2][0]]])
+        ekfZ = np.array([[self.podLaserRange], [self.vesselCameraAzimuth], [self.vesselCameraElevation], [self.uavPos[2][0]]])
+        self.console.print(f'{ekfZ = }')
         if not (0 < ekfZ[0][0] < 4000 and ekfZ[1][0] is not None and ekfZ[2][0] is not None):
             ekfZ = np.array([[0], [0], [0], [0]])
         self.ekfs[self.trackName].newFrame(

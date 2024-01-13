@@ -52,7 +52,7 @@ class LocatingEKF:
 
         else:
             self.setFQ()
-            if Z[0] < 10 or Z[0] > 1000:
+            if Z[0] < 10 or Z[0] > 4000:
                 self.ekf.predict()
                 return self.ekf.x
 
