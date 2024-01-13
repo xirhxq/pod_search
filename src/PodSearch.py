@@ -431,7 +431,7 @@ class PodSearch:
                     expectedHfovDeg = self.podHfovDegDelayed
                     if target.w < self.config['trackWidth']['min'] or target.w > self.config['trackWidth']['max']:
                         expectedHfovDeg = PodParas.clipHfov(self.podHfovDegDelayed * target.w / self.config['trackWidth']['avg'])
-                    self.trackData[id] = PodAngles(
+                    self.trackData['boat'] = PodAngles(
                         pitchDeg=self.vesselCameraElevation + self.podPitchDegDelayed, 
                         yawDeg=self.vesselCameraAzimuth + self.podYawDegDelayed, 
                         hfovDeg=expectedHfovDeg, 
@@ -439,7 +439,7 @@ class PodSearch:
                         laserOn=self.config['laserOn']
                     )
                     score = target.score
-                    print(f'{BOLD}{BLUE}{id = } {score = }{RESET}')
+                    # print(f'{BOLD}{BLUE}{id = } {score = }{RESET}')
                     if self.state == State.SEARCH and target.category_id != 100:
                         if id in self.vesselDict.keys():
                             self.vesselDict[id] = min(self.vesselDict[id], score)
@@ -619,8 +619,8 @@ class PodSearch:
         self.console.print(
             f'{self.trackData[self.trackName]}'
         )
-        if self.getTimeNow() - self.lastUSVCaptureTime >= 5.0:
-            self.toStepRefind(self.trackName)
+        # if self.getTimeNow() - self.lastUSVCaptureTime >= 5.0:
+        #     self.toStepRefind(self.trackName)
         if not self.podLaserOn and self.config['laserOn']:
             self.expectedLaserOn = True
             self.expectedLaserOnPub.publish(True)
@@ -638,13 +638,10 @@ class PodSearch:
             R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T
         )
         print(f'{self.ekfs[self.trackName].ekf.x = }')
-        if self.toc - self.tic >= 60:
-            self.toStepEnd()
-        return
         if self.ksbState == 'TargetConfirmed':
             self.targetPos = self.ekfs[self.trackName].ekf.x[:3].reshape(3, 1)
             self.toStepDock()
-        if self.ksbState == 'TargetRejected' or self.toc - self.tic >= 30:
+        if self.ksbState == 'TargetRejected' or self.toc - self.tic >= 300:
             self.reportNumber += 1
             if self.config['onReportFailure'] == 'next':
                 idAndScore = self.getKthScoreTargetIdAndScore(self.reportNumber)[0]
