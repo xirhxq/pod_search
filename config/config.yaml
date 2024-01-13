@@ -62,7 +62,7 @@ searchConfig:
 
 targetSimilarityThreshold: 0.2
 
-onReportFaliure: 'next' # 'next' or 'remove'
+onReportFailure: 'next' # 'next' or 'remove'
 
 usvGuideSideLength: 500
 
