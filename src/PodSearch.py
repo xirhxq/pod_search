@@ -598,7 +598,9 @@ class PodSearch:
         self.ekfs[trackName] = LocatingEKF(initialT=self.getTimeNow())
         if not self.podLaserOn and self.config['laserOn']:
             self.expectedLaserOn = True
-            self.expectedLaserOnPub.publish(True)
+        else:
+            self.expectedLaserOn = False
+        self.expectedLaserOnPub.publish(self.expectedLaserOn)
     
     def stepTrack(self):
         self.trackPoint.id = next(self.idGen)
@@ -674,7 +676,9 @@ class PodSearch:
             ])
         if not self.podLaserOn and self.config['laserOn']:
             self.expectedLaserOn = True
-            self.expectedLaserOnPub.publish(True)
+        else:
+            self.expectedLaserOn = False
+        self.expectedLaserOnPub.publish(self.expectedLaserOn)
 
     def stepGuide(self):
         self.trackPoint.id = next(self.idGen)
