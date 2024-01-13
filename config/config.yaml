@@ -5,23 +5,23 @@ SearchArea:
 
 SearchPoints:
   - id: 0
-    uavPosF: 950
+    uavPosF: 1000
     uavPosL: 0
-    uavPosU: 20
+    uavPosU: 40
     uavYaw: 90
     yawRange: 130
     timeout: 300
   - id: 1
-    uavPosF: 950
+    uavPosF: 1000
     uavPosL: 0
-    uavPosU: 20
+    uavPosU: 40
     uavYaw: 210
     yawRange: 130
     timeout: 300
   - id: 2
-    uavPosF: 950
+    uavPosF: 1000
     uavPosL: 0
-    uavPosU: 20
+    uavPosU: 40
     uavYaw: 330
     yawRange: 130
     timeout: 300
