@@ -481,7 +481,7 @@ if __name__ == '__main__':
     parser.add_argument('--controlDebug', help='control output', action='store_true')
     parser.add_argument('--indoor', help='indoor test w/o laser', action='store_true')
     parser.add_argument('--control-mode', help='control mode', choices=['p', 'pi'], default='pi')
-    parser.add_argument('--no-enhance', dest='enhance', help='image enhance off', action='store_false')
+    parser.add_argument('--no-enhance', dest='enhance', help='image enhance off', action='store_true')
     parser.add_argument('--port', help='serial port of pod', type=str, default='/dev/ttyCH343USB3')
     parser.add_argument('--frame', help='control mode: B or I', choices=['b', 'i'], default='i')
     args, unknown = parser.parse_known_args()
