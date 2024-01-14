@@ -278,7 +278,7 @@ class PodSearch:
             self.toStepGuide()
             print('<<<TRACK MODE: USV>>>')
         if args.trackVessel:
-            self.toStepTrack(trackName='boat')
+            self.toStepTrack(trackName=args.id)
             print('<<<TRACK MODE: Vessel>>>')
         if args.dock:
             self.toStepDock()
@@ -428,11 +428,12 @@ class PodSearch:
                 self.vesselCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * py))
                 id = str(target.category_id)
                 if id != '100':
-                    id = 'boat'
+                    if self.args.id == 'boat':
+                        id = 'boat'
                     if target.w < self.config['trackWidth']['min'] or target.w > self.config['trackWidth']['max']:
                         expectedHfovDeg = PodParas.clipHfov(self.podHfovDegDelayed * target.w / self.config['trackWidth']['avg'])
                     else:
-                        expectedHfovDeg = self.trackData[id]
+                        expectedHfovDeg = self.trackData[id].hfovDeg
                     self.trackData[id] = PodAngles(
                         pitchDeg=self.vesselCameraElevation + self.podPitchDegDelayed, 
                         yawDeg=self.vesselCameraAzimuth + self.podYawDegDelayed, 
@@ -441,17 +442,17 @@ class PodSearch:
                         laserOn=self.config['laserOn']
                     )
                     score = target.score
+                    self.lastVesselCaptureTime[id] = self.getTimeNow()
                     # print(f'{BOLD}{BLUE}{id = } {score = }{RESET}')
                     if self.state == State.SEARCH and target.category_id != 100:
                         if id in self.vesselDict.keys():
                             self.vesselDict[id] = min(self.vesselDict[id], score)
                         else:
                             self.vesselDict[id] = score
-                        self.lastVesselCaptureTime[id] = self.getTimeNow()
                     
             except Exception as e:
                 pass
-                # print(e)
+                print(e)
 
     def getMinScoreTargetIdAndScore(self):
         if len(self.vesselDict) == 0:
@@ -596,7 +597,7 @@ class PodSearch:
     def toStepTrack(self, trackName):
         self.state = State.TRACK
         self.trackName = trackName
-        self.trackData[trackName] = PodAngles()
+        self.trackData[trackName] = PodAngles(hfovDeg=20)
         self.ekfs[trackName] = LocatingEKF(initialT=self.getTimeNow())
         if not self.podLaserOn and self.config['laserOn']:
             self.expectedLaserOn = True
@@ -621,12 +622,16 @@ class PodSearch:
         self.console.print(
             f'{self.trackData[self.trackName]}'
         )
+        if self.trackName in self.lastVesselCaptureTime:
+            self.console.print(
+                f'{self.getTimeNow() - self.lastVesselCaptureTime[self.trackName]}'
+            )
         # if self.getTimeNow() - self.lastUSVCaptureTime >= 5.0:
         #     self.toStepRefind(self.trackName)
         if not self.podLaserOn and self.config['laserOn']:
             self.expectedLaserOn = True
             self.expectedLaserOnPub.publish(True)
-        if self.trackName in self.trackData:
+        if self.trackName in self.trackData and self.trackData[self.trackName].hfovDeg > 0:
             self.expectedPodAngles = self.trackData[self.trackName]
             self.pubPYZMaxRate()
         ekfZ = np.array([[self.podLaserRange], [self.vesselCameraAzimuth], [self.vesselCameraElevation], [self.uavPos[2][0]]])
@@ -916,6 +921,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--trackUSV', help='track usv', action='store_true')
     parser.add_argument('--trackVessel', help='track usv', action='store_true')
+    parser.add_argument('--id', default='boat')
     parser.add_argument('--dock', help='look at dock', action='store_true')
     parser.add_argument('--fast', help='using default paras & skip confirmation', action='store_true')
     parser.add_argument('--bag', help='rosbag record', action='store_false')

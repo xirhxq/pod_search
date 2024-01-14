@@ -26,7 +26,7 @@ SearchPoints:
     yawRange: 130
     timeout: 300
 
-uavInitialPos: [[0], [0], [10]]
+uavInitialPos: [[0], [0], [20]]
 
 targetInitialPos: [[-156], [218], [0]]
 
@@ -88,8 +88,8 @@ guideWidth:
 guideMaxRateDeg: 2
 
 trackWidth:
-  min: 0.15
-  max: 0.25
-  avg: 0.2
+  min: 0.1
+  max: 0.2
+  avg: 0.15
 
-trackMaxRateDeg: 2
+trackMaxRateDeg: 20
