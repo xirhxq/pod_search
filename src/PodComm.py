@@ -87,8 +87,8 @@ class UP_MSG:
 
     def manualPYRate(self, prate, yrate):
         self.orderB = b'\x24'
-        self.orderX = pack('<h', int(-20 * yrate))
-        self.orderY = pack('<h', int(-20 * prate))
+        self.orderX = pack('<h', int(-10 * yrate))
+        self.orderY = pack('<h', int(-10 * prate))
         return self.msg()
 
     def laserOn(self):
@@ -408,6 +408,7 @@ class POD_COMM:
         print(GREEN if self.fAtTarget else RED, end='')
         print(f'Zoom {self.podF:6.1f}({self.podZoomLevel:6.1f}) -> {self.expectedF:6.1f}({self.expectedZoomLevel:6.1f}){RESET}')
         print(f'Hfov {PodParas.getHfovFromF(self.podF):6.2f} -> {PodParas.getHfovFromF(self.expectedF):6.2f}')
+        print(f'Rate r{self.podRollRate:10.2f} p{self.podPitchRate:10.2f} y{self.podYawRate:10.2f}')
         print(f'CHECKSUM right/wrong: {self.checkSumRightCnt}/{self.checkSumWrongCnt}')
 
     def rosPub(self):
