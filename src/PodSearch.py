@@ -207,7 +207,6 @@ class PodSearch:
                             'uavPos': (view['uavPosF'], view['uavPosL'], view['uavPosU']),
                             'yaw': view['uavYaw'],
                             'yawRange': view['yawRange'],
-                            'hfovPitchRatio': round['hfovPitchRatio'],
                             'theTime': round['theTime'],
                             'widthRatio': round['widthRatio']
                         }
@@ -501,9 +500,6 @@ class PodSearch:
             hfovDeg=self.podHfovDeg,
             maxRateDeg=self.expectedPodAngles.maxRateDeg
         )
-
-    def getHfovFromPitch(self, pitch):
-        return min(PodParas.maxHfov, max(PodParas.minHfov, pitch * self.autoTra.hfovPitchRatio))
 
     def isAtTarget(self):
         if self.args.head_only:

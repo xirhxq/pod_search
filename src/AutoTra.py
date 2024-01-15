@@ -71,7 +71,7 @@ class AutoTra:
 
         self.cmap = plt.get_cmap('tab10')
 
-        self.overlapD = 10 * self.height / 100 if overlapOn else 0
+        self.overlapD = self.height * 100 if overlapOn else 0
 
         self.pitchLevelOn = pitchLevelOn
         self.drawNum = drawNum
@@ -120,7 +120,7 @@ class AutoTra:
             nowVFov = self.getVFovFromTopPitch(nowP)
             nowMinP = min(nowMinP, nowP - nowVFov / 2)
             nowMaxP = min(nowMaxP, nowP + nowVFov / 2)
-            # print(f'podP: {self.pitches[-1]:.12f} [{nowMinP:.2f}, {nowMaxP:.2f}]')
+            print(f'podP: {self.pitches[-1]:.12f} [{nowMinP:.2f}, {nowMaxP:.2f}]')
 
         self.theList = []
         self.expectedTime = 0
@@ -156,8 +156,8 @@ class AutoTra:
         # make sure that xlim & ylim include self.uavPos
         ax.set_xlim(min(ax.get_xlim()[0], self.uavPos.x), max(ax.get_xlim()[1], self.uavPos.x))
         ax.set_ylim(min(ax.get_ylim()[0], self.uavPos.y), max(ax.get_ylim()[1], self.uavPos.y))
-        ax.set_xlim(inflateInterval(ax.get_xlim(), 0.1))
-        ax.set_ylim(inflateInterval(ax.get_ylim(), 0.1))
+        ax.set_xlim(inflateInterval(ax.get_xlim(), 1))
+        ax.set_ylim(inflateInterval(ax.get_ylim(), 1))
         ax.set_aspect('equal')
         plt.show()
 
@@ -457,14 +457,14 @@ def testSingleAutoTra():
             'areaPoints': [
                 (0, 1500),
                 (1500, 1500),
-                (1500, -1200),
-                (0, -1200)
+                (1500, -1500),
+                (0, -1500)
             ],
-            'uavPos': [-200, 0, 7.5],
+            'uavPos': [-50, 0, 7.5],
             'yaw': 0,
-            'yawRange': 200,
-            'theTime': 3,
-            'widthRatio': 0.02
+            'yawRange': 180,
+            'theTime': 6,
+            'widthRatio': 0.1
         },
         fast=True
     )
@@ -473,8 +473,7 @@ def testSingleAutoTra():
     ax = fig.add_subplot(111)
     autoTra.drawBasic(ax)
     autoTra.draw(ax)
-    plt.show()
-    # autoTra.draw(ax)
+    autoTra.adjustAndShow(ax)
     # autoTra.drawHorizonLength()
     # print(autoTra.theList)
 
