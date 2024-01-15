@@ -428,7 +428,7 @@ class PodSearch:
                 self.vesselCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * py))
                 id = str(target.category_id)
                 if id != '100':
-                    if self.args.id == 'boat':
+                    if self.args.id == 'boat' and self.args.trackVessel:
                         id = 'boat'
                     if target.w < self.config['trackWidth']['min'] or target.w > self.config['trackWidth']['max']:
                         expectedHfovDeg = PodParas.clipHfov(self.podHfovDegDelayed * target.w / self.config['trackWidth']['avg'])
