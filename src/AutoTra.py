@@ -209,7 +209,7 @@ class AutoTra:
                 (2 * PodParas.imageRatio * self.height / self.horizonLength + cos(radians(pitch)))
             )) * 2
         )
-        # hfovExact = PodParas.clipHfov(hfovDeg)
+        hfovExact = PodParas.clipHfov(hfovDeg)
         # print(f'{pitch=:.2f}->{hfovDeg=:.2f}->{hfovExact=:.2f}')
         return PodParas.getHfovFromExactHfov(hfovExact)
 
@@ -455,16 +455,16 @@ def testSingleAutoTra():
         drawNum=-1,
         config={
             'areaPoints': [
-                (0, 1700),
-                (2000, 1700),
-                (2000, -1500),
-                (0, -1500)
+                (0, 1500),
+                (1500, 1500),
+                (1500, -1200),
+                (0, -1200)
             ],
-            'uavPos': [-25, 0, 66],
+            'uavPos': [-200, 0, 7.5],
             'yaw': 0,
             'yawRange': 200,
             'theTime': 3,
-            'widthRatio': 0.1
+            'widthRatio': 0.02
         },
         fast=True
     )
