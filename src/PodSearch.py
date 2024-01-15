@@ -19,7 +19,7 @@ from rich.console import Console
 import rospy
 import rospkg
 from std_msgs.msg import Float32, Bool, Float64MultiArray, Int8, Int16, MultiArrayDimension, Header, Float32MultiArray, String
-from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
+from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion, QuaternionStamped
 from nav_msgs.msg import Odometry
 
 from spirecv_msgs.msg import TargetsInFrame
@@ -132,6 +132,10 @@ class PodSearch:
         # From localisation: location
         self.uavPos = np.array(self.config['uavInitialPos'])
         rospy.Subscriber(self.uavName + '/uwb/filter/odom', Odometry, self.uavPosCallback, queue_size=1)
+
+        # From dji osdk: attitude
+        self.uavEuler = [float(self.config['uavYawDeg'])]
+        rospy.Subscriber(self.uavName + '/dji_osdk_ros/attitude', QuaternionStamped, self.djiAttitudeCallback, queue_size=1)
 
         # From suav: suav control state
         self.uavState = 0
@@ -359,6 +363,16 @@ class PodSearch:
 
     def uavPosCallback(self, msg):
         self.uavPos = np.array([[msg.twist.twist.linear.x], [msg.twist.twist.linear.y], [msg.twist.twist.linear.z]])
+
+    def djiAttitudeCallback(self, msg):
+        quaternion = [
+            msg.quaternion.x,
+            msg.quaternion.y,
+            msg.quaternion.z,
+            msg.quaternion.w
+        ]
+        self.uavEuler = R.from_quat(quaternion).as_euler('zyx', degrees=True).tolist()
+        self.uavYawDeg = self.uavEuler[0]
 
     @property
     def podPitchDeg(self):
@@ -858,6 +872,11 @@ class PodSearch:
             f'[red3]'
             f'suav in #{self.uavState} '
             f'@ ({", ".join([f"{self.uavPos[i][0]:.2f}" for i in range(3)])}), {self.uavYawDeg:.2f} Deg'
+        )
+        self.console.rule(
+            f'[red3]'
+            f'UAV Euler: {self.uavEuler} '
+            f'Yaw: {self.uavYawDeg:.2f}'
         )
         self.console.rule(
             f'[cyan3]'

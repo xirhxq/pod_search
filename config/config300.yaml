@@ -75,3 +75,5 @@ trackWidth:
   avg: 0.15
 
 trackMaxRateDeg: 20
+
+uavYawDeg: 120
