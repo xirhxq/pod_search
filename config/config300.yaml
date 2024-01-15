@@ -1,0 +1,81 @@
+SearchArea:
+  frontLength: 2000
+  leftLength: 1700
+  rightLength: 1500
+
+SearchPoints:
+  - id: 0
+    uavPosF: -50
+    uavPosL: 0
+    uavPosU: 40
+    uavYaw: 0
+    yawRange: 200
+    timeout: 300
+
+uavInitialPos: [[0], [0], [7.5]]
+
+targetInitialPos: [[-156], [218], [0]]
+
+podInitialData:
+  pitchDeg: 30
+  yawDeg: 0
+  hfovDeg: 40
+  maxRateDeg: 20
+
+preSearchData:
+  - pitchDeg: 20
+    yawDeg: -50
+    hfovDeg: 40
+    maxRateDeg: 5
+  - pitchDeg: 20
+    yawDeg: 50
+    hfovDeg: 40
+    maxRateDeg: 5
+
+dockData:
+  pitchDeg: 30
+  yawDeg: 0
+  hfovDeg: 60
+  maxRateDeg: 20
+
+searchConfig:
+  - hfovPitchRatio: 3
+    theTime: 3
+    widthRatio: 0.06
+  - hfovPitchRatio: 3
+    theTime: 5
+    widthRatio: 0.1
+
+targetSimilarityThreshold: 0.2
+
+onReportFailure: 'next' # 'next' or 'remove'
+
+usvGuideSideLength: 500
+
+others:
+  - 'usv'
+  - 'tuav1'
+  - 'tuav2'
+  - 'tuav3'
+  - 'tuav6'
+  - 'streamer'
+
+related:
+  - 'usv'
+  - 'streamer'
+
+laserOn: True
+
+guideWidth:
+  min: 0.15
+  max: 0.25
+  avg: 0.2
+
+guideMaxRateDeg: 2
+
+trackWidth:
+  min: 0.1
+  max: 0.2
+  avg: 0.15
+
+trackMaxRateDeg: 20

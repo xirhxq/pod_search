@@ -203,12 +203,14 @@ class AutoTra:
     def getHFovFromTopPitch(self, pitch):
         if not self.pitchLevelOn:
             return pitch
-        hfovExact = PodParas.clipHfov(PodParas.getHfovFromVFov(
+        hfovDeg = PodParas.getHfovFromVFov(
             degrees(atan(
                 sin(radians(pitch)) /
                 (2 * PodParas.imageRatio * self.height / self.horizonLength + cos(radians(pitch)))
             )) * 2
-        ))
+        )
+        # hfovExact = PodParas.clipHfov(hfovDeg)
+        # print(f'{pitch=:.2f}->{hfovDeg=:.2f}->{hfovExact=:.2f}')
         return PodParas.getHfovFromExactHfov(hfovExact)
 
     def getVFovFromTopPitch(self, pitch):
@@ -458,11 +460,11 @@ def testSingleAutoTra():
                 (2000, -1500),
                 (0, -1500)
             ],
-            'uavPos': [1000, 0, 40],
-            'yaw': 330,
-            'yawRange': 120,
+            'uavPos': [-25, 0, 66],
+            'yaw': 0,
+            'yawRange': 200,
             'theTime': 3,
-            'widthRatio': 0.06
+            'widthRatio': 0.1
         },
         fast=True
     )

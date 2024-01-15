@@ -70,7 +70,7 @@ class PodSearch:
         print(BLUE + 'ARGS:', self.args, RESET)
 
         self.packagePath = rospkg.RosPack().get_path('pod_search')
-        with open(self.packagePath + '/config/config.yaml', 'r') as config:
+        with open(self.packagePath + '/config/config' + self.args.config + '.yaml', 'r') as config:
             self.config = yaml.safe_load(config)
 
         if not self.args.fast:
@@ -919,6 +919,7 @@ class PodSearch:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--config', choices=['20', '300'], default='300')
     parser.add_argument('--trackUSV', help='track usv', action='store_true')
     parser.add_argument('--trackVessel', help='track usv', action='store_true')
     parser.add_argument('--id', default='boat')
