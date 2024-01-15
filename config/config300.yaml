@@ -1,15 +1,15 @@
 SearchArea:
-  frontLength: 2000
-  leftLength: 1700
-  rightLength: 1500
+  frontLength: 1200
+  leftLength: 1200
+  rightLength: 1200
 
 SearchPoints:
   - id: 0
-    uavPosF: -50
+    uavPosF: -200
     uavPosL: 0
-    uavPosU: 40
+    uavPosU: 7.5
     uavYaw: 0
-    yawRange: 200
+    yawRange: 180
     timeout: 300
 
 uavInitialPos: [[0], [0], [7.5]]
@@ -40,11 +40,8 @@ dockData:
 
 searchConfig:
   - hfovPitchRatio: 3
-    theTime: 3
-    widthRatio: 0.06
-  - hfovPitchRatio: 3
     theTime: 5
-    widthRatio: 0.1
+    widthRatio: 0.05
 
 targetSimilarityThreshold: 0.2
 
