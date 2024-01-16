@@ -616,9 +616,9 @@ class PodSearch:
         self.expectedLaserOnPub.publish(self.expectedLaserOn)
     
     def stepTrack(self):
-        self.trackPoint.id = next(self.idGen)
-        self.trackPoint.uavYaw = (self.toc - self.tic) * 3 + self.dockPoint.uavYaw
-        self.searchPointPub.publish(data=self.trackPoint.toList())
+        # self.trackPoint.id = next(self.idGen)
+        # self.trackPoint.uavYaw = (self.toc - self.tic) * 3 + self.dockPoint.uavYaw
+        # self.searchPointPub.publish(data=self.trackPoint.toList())
         self.console.rule(
             f'[bold blue]'
             f'Tracking for {self.trackName}... Laser '
@@ -910,6 +910,7 @@ class PodSearch:
                 justify='center'
             )
         self.toStreamerPub.publish(Int8(data=(1 if self.state == State.TRACK else 0)))
+        self.systemState = 'REPORT' if self.state.name == 'TRACK' else self.state.name
         self.systemStatePub.publish(self.systemState)
         self.controlStateMachine()
         self.console.print(f'{self.vesselDict = }')
