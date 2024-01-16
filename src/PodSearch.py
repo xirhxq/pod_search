@@ -435,7 +435,7 @@ class PodSearch:
         self.vesselCameraElevation = None
         for target in msg.targets:
             px = (target.cx - 0.5) * 2
-            py = (target.cy - 0.5) * 2
+            py = (target.cy - target.h / 2 - 0.5) * 2
             try:
                 self.vesselCameraAzimuth = -np.degrees(np.arctan(np.tan(np.radians(self.podHfovDegDelayed) / 2) * px))
                 self.vesselCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * py))
@@ -483,7 +483,7 @@ class PodSearch:
         self.usvCameraElevation = None
         for target in msg.targets:
             px = (target.cx - 0.5) * 2
-            py = (target.cy - 0.5) * 2
+            py = (target.cy - target.h / 2 - 0.5) * 2
             try:
                 self.usvCameraAzimuth = -np.degrees(np.arctan(np.tan(np.radians(self.podHfovDegDelayed) / 2) * px))
                 self.usvCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * py))
@@ -492,7 +492,7 @@ class PodSearch:
                 elif self.trackData['usv'] is not None:
                     expectedHfovDeg = self.trackData['usv'].hfovDeg
                 else:
-                    expectedHfovDeg = self.hfovDeg
+                    expectedHfovDeg = self.podHfovDeg
                 self.trackData['usv'] = PodAngles(
                     pitchDeg=self.usvCameraElevation + self.podPitchDegDelayed, 
                     yawDeg=self.usvCameraAzimuth + self.podYawDegDelayed, 
