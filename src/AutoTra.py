@@ -463,13 +463,19 @@ def testSingleAutoTra():
             'areaPoints': [
                 (0, 1500),
                 (1500, 1500),
-                (1500, -1500),
-                (0, -1500)
+                (1500, -1700),
+                (0, -1700)
             ],
-            'uavPos': [-50, 0, 7.5],
+            # 'areaPoints': [
+            #     (0, 750),
+            #     (1500, 750),
+            #     (1500, -750),
+            #     (0, -750)
+            # ],
+            'uavPos': [-300, 0, 7.5],
             'yaw': 0,
             'yawRange': 180,
-            'theTime': 6,
+            'theTime': 4,
             'widthRatio': 0.1
         },
         fast=True
