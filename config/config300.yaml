@@ -9,7 +9,7 @@ SearchPoints:
     uavPosL: 0
     uavPosU: 7.5
     uavYaw: 0
-    yawRange: 180
+    yawRange: 140
     timeout: 300
 
 uavInitialPos: [[0], [0], [7.5]]
@@ -39,7 +39,7 @@ dockData:
   maxRateDeg: 20
 
 searchConfig:
-  - theTime: 6
+  - theTime: 4
     widthRatio: 0.02
 
 targetSimilarityThreshold: 0.2
