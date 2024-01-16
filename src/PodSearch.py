@@ -452,7 +452,7 @@ class PodSearch:
                         yawDeg=self.vesselCameraAzimuth + self.podYawDegDelayed, 
                         hfovDeg=expectedHfovDeg, 
                         maxRateDeg=self.config['trackMaxRateDeg'],
-                        laserOn=self.config['laserOn']
+                        laserOn=self.config['laserOn'] 
                     )
                     score = target.score
                     self.lastVesselCaptureTime[id] = self.getTimeNow()
@@ -677,7 +677,7 @@ class PodSearch:
     @stepEntrance
     def toStepGuide(self):
         self.state = State.GUIDE
-        self.guideFake = self.targetPos[0][0] > self.uavPos[0][0]
+        self.guideFake = False
         self.trackName = 'usv'
         self.trackData[self.trackName] = None
         self.ekfs[self.trackName] = LocatingEKF(initialT=self.getTimeNow())
@@ -731,7 +731,6 @@ class PodSearch:
             self.getTimeNow(),
             ekfZ,
             self.uavPos,
-
             self.rP2BDelayed,
             R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T
         )
