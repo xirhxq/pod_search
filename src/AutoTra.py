@@ -242,10 +242,12 @@ class AutoTra:
         #     )
         # r = self.getRFromPitch(pitch)
         # print(f'{pitch=:.2f} {r=:.2f}')
+        rMin = self.getRFromPitch(pitch + self.getVFovFromTopPitch(pitch) / 2)
+        rMax = self.getRFromPitch(pitch - self.getVFovFromTopPitch(pitch) / 2)
         rs = [
             self.getRFromPitch(pitch),
-            self.getRFromPitch(pitch - self.getVFovFromTopPitch(pitch) / 2),
-            self.getRFromPitch(pitch + self.getVFovFromTopPitch(pitch) / 2)
+            rMax,
+            rMin
         ]
 
         edgePoints = [
@@ -256,6 +258,10 @@ class AutoTra:
             for yaw in self.yawLinspaceDeg for r in rs
         ]
         # print(f'{edgePoints=}')
+
+        for point in self.config['areaPoints']:
+            if rMin <= Point(point).distance(self.uavPos) <= rMax:
+                edgePoints.append(Point(point))
 
         edgePoints = [
             edgePoint
