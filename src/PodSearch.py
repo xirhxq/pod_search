@@ -445,10 +445,11 @@ class PodSearch:
                 if id != '100':
                     if self.args.id == 'boat' and self.args.trackVessel:
                         id = 'boat'
-                    if target.w < self.config['trackWidth']['min'] or target.w > self.config['trackWidth']['max']:
-                        expectedHfovDeg = PodParas.clipHfov(self.podHfovDegDelayed * target.w / self.config['trackWidth']['avg'])
-                    else:
-                        expectedHfovDeg = self.trackData[id].hfovDeg
+                    expectedHfovDeg = self.podHfovDegDelayed
+                    # if target.w < self.config['trackWidth']['min'] or target.w > self.config['trackWidth']['max']:
+                    #     expectedHfovDeg = PodParas.clipHfov(self.podHfovDegDelayed * target.w / self.config['trackWidth']['avg'])
+                    # else:
+                    #     expectedHfovDeg = self.trackData[id].hfovDeg
                     self.trackData[id] = PodAngles(
                         pitchDeg=self.vesselCameraElevation + self.podPitchDegDelayed, 
                         yawDeg=self.vesselCameraAzimuth + self.podYawDegDelayed, 

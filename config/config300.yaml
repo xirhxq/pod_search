@@ -1,7 +1,7 @@
 SearchArea:
   frontLength: 1500
-  leftLength: 750
-  rightLength: 750
+  leftLength: 300
+  rightLength: 300
 
 SearchPoints:
   - id: 0
