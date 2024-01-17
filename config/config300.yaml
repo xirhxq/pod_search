@@ -40,7 +40,7 @@ dockData:
 
 searchConfig:
   - theTime: 4
-    widthRatio: 0.02
+    widthRatio: 0.1
 
 targetSimilarityThreshold: 0.2
 

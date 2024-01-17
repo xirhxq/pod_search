@@ -547,7 +547,8 @@ class PodSearch:
             self.searchViewCnt = 0
             self.searchRoundCnt += 1
         if self.searchRoundCnt == len(self.autoTras):
-            self.toStepDock()
+            self.searchRoundCnt = 0
+            # self.toStepDock()
             # self.toStepEnd()
             return
         self.autoTra = self.autoTras[self.searchRoundCnt][self.searchViewCnt]
