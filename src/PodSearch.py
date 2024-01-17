@@ -327,6 +327,8 @@ class PodSearch:
             startTime = (startTime + datetime.timedelta(minutes=1)).replace(second=0, microsecond=0)
         elif self.args.start == 'hour':
             startTime = (startTime + datetime.timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+        else:
+            startTime = (startTime + datetime.timedelta(seconds=1))
 
         while datetime.datetime.now() < startTime or not self.othersAllReady or self.systemState != 'COUNTDOWN':
             if self.relatedAllReady:
@@ -871,11 +873,6 @@ class PodSearch:
             f'[red3]'
             f'suav in #{self.uavState} '
             f'@ ({", ".join([f"{self.uavPos[i][0]:.2f}" for i in range(3)])}), {self.uavYawDeg:.2f} Deg'
-        )
-        self.console.rule(
-            f'[red3]'
-            f'UAV Euler: {self.uavEuler} '
-            f'Yaw: {self.uavYawDeg:.2f}'
         )
         self.console.rule(
             f'[cyan3]'
