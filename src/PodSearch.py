@@ -567,10 +567,6 @@ class PodSearch:
             self.pubPYZMaxRate()
             if self.isAtTarget():
                 self.preSearchCnt = next(self.preSearchCntGen)
-            idAndScore = self.getMinScoreTargetIdAndScore()
-            if idAndScore is not None and idAndScore[1] < self.config['targetSimilarityThreshold']: 
-                self.targetId = idAndScore[0]
-                self.toStepTrack(self.targetId)
         else:
             self.expectedPodAngles = self.tra[0]
             self.pubPYZMaxRate()
@@ -598,6 +594,10 @@ class PodSearch:
                 f'FREEZING!!!!'
             )
         self.pubPYZMaxRate()
+        idAndScore = self.getMinScoreTargetIdAndScore()
+        if idAndScore is not None and idAndScore[1] < self.config['targetSimilarityThreshold']:
+            self.targetId = idAndScore[0]
+            self.toStepTrack(self.targetId)
         if self.isAtTarget():
             self.traCnt += 1
         if self.traCnt == len(self.tra):
