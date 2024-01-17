@@ -480,7 +480,7 @@ class PodSearch:
         return min(self.vesselDict.items(), key=lambda x: x[1])
     
     def getKthScoreTargetIdAndScore(self, k):
-        if len(self.vesselDict) < k:
+        if len(self.vesselDict) == 0:
             return None
         item = heapq.nsmallest(k, self.vesselDict.items(), key=lambda x: x[1])
         return item[-1] if len(item) == k else None
@@ -676,10 +676,10 @@ class PodSearch:
         if self.ksbState == 'TargetRejected' or self.toc - self.tic >= 300:
             self.reportNumber += 1
             if self.config['onReportFailure'] == 'next':
-                idAndScore = self.getKthScoreTargetIdAndScore(self.reportNumber)[0]
+                idAndScore = self.getKthScoreTargetIdAndScore(self.reportNumber)
             elif self.config['onReportFailure'] == 'remove':
                 self.vesselDict.pop(self.targetId)
-                idAndScore = self.getMinScoreTargetIdAndScore()[0]
+                idAndScore = self.getMinScoreTargetIdAndScore()
             if idAndScore is None:
                 self.vesselDict.clear()
                 self.targetId = None
