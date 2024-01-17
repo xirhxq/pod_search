@@ -266,6 +266,10 @@ class PodSearch:
         # [StepTrack] For test: target vessel position subscribing
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/targetPos', Float64MultiArray, self.targetPosCallback)
 
+        # [StepTrack] Tracking ratio inside bbox, [-1, 1]
+        self.trackX = 0
+        self.trackY = -1
+
         # [StepRefind] target name & related pod angles
         self.refindName = None
         self.refindPodAngles = None
@@ -436,8 +440,8 @@ class PodSearch:
         self.vesselCameraAzimuth = None
         self.vesselCameraElevation = None
         for target in msg.targets:
-            px = (target.cx - 0.5) * 2
-            py = (target.cy - target.h / 2 - 0.5) * 2
+            px = (target.cx + self.trackX * (target.w / 2) - 0.5) * 2
+            py = (target.cy + self.trackY * (target.h / 2) - 0.5) * 2
             try:
                 self.vesselCameraAzimuth = -np.degrees(np.arctan(np.tan(np.radians(self.podHfovDegDelayed) / 2) * px))
                 self.vesselCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * py))
@@ -446,10 +450,10 @@ class PodSearch:
                     if self.args.id == 'boat' and self.args.trackVessel:
                         id = 'boat'
                     expectedHfovDeg = self.podHfovDegDelayed
-                    # if target.w < self.config['trackWidth']['min'] or target.w > self.config['trackWidth']['max']:
-                    #     expectedHfovDeg = PodParas.clipHfov(self.podHfovDegDelayed * target.w / self.config['trackWidth']['avg'])
-                    # else:
-                    #     expectedHfovDeg = self.trackData[id].hfovDeg
+                    if target.w < self.config['trackWidth']['min']:
+                        expectedHfovDeg = PodParas.clipHfov(self.podHfovDegDelayed * target.w / self.config['trackWidth']['min'])
+                    if target.w > self.config['trackWidth']['max']:
+                        expectedHfovDeg = PodParas.clipHfov(self.podHfovDegDelayed * target.w / self.config['trackWidth']['max'])
                     self.trackData[id] = PodAngles(
                         pitchDeg=self.vesselCameraElevation + self.podPitchDegDelayed, 
                         yawDeg=self.vesselCameraAzimuth + self.podYawDegDelayed, 
@@ -640,6 +644,12 @@ class PodSearch:
             self.console.print(
                 f'{self.getTimeNow() - self.lastVesselCaptureTime[self.trackName]}'
             )
+        self.trackX = np.sin((self.toc - self.tic) / 2 / np.pi / 10)
+        self.trackY = -1
+        self.console.rule(
+            f'[magenta2]'
+            f'track ({self.trackX:6.2f}, {self.trackY:6.2f})'
+        )
         # if self.getTimeNow() - self.lastUSVCaptureTime >= 5.0:
         #     self.toStepRefind(self.trackName)
         if not self.podLaserOn and self.config['laserOn']:
