@@ -254,6 +254,10 @@ class PodSearch:
         self.landFlag = -1
         rospy.Subscriber('/usv/suav_land_flag', Int8, lambda msg: setattr(self, 'landFlag', msg.data))
 
+        # [StepTrack & StepGuide] Fake R for vessel & usv
+        self.fakeRVessel = None
+        self.fakeRUSV = None
+
         # [StepGuide] guidance data
         self.usvTargetPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/target_nav_position', PoseStamped, queue_size=1)
 
@@ -444,9 +448,11 @@ class PodSearch:
         for target in msg.targets:
             px = (target.cx + self.trackX * (target.w / 2) - 0.5) * 2
             py = (target.cy + self.trackY * (target.h / 2) - 0.5) * 2
+            fpy = (target.cy + (target.h / 2) - 0.5) * 2
             try:
                 self.vesselCameraAzimuth = -np.degrees(np.arctan(np.tan(np.radians(self.podHfovDegDelayed) / 2) * px))
                 self.vesselCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * py))
+                self.fakeVesselCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * fpy))
                 id = str(target.category_id)
                 if id != '100':
                     if self.args.id == 'boat' and self.args.trackVessel:
@@ -461,8 +467,9 @@ class PodSearch:
                         yawDeg=self.vesselCameraAzimuth + self.podYawDegDelayed, 
                         hfovDeg=expectedHfovDeg, 
                         maxRateDeg=self.config['trackMaxRateDeg'],
-                        laserOn=self.config['laserOn'] 
+                        laserOn=self.config['laserOn']
                     )
+                    self.fakeRVessel = self.uavPos[2][0] / np.sin(np.radians(self.fakeVesselCameraElevation))
                     score = target.score
                     self.lastVesselCaptureTime[id] = self.getTimeNow()
                     # print(f'{BOLD}{BLUE}{id = } {score = }{RESET}')
@@ -493,9 +500,11 @@ class PodSearch:
         for target in msg.targets:
             px = (target.cx + self.trackX * (target.w / 2) - 0.5) * 2
             py = (target.cy + self.trackY * (target.h / 2) - 0.5) * 2
+            fpy = (target.cy + (target.h / 2) - 0.5) * 2
             try:
                 self.usvCameraAzimuth = -np.degrees(np.arctan(np.tan(np.radians(self.podHfovDegDelayed) / 2) * px))
                 self.usvCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * py))
+                self.fakeUSVCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * fpy))
                 if target.w < self.config['guideWidth']['min'] or target.w > self.config['guideWidth']['max']:
                     expectedHfovDeg = PodParas.clipHfov(self.podHfovDegDelayed * target.w / self.config['guideWidth']['avg'])
                 elif self.trackData['usv'] is not None:
@@ -509,6 +518,7 @@ class PodSearch:
                     maxRateDeg=self.config['guideMaxRateDeg'],
                     laserOn=self.config['laserOn']
                 )
+                self.fakeRUSV = self.uavPos[2][0] / np.sin(np.radians(self.fakeUSVCameraElevation))
                 self.lastUSVCaptureTime = self.getTimeNow()
             except Exception as e:
                 print(e)
@@ -620,9 +630,6 @@ class PodSearch:
         self.expectedLaserOnPub.publish(self.expectedLaserOn)
     
     def stepTrack(self):
-        # self.trackPoint.id = next(self.idGen)
-        # self.trackPoint.uavYaw = (self.toc - self.tic) * 3 + self.dockPoint.uavYaw
-        # self.searchPointPub.publish(data=self.trackPoint.toList())
         self.console.rule(
             f'[bold blue]'
             f'Tracking for {self.trackName}... Laser '
@@ -663,7 +670,8 @@ class PodSearch:
             ekfZ,
             self.uavPos,
             self.rP2BDelayed,
-            R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T
+            R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T,
+            self.fakeRVessel
         )
         print(f'{self.ekfs[self.trackName].ekf.x = }')
         if self.ksbState == 'TargetConfirmed':
@@ -749,7 +757,8 @@ class PodSearch:
             ekfZ,
             self.uavPos,
             self.rP2BDelayed,
-            R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T
+            R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T,
+            self.fakeRUSV
         )
         print(f'{self.ekfs[self.trackName].ekf.x = }')
         # if self.toc - self.tic >= 60:
