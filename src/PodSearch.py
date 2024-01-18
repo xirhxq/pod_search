@@ -175,8 +175,8 @@ class PodSearch:
         self.toStreamerPub = rospy.Publisher(self.uavName + '/toStreamer', Int8, queue_size=1)
 
         # [StepPrepare: pre-search] pre-search counter
-        self.preSearchCnt = 0
-        self.preSearchCntGen = itertools.cycle(range(len(self.config['preSearchData'])))
+        self.preGuideCnt = 0
+        self.preGuideCntGen = itertools.cycle(range(len(self.config['preGuideData'])))
 
         # [StepPrepare] counters
         self.searchRoundCnt = 0
@@ -560,6 +560,7 @@ class PodSearch:
             return
         self.autoTra = self.autoTras[self.searchRoundCnt][self.searchViewCnt]
         self.tra = self.autoTra.theList
+        self.expectedPodAngles = copy.deepcopy(self.tra[0])
 
     def stepPrepare(self):
         self.console.rule(
@@ -568,14 +569,7 @@ class PodSearch:
             f'Round #{self.searchRoundCnt + 1}, View #{self.searchViewCnt + 1}, '
             f'waiting for {self.searchPoints[self.searchViewCnt].id:d}X1'
         )
-        if self.searchRoundCnt == 0 and self.searchViewCnt == 0:
-            self.expectedPodAngles = copy.deepcopy(self.tra[0])
-            self.pubPYZMaxRate()
-            if self.isAtTarget():
-                self.preSearchCnt = next(self.preSearchCntGen)
-        else:
-            self.expectedPodAngles = self.tra[0]
-            self.pubPYZMaxRate()
+        self.pubPYZMaxRate()
         self.searchPointPub.publish(data=self.searchPoints[self.searchViewCnt].toList())
         if self.uavState % 10 == 1 and self.uavState // 100 == self.searchPoints[self.searchViewCnt].id:
             self.toStepSearch()
@@ -816,9 +810,12 @@ class PodSearch:
     @stepEntrance
     def toStepDock(self):
         self.state = State.DOCK
+        self.preGuideCnt = 0
 
     def stepDock(self):
-        self.expectedPodAngles = self.dockData
+        self.expectedPodAngles = PodAngles(**self.config['preGuideData'][self.preGuideCnt])
+        if self.isAtTarget():
+            self.preGuideCnt = next(self.preGuideCntGen)
         self.pubPYZMaxRate()
         self.searchPointPub.publish(data=self.dockPoint.toList())
         self.console.rule(
