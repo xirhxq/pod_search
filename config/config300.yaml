@@ -1,7 +1,7 @@
 SearchArea:
   frontLength: 1500
-  leftLength: 300
-  rightLength: 300
+  leftLength: 1500
+  rightLength: 1500
 
 SearchPoints:
   - id: 0
@@ -33,16 +33,16 @@ preSearchData:
     maxRateDeg: 5
 
 dockData:
-  pitchDeg: 30
+  pitchDeg: 4
   yawDeg: 0
-  hfovDeg: 60
+  hfovDeg: 20
   maxRateDeg: 20
 
 searchConfig:
   - theTime: 4
     widthRatio: 0.1
 
-targetSimilarityThreshold: 0.2
+targetSimilarityThreshold: 0.3
 
 onReportFailure: 'next' # 'next' or 'remove'
 

@@ -128,6 +128,7 @@ class PodSearch:
         self.vesselCameraElevation = None
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/vessel_det', TargetsInFrame, self.vesselDetectionCallback, queue_size=1)
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/usv_detection', TargetsInFrame, self.usvDetectionCallback, queue_size=1)
+        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/tv_det', TargetsInFrame, self.vesselDetectionCallback, queue_size=1)
 
         # From localisation: location
         self.uavPos = np.array(self.config['uavInitialPos'])
@@ -567,7 +568,7 @@ class PodSearch:
             f'waiting for {self.searchPoints[self.searchViewCnt].id:d}X1'
         )
         if self.searchRoundCnt == 0 and self.searchViewCnt == 0:
-            self.expectedPodAngles = PodAngles(**self.config['preSearchData'][self.preSearchCnt])
+            self.expectedPodAngles = copy.deepcopy(self.tra[0])
             self.pubPYZMaxRate()
             if self.isAtTarget():
                 self.preSearchCnt = next(self.preSearchCntGen)
@@ -819,9 +820,7 @@ class PodSearch:
         )
         if (
                 self.toc - self.tic >= 10 and
-                self.isAtTarget() and
-                self.uavState % 10 == 1 and
-                self.uavState // 100 == self.dockPoint.id
+                self.isAtTarget()
         ):
             self.toStepGuide()
 
