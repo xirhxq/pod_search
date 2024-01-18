@@ -9,7 +9,7 @@ viewTypeDict = {0: 'EO1', 1: 'EO2', 2: 'IR1', 3: 'IR2'}
 
 imageRatio = 16 / 9
 
-podDelay = 0.67
+podDelay = 0.6
 
 
 def getFFromHfov(hFov):

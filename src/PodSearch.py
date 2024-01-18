@@ -126,6 +126,11 @@ class PodSearch:
         self.usvCameraElevation = None
         self.vesselCameraAzimuth = None
         self.vesselCameraElevation = None
+
+        # [StepTrack] Tracking ratio inside bbox, [-1, 1]
+        self.trackX = 0
+        self.trackY = -1
+        
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/vessel_det', TargetsInFrame, self.vesselDetectionCallback, queue_size=1)
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/usv_detection', TargetsInFrame, self.usvDetectionCallback, queue_size=1)
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/tv_det', TargetsInFrame, self.vesselDetectionCallback, queue_size=1)
@@ -266,10 +271,6 @@ class PodSearch:
 
         # [StepTrack] For test: target vessel position subscribing
         rospy.Subscriber(self.uavName + '/' + self.deviceName + '/targetPos', Float64MultiArray, self.targetPosCallback)
-
-        # [StepTrack] Tracking ratio inside bbox, [-1, 1]
-        self.trackX = 0
-        self.trackY = -1
 
         # [StepRefind] target name & related pod angles
         self.refindName = None
@@ -490,8 +491,8 @@ class PodSearch:
         self.usvCameraAzimuth = None
         self.usvCameraElevation = None
         for target in msg.targets:
-            px = (target.cx - 0.5) * 2
-            py = (target.cy - target.h / 2 - 0.5) * 2
+            px = (target.cx + self.trackX * (target.w / 2) - 0.5) * 2
+            py = (target.cy + self.trackY * (target.h / 2) - 0.5) * 2
             try:
                 self.usvCameraAzimuth = -np.degrees(np.arctan(np.tan(np.radians(self.podHfovDegDelayed) / 2) * px))
                 self.usvCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * py))
@@ -711,6 +712,8 @@ class PodSearch:
         self.expectedLaserOnPub.publish(self.expectedLaserOn)
 
     def stepGuide(self):
+        self.trackX = 2 * np.sin((self.toc - self.tic) * 2 * np.pi / 10)
+        self.trackY = 2 * np.sin((self.toc - self.tic) * 2 * np.pi / 10)
         self.trackPoint.id = next(self.idGen)
         self.trackPoint.uavYaw = (self.toc - self.tic) * 3 + self.dockPoint.uavYaw
         self.searchPointPub.publish(data=self.trackPoint.toList())
@@ -724,13 +727,17 @@ class PodSearch:
             f'Search Point #{self.trackPoint.id}: '
             f'{self.trackPoint}'
         )
+        self.console.rule(
+            f'[magenta2]'
+            f'track ({self.trackX:6.2f}, {self.trackY:6.2f})'
+        )
         self.console.print(
             f'{self.trackData[self.trackName]}'
         )
         if self.landFlag == 1:
             self.toStepEnd()
-        # if self.getTimeNow() - self.lastUSVCaptureTime >= 5.0:
-        #     self.toStepRefind(self.trackName)
+        if self.getTimeNow() - self.lastUSVCaptureTime >= 5.0:
+            self.toStepRefind(self.trackName)
         if not self.podLaserOn and self.config['laserOn']:
             self.expectedLaserOn = True
             self.expectedLaserOnPub.publish(True)
@@ -793,8 +800,8 @@ class PodSearch:
             f'@ (p{self.refindPodAngles.pitchDeg:.2f}, y{self.refindPodAngles.yawDeg:.2f}, hfov{self.refindPodAngles.hfovDeg:.2f})'
         )
         self.expectedPodAngles = PodAngles(
-            pitchDeg=self.refindPodAngles.pitchDeg + (self.toc - self.tic) / 10 * np.sin((self.toc - self.tic) / 15 * 2 * np.pi),
-            yawDeg=self.refindPodAngles.yawDeg + (self.toc - self.tic) / 3 * np.cos((self.toc - self.tic) / 15 * 2 * np.pi),
+            pitchDeg=self.refindPodAngles.pitchDeg + (self.toc - self.tic) / 100 * np.sin((self.toc - self.tic) / 15 * 2 * np.pi),
+            yawDeg=self.refindPodAngles.yawDeg + (self.toc - self.tic) / 30 * np.cos((self.toc - self.tic) / 15 * 2 * np.pi),
             hfovDeg=PodParas.clipHfov(self.refindPodAngles.hfovDeg * 1.5),
             maxRateDeg=10
         )
@@ -922,7 +929,7 @@ class PodSearch:
         self.controlStateMachine()
         self.console.print(f'{self.vesselDict = }')
         self.console.print(f'{self.targetId = }')
-        self.console.print(f'{self.trackData = }')
+        # self.console.print(f'{self.trackData = }')
         self.console.print(f'{self.targetPos = }')
     
     def signalHandler(self, sig, frame):
