@@ -696,7 +696,8 @@ class PodSearch:
         self.guideFake = False
         self.trackName = 'usv'
         self.trackData[self.trackName] = self.getPodAnglesNow()
-        self.ekfs[self.trackName] = LocatingEKF(initialT=self.getTimeNow())
+        if self.ekfs[self.trackName] is None or self.ekfs[self.trackName].ekf.x is None:
+            self.ekfs[self.trackName] = LocatingEKF(initialT=self.getTimeNow())
         self.expectedLaserOn = False
         if self.guideFake:
             factor = -1 if self.targetPos[1][0] < self.uavPos[1][0] else 1
