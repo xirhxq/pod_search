@@ -684,13 +684,13 @@ class PodSearch:
                 f'{self.getTimeNow() - self.lastVesselCaptureTime[self.trackName]}'
             )
         self.trackX = np.sin((self.toc - self.tic) * 2 * np.pi / 10)
-        self.trackY = -1 + np.sin((self.toc - self.tic) * 2 * np.pi / 10) / 10
+        self.trackY = -1 + np.sin((self.toc - self.tic) * 2 * np.pi / 10)
         self.console.rule(
             f'[magenta2]'
             f'track ({self.trackX:6.2f}, {self.trackY:6.2f})'
         )
-        # if self.getTimeNow() - self.lastUSVCaptureTime >= 5.0:
-        #     self.toStepRefind(self.trackName)
+        if self.getTimeNow() - self.lastVesselCaptureTime[self.trackName] >= 5.0:
+            self.toStepRefind(self.trackName)
         if not self.podLaserOn and self.config['laserOn']:
             self.expectedLaserOn = True
             self.expectedLaserOnPub.publish(True)
