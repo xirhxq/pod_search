@@ -340,7 +340,7 @@ class PodSearch:
                 for sender in responce_data["senders"]:
                     dist = sender["dist"]
                     ipAddr = sender["ipAddr"]
-                    if ipAddr == self.config['usvDatalinkIpAddr']:
+                    if ipAddr == self.config['usvDatalinkIpAddr'] and 0 < dist < 3000:
                         self.datalinkR = dist
 
             except socket.timeout:
