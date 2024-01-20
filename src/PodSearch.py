@@ -642,7 +642,7 @@ class PodSearch:
             self.targetId = idAndScore[0]
             self.searchEndPodAngles = self.getPodAnglesNow()
             self.toStepTrack(self.targetId)
-        if self.isAtTarget():
+        if self.isAtTarget() and self.searchEndPodAngles is None:
             self.traCnt += 1
         if self.traCnt == len(self.tra):
             if len(self.vesselDict) > 0:
