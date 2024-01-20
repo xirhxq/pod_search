@@ -375,7 +375,7 @@ class PodSearch:
         else:
             startTime = (startTime + datetime.timedelta(seconds=1))
 
-        while datetime.datetime.now() < startTime or not self.othersAllReady or self.systemState != 'COUNTDOWN':
+        while datetime.datetime.now() < startTime or self.systemState != 'COUNTDOWN':
             if self.relatedAllReady:
                 self.systemState = 'READY'
             if self.systemState == 'READY' and self.othersAllReady:
