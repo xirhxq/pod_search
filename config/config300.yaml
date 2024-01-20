@@ -17,9 +17,9 @@ uavInitialPos: [[0], [0], [7.5]]
 targetInitialPos: [[-156], [1180], [0]]
 
 podInitialData:
-  pitchDeg: 30
-  yawDeg: 0
-  hfovDeg: 40
+  pitchDeg: 0
+  yawDeg: 60
+  hfovDeg: 10
   maxRateDeg: 20
 
 preGuideData:
@@ -78,4 +78,4 @@ trackMaxRateDeg: 20
 uavYawDeg: 120
 
 myDatalinkIpAddr: '192.168.147.30'
-usvDatalinkIpAddr: '192.168.147.20'
+usvDatalinkIpAddr: '192.168.147.60'
