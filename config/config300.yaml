@@ -50,15 +50,10 @@ usvGuideSideLength: 500
 
 others:
   - 'usv'
-  - 'tuav1'
-  - 'tuav2'
-  - 'tuav3'
-  - 'tuav6'
-  - 'streamer'
+  - 'tuav8'
 
 related:
   - 'usv'
-  - 'streamer'
 
 laserOn: True
 
