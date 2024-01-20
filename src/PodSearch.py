@@ -625,7 +625,7 @@ class PodSearch:
             f'Spend {self.autoTra.expectedTime:.1f}'
         )
         if self.searchEndPodAngles is not None:
-            self.expectedPodAngles = copy.deepcopy(self.searchPodAngles)
+            self.expectedPodAngles = copy.deepcopy(self.searchEndPodAngles)
             if self.isAtTarget():
                 self.searchEndPodAngles = None
         else:
