@@ -24,7 +24,7 @@ class LocatingEKF:
         self.ekf.Q[3:6, 0:3] = np.eye(3) * sigmaA * self.dt ** 3 / 2
         self.ekf.Q[3:6, 3:6] = np.eye(3) * self.dt
 
-    def firstFrame(self, Z, uavPos, rP2B, rB2I, fakeR):
+    def firstFrame(self, Z, uavPos, rP2B, rB2I):
         r, alpha, epsilon, h = Z[0][0], Z[1][0], Z[2][0], Z[3][0]
         if r == 0 or r >= 3000:
             return None
