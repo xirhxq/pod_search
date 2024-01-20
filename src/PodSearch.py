@@ -939,7 +939,6 @@ class PodSearch:
             f'[cyan3]'
             f'KSB state: {self.ksbState}'
         )
-        self.getDatalinkR()
         self.console.rule(
             f'[red3]'
             f'Datalink range: {self.datalinkR:.2f}'
@@ -979,6 +978,7 @@ class PodSearch:
         self.console.print(f'{self.targetId = }')
         # self.console.print(f'{self.trackData = }')
         self.console.print(f'{self.targetPos = }')
+        self.getDatalinkR()
     
     def signalHandler(self, sig, frame):
         print('You pressed Ctrl+C!')
