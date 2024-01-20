@@ -351,7 +351,8 @@ class PodSearch:
         if not self.args.check:
             return True
         for name in self.config['others']:
-            if getattr(self, name + 'State', 'NONE') != 'READY':
+            state = getattr(self, name + 'State', 'NONE')
+            if state != 'READY' and state != 'STANDBY':
                 return False
         return True
     
@@ -360,7 +361,8 @@ class PodSearch:
         if not self.args.check:
             return True
         for name in self.config['related']:
-            if getattr(self, name + 'State', 'NONE') != 'COMM_TEST' and getattr(self, name + 'State', 'NONE') != 'READY':
+            state = getattr(self, name + 'State', 'NONE')
+            if state != 'COMM_TEST' and state != 'READY':
                 return False
         return True
 
@@ -384,11 +386,17 @@ class PodSearch:
                 f'[bold red]'
                 f'Set start at {startTime}'
             )
-            remainingTime = startTime - datetime.datetime.now()
-            countDownStr = str(remainingTime).split('.')[0]
+            if startTime > datetime.datetime.now():
+                remainingTime = startTime - datetime.datetime.now()
+                countDownStr = str(remainingTime).split('.')[0]
+                colour = 'green'
+            else:
+                countDownStr = str(datetime.datetime.now() - startTime).split('.')[0]
+                colour = 'red'
             self.console.print(
                 pyfiglet.figlet_format(countDownStr),
-                justify='center'
+                justify='center',
+                style=colour
             )
             self.console.rule(
                 self.uavName + ': ' + self.systemState
