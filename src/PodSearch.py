@@ -709,7 +709,7 @@ class PodSearch:
             R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T
         )
         print(f'{self.ekfs[self.trackName].ekf.x = }')
-        if self.ksbState == 'TargetConfirmed':
+        if self.ksbState == 'TargetConfirmed' and self.ekfs[self.trackName].ekf.x is not None:
             self.targetPos = self.ekfs[self.trackName].ekf.x[:3].reshape(3, 1)
             self.toStepDock()
         if self.ksbState == 'TargetRejected' or self.toc - self.tic >= 300:
