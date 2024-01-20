@@ -42,10 +42,7 @@ class TimeBuffer:
 
         if self.preT == None or self.preMsg == None:
             return self.getData(self.preMsg)
-
-        if not (self.preT <= targetTime <= self.buffer[0][0]):
-            raise AssertionError(f'Buffer not right {self.preT.to_sec():.3f} -- {targetTime.to_sec():3f} -- {self.buffer[0][0]:.3f}')
-
+        
         t1 = self.preT.to_sec()
         t2 = self.buffer[0][0].to_sec()
         val1 = self.getData(self.preMsg)
