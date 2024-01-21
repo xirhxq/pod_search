@@ -196,8 +196,6 @@ class PodSearch:
         self.trackPoint = copy.deepcopy(self.dockPoint)
         self.idGen = itertools.cycle(range(66, 89))
         self.searchPointPub = rospy.Publisher(self.uavName + '/searchPoint', Float64MultiArray, queue_size=1)
-        
-        self.searchEndPodAngles = None
 
         # [StepSearch] trajectory setting
 
@@ -620,9 +618,9 @@ class PodSearch:
             self.toStepSearch()
 
     @stepEntrance
-    def toStepSearch(self):
+    def toStepSearch(self, reset=True):
         self.state = State.SEARCH
-        if self.searchEndPodAngles is None:
+        if reset:
             self.traCnt = 0
 
     def stepSearch(self):
@@ -632,12 +630,7 @@ class PodSearch:
             f'Round #{self.searchRoundCnt + 1}, View #{self.searchViewCnt + 1}, '
             f'Spend {self.autoTra.expectedTime:.1f}'
         )
-        if self.searchEndPodAngles is not None:
-            self.expectedPodAngles = copy.deepcopy(self.searchEndPodAngles)
-            if self.isAtTarget():
-                self.searchEndPodAngles = None
-        else:
-            self.expectedPodAngles = copy.deepcopy(self.tra[self.traCnt])
+        self.expectedPodAngles = copy.deepcopy(self.tra[self.traCnt])
         if self.uavState % 10 == 0:
             self.expectedPodAngles.maxRateDeg = 0
             self.console.rule(
@@ -648,17 +641,14 @@ class PodSearch:
         idAndScore = self.getMinScoreTargetIdAndScore()
         if idAndScore is not None and idAndScore[1] < self.config['targetSimilarityThreshold']:
             self.targetId = idAndScore[0]
-            self.searchEndPodAngles = self.getPodAnglesNow()
             self.toStepTrack(self.targetId)
-        if self.isAtTarget() and self.searchEndPodAngles is None:
+        if self.isAtTarget() and self.toc - self.tic >= 3:
             self.traCnt += 1
         if self.traCnt == len(self.tra):
             if len(self.vesselDict) > 0:
                 self.targetId = self.getMinScoreTargetIdAndScore()[0]
-            self.searchEndPodAngles = None
             self.toStepPrepare()
         if self.targetId is not None and self.getTimeNow() - self.lastVesselCaptureTime[self.targetId] < 0.1:
-            self.searchEndPodAngles = self.getPodAnglesNow()
             self.toStepTrack(self.targetId)
 
     @stepEntrance
@@ -678,6 +668,7 @@ class PodSearch:
             f'[bold blue]'
             f'Tracking for {self.trackName}... Laser '
             f"{'[bold red] on' if self.expectedLaserOn else '[bold green]off'}"
+            f'Report #{self.reportNumber}'
         )
         self.console.rule(
             f'[bold blue]'
@@ -723,17 +714,17 @@ class PodSearch:
         if self.ksbState == 'TargetRejected' or self.toc - self.tic >= 300:
             self.reportNumber += 1
             if self.config['onReportFailure'] == 'next':
-                idAndScore = self.getKthScoreTargetIdAndScore(self.reportNumber)
+                idAndScore = self.getMinScoreTargetIdAndScore()
             elif self.config['onReportFailure'] == 'remove':
                 self.vesselDict.pop(self.targetId)
                 idAndScore = self.getMinScoreTargetIdAndScore()
-            if idAndScore is None:
+            if idAndScore is None or self.reportNumber >= 3:
                 self.vesselDict.clear()
                 self.targetId = None
                 self.toStepPrepare()
             else:
                 self.targetId = idAndScore[0]
-                self.toStepPrepare()
+                self.toStepSearch(reset=False)
                 
     @stepEntrance
     def toStepGuide(self):
