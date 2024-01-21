@@ -353,7 +353,7 @@ class PodSearch:
             return True
         for name in self.config['others']:
             state = getattr(self, name + 'State', 'NONE')
-            if state != 'READY' and state != 'STANDBY':
+            if state != 'READY' and state != 'STANDBY' and state != 'WAIT':
                 return False
         return True
     
@@ -363,7 +363,7 @@ class PodSearch:
             return True
         for name in self.config['related']:
             state = getattr(self, name + 'State', 'NONE')
-            if state != 'COMM_TEST' and state != 'READY':
+            if state != 'COMM_TEST' and state != 'READY' and state != 'STANDBY' and state != 'WAIT':
                 return False
         return True
 
