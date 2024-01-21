@@ -608,7 +608,9 @@ class PodSearch:
             return
         self.autoTra = self.autoTras[self.searchRoundCnt][self.searchViewCnt]
         self.tra = self.autoTra.theList
-        self.expectedPodAngles = copy.deepcopy(self.tra[0])
+        self.expectedPodAngles = copy.deepcopy(PodAngles(
+            **self.config['podInitialData']
+        ))
 
     def stepPrepare(self):
         self.console.rule(

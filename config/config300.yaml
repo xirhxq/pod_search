@@ -17,9 +17,9 @@ uavInitialPos: [[0], [0], [7.5]]
 targetInitialPos: [[-156], [1180], [0]]
 
 podInitialData:
-  pitchDeg: 0
+  pitchDeg: -5
   yawDeg: 60
-  hfovDeg: 10
+  hfovDeg: 40
   maxRateDeg: 20
 
 preGuideData:
