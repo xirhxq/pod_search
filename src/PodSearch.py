@@ -373,6 +373,8 @@ class PodSearch:
             startTime = (startTime + datetime.timedelta(minutes=1)).replace(second=0, microsecond=0)
         elif self.args.start == 'hour':
             startTime = (startTime + datetime.timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+        elif self.args.start == 'half':
+            startTime = startTime.replace(minute=int(self.args.min), second=0, microsecond=0)
         else:
             startTime = (startTime + datetime.timedelta(seconds=1))
 
@@ -1006,10 +1008,11 @@ if __name__ == '__main__':
     parser.add_argument('--dock', help='look at dock', action='store_true')
     parser.add_argument('--fast', help='using default paras & skip confirmation', action='store_false')
     parser.add_argument('--bag', help='rosbag record', action='store_true')
-    parser.add_argument('--start', choices=['now', 'minute', 'hour'], default='minute')
+    parser.add_argument('--start', choices=['now', 'minute', 'hour', 'half'], default='minute')
     parser.add_argument('--init', help='initial state', default='None')
     parser.add_argument('--head-only', help='no pod', action='store_true')
     parser.add_argument('--check', help='check other system state', action='store_true')
+    parser.add_argument('--min', help='start minute', default=40)
     args, unknown = parser.parse_known_args()
 
     if args.bag:
