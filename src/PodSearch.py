@@ -316,33 +316,36 @@ class PodSearch:
         self.toc = self.getTimeNow()
 
     def getDatalinkR(self):
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            request_json = json.dumps({"get":"radioinfo"}).encode('utf-8')
-            s.sendto(request_json,(self.config['myDatalinkIpAddr'], 9999))
-            s.settimeout(1.0)
-            
-            try:
-                responce, _ = s.recvfrom(1024)
-                responce_str = responce.decode('utf-8')
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                request_json = json.dumps({"get":"radioinfo"}).encode('utf-8')
+                s.sendto(request_json,(self.config['myDatalinkIpAddr'], 9999))
+                s.settimeout(1.0)
+                
+                try:
+                    responce, _ = s.recvfrom(1024)
+                    responce_str = responce.decode('utf-8')
 
-                match = re.search(r'{.*}',responce_str)
+                    match = re.search(r'{.*}',responce_str)
 
-                if match:
-                    valid_json = match.group(0)
-                    try:
-                        responce_data = json.loads(valid_json)
+                    if match:
+                        valid_json = match.group(0)
+                        try:
+                            responce_data = json.loads(valid_json)
 
-                    except json.JSONDecodeError as e:
-                        print(f"JSON decoding error: {e}")
+                        except json.JSONDecodeError as e:
+                            print(f"JSON decoding error: {e}")
 
-                for sender in responce_data["senders"]:
-                    dist = sender["dist"]
-                    ipAddr = sender["ipAddr"]
-                    if ipAddr == self.config['usvDatalinkIpAddr'] and 0 < dist < 3000:
-                        self.datalinkR = dist
+                    for sender in responce_data["senders"]:
+                        dist = sender["dist"]
+                        ipAddr = sender["ipAddr"]
+                        if ipAddr == self.config['usvDatalinkIpAddr'] and 0 < dist < 3000:
+                            self.datalinkR = dist
 
-            except socket.timeout:
-                print("Timed out waiting for a Datalink packet.")
+                except socket.timeout:
+                    print("Timed out waiting for a Datalink packet.")
+        except:
+            pass
 
     @property
     def othersAllReady(self):
