@@ -728,7 +728,7 @@ class PodSearch:
             if idAndScore is None or self.reportNumber >= 3:
                 self.vesselDict.clear()
                 self.targetId = None
-                self.toStepPrepare()
+                self.toStepSearch(reset=False)
             else:
                 self.targetId = idAndScore[0]
                 self.toStepSearch(reset=False)
