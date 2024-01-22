@@ -646,7 +646,11 @@ class PodSearch:
             )
         self.pubPYZMaxRate()
         idAndScore = self.getMinScoreTargetIdAndScore()
-        if idAndScore is not None and idAndScore[1] < self.config['targetSimilarityThreshold']:
+        if (
+            idAndScore is not None and 
+            idAndScore[1] < self.config['targetSimilarityThreshold'] and
+            self.getTimeNow() - self.lastVesselCaptureTime[idAndScore[1]] < 0.1
+        ):
             self.targetId = idAndScore[0]
             self.toStepTrack(self.targetId)
         if self.isAtTarget() and self.toc - self.tic >= 3:
@@ -696,7 +700,7 @@ class PodSearch:
             f'track ({self.trackX:6.2f}, {self.trackY:6.2f})'
         )
         if self.getTimeNow() - self.lastVesselCaptureTime[self.trackName] >= 5.0:
-            self.toStepRefind(self.trackName)
+            self.toStepSearch(reset=False)
         if not self.podLaserOn and self.config['laserOn']:
             self.expectedLaserOn = True
             self.expectedLaserOnPub.publish(True)
