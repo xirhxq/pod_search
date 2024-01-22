@@ -668,10 +668,7 @@ class PodSearch:
         self.trackName = trackName
         self.trackData[trackName] = self.getPodAnglesNow()
         self.ekfs[trackName] = LocatingEKF(initialT=self.getTimeNow())
-        if not self.podLaserOn and self.config['laserOn']:
-            self.expectedLaserOn = True
-        else:
-            self.expectedLaserOn = False
+        self.expectedLaserOn = (not self.podLaserOn and self.config['laserOn'])
         self.expectedLaserOnPub.publish(self.expectedLaserOn)
     
     def stepTrack(self):
