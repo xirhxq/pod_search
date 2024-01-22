@@ -5,7 +5,7 @@ SearchArea:
 
 SearchPoints:
   - id: 0
-    uavPosF: -500
+    uavPosF: -300
     uavPosL: 0
     uavPosU: 7.5
     uavYaw: 0
@@ -50,6 +50,8 @@ usvGuideSideLength: 500
 
 others:
   - 'usv'
+  - 'tuav2'
+  - 'tuav3'
   - 'tuav8'
 
 related:
