@@ -14,7 +14,7 @@ SearchPoints:
 
 uavInitialPos: [[0], [0], [7.5]]
 
-targetInitialPos: [[-156], [1180], [0]]
+targetInitialPos: [[-700], [700], [0]]
 
 podInitialData:
   pitchDeg: -5
