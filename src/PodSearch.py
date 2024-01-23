@@ -649,7 +649,7 @@ class PodSearch:
         if (
             idAndScore is not None and 
             idAndScore[1] < self.config['targetSimilarityThreshold'] and
-            self.getTimeNow() - self.lastVesselCaptureTime[idAndScore[1]] < 0.1
+            self.getTimeNow() - self.lastVesselCaptureTime[idAndScore[0]] < 0.1
         ):
             self.targetId = idAndScore[0]
             self.toStepTrack(self.targetId)
