@@ -49,10 +49,11 @@ onReportFailure: 'next' # 'next' or 'remove'
 usvGuideSideLength: 500
 
 others:
+  - 'arm'
   - 'usv'
   - 'tuav2'
   - 'tuav3'
-  - 'tuav8'
+  - 'tuav6'
 
 related:
   - 'usv'
