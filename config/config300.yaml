@@ -24,11 +24,11 @@ podInitialData:
 
 preGuideData:
   - pitchDeg: 4
-    yawDeg: -10
+    yawDeg: -20
     hfovDeg: 20
     maxRateDeg: 5
   - pitchDeg: 4
-    yawDeg: 10
+    yawDeg: 20
     hfovDeg: 20
     maxRateDeg: 5
 
