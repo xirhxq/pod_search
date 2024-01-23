@@ -875,10 +875,7 @@ class PodSearch:
             f'Search Point #{self.dockPoint.id}: '
             f'{self.dockPoint}'
         )
-        if (
-                self.toc - self.tic >= 10 and
-                self.isAtTarget()
-        ):
+        if self.getTimeNow() - self.lastUSVCaptureTime < 0.1:
             self.toStepGuide()
 
     @stepEntrance
