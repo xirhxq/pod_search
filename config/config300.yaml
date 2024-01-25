@@ -1,7 +1,7 @@
 SearchArea:
   frontLength: 1500
-  leftLength: 400
-  rightLength: 400
+  leftLength: 600
+  rightLength: 1100
 
 SearchPoints:
   - id: 0
@@ -42,7 +42,7 @@ searchConfig:
   - theTime: 4
     widthRatio: 0.1
 
-targetSimilarityThreshold: 0.3
+targetSimilarityThreshold: 0
 
 onReportFailure: 'next' # 'next' or 'remove'
 
