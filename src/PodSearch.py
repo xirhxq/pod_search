@@ -130,6 +130,9 @@ class PodSearch:
         self.vesselCameraAzimuth = None
         self.vesselCameraElevation = None
 
+        # [StepTrack] Vessel FakeR
+        self.vesselFakeR = None
+
         # [StepTrack] Tracking ratio inside bbox, [-1, 1]
         self.trackX = 0
         self.trackY = -1
@@ -492,9 +495,11 @@ class PodSearch:
         for target in msg.targets:
             px = (target.cx + self.trackX * (target.w / 2) - 0.5) * 2
             py = (target.cy + self.trackY * (target.h / 2) - 0.5) * 2
+            bottomY = (target.cy + target.h / 2 - 0.5) * 2
             try:
                 self.vesselCameraAzimuth = -np.degrees(np.arctan(np.tan(np.radians(self.podHfovDegDelayed) / 2) * px))
                 self.vesselCameraElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * py))
+                self.vesselBottomElevation = np.degrees(np.arctan(np.tan(np.radians(self.podVfovDegDelayed) / 2) * bottomY))
                 id = str(target.category_id)
                 if id != '100':
                     if self.args.id == 'boat' and self.args.trackVessel:
@@ -511,6 +516,7 @@ class PodSearch:
                         maxRateDeg=self.config['trackMaxRateDeg'],
                         laserOn=self.config['laserOn']
                     )
+                    self.vesselFakeR = self.uavPos[2][0] / np.sin(np.radians(np.max(0.1, self.vesselBottomElevation + self.podPitchDegDelayed)))
                     score = target.score
                     self.lastVesselCaptureTime[id] = self.getTimeNow()
                     # print(f'{BOLD}{BLUE}{id = } {score = }{RESET}')
@@ -675,13 +681,15 @@ class PodSearch:
         self.ekfs[trackName] = LocatingEKF(initialT=self.getTimeNow())
         self.expectedLaserOn = (not self.podLaserOn and self.config['laserOn'])
         self.expectedLaserOnPub.publish(self.expectedLaserOn)
+        self.usingFakeR = False
     
     def stepTrack(self):
         self.console.rule(
             f'[bold blue]'
             f'Tracking for {self.trackName}... Laser '
             f"{'[bold red] on' if self.expectedLaserOn else '[bold green]off'}"
-            f'Report #{self.reportNumber}'
+            f'Report #{self.reportNumber} '
+            f'FakeR: {self.usingFakeR}'
         )
         self.console.rule(
             f'[bold blue]'
@@ -709,7 +717,14 @@ class PodSearch:
         if self.trackName in self.trackData and self.trackData[self.trackName].hfovDeg > 0:
             self.expectedPodAngles = self.trackData[self.trackName]
             self.pubPYZMaxRate()
-        ekfZ = np.array([[self.podLaserRange], [self.vesselCameraAzimuth], [self.vesselCameraElevation], [self.uavPos[2][0]]])
+        ekfZ = np.array([
+            [self.vesselFakeR if self.usingFakeR else self.podLaserRange], 
+            [self.vesselCameraAzimuth], 
+            [self.vesselCameraElevation], 
+            [self.uavPos[2][0]]
+        ])
+        if self.toc - self.tic >= 20.0 and self.ekfs[self.trackName].ekf.x is None:
+            self.usingFakeR = True
         self.console.print(f'{ekfZ = }')
         if not (0 < ekfZ[0][0] < 4000 and ekfZ[1][0] is not None and ekfZ[2][0] is not None):
             ekfZ = np.array([[0], [0], [0], [0]])
@@ -722,8 +737,9 @@ class PodSearch:
         )
         print(f'{self.ekfs[self.trackName].ekf.x = }')
         if self.ksbState == 'TargetConfirmed' and self.ekfs[self.trackName].ekf.x is not None:
-            self.targetPos = self.ekfs[self.trackName].ekf.x[:3].reshape(3, 1)
-            self.toStepDock()
+            if not self.usingFakeR or self.toc - self.tic >= 25.0:
+                self.targetPos = self.ekfs[self.trackName].ekf.x[:3].reshape(3, 1)
+                self.toStepDock()
         if self.ksbState == 'TargetRejected' or self.toc - self.tic >= 300:
             self.reportNumber += 1
             if self.config['onReportFailure'] == 'next':
