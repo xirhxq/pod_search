@@ -42,7 +42,7 @@ searchConfig:
   - theTime: 4
     widthRatio: 0.1
 
-targetSimilarityThreshold: 0
+targetSimilarityThreshold: 0.2
 
 onReportFailure: 'next' # 'next' or 'remove'
 
