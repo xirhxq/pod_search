@@ -68,7 +68,7 @@ guideWidth:
 guideMaxRateDeg: 2
 
 trackWidth:
-  min: 0.02
+  min: 0.10
   max: 0.50
 
 trackMaxRateDeg: 20
