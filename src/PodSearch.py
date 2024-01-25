@@ -649,7 +649,8 @@ class PodSearch:
         if (
             idAndScore is not None and 
             idAndScore[1] < self.config['targetSimilarityThreshold'] and
-            self.getTimeNow() - self.lastVesselCaptureTime[idAndScore[0]] < 0.1
+            self.getTimeNow() - self.lastVesselCaptureTime[idAndScore[0]] < 0.1 and
+            self.toc - self.tic >= 5.0
         ):
             self.targetId = idAndScore[0]
             self.toStepTrack(self.targetId)
@@ -659,7 +660,11 @@ class PodSearch:
             if len(self.vesselDict) > 0:
                 self.targetId = self.getMinScoreTargetIdAndScore()[0]
             self.toStepPrepare()
-        if self.targetId is not None and self.getTimeNow() - self.lastVesselCaptureTime[self.targetId] < 0.1:
+        if (
+            self.targetId is not None and
+            self.getTimeNow() - self.lastVesselCaptureTime[self.targetId] < 0.1 and
+            self.toc - self.tic >= 5.0
+        ):
             self.toStepTrack(self.targetId)
 
     @stepEntrance
