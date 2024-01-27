@@ -663,9 +663,12 @@ class PodSearch:
         if self.isAtTarget() and self.toc - self.tic >= 3:
             self.traCnt += 1
         if self.traCnt == len(self.tra):
-            if len(self.vesselDict) > 0:
-                self.targetId = self.getMinScoreTargetIdAndScore()[0]
-            self.toStepPrepare()
+            if self.config['oneShot']:
+                self.toStepDock()
+            else:
+                if len(self.vesselDict) > 0:
+                    self.targetId = self.getMinScoreTargetIdAndScore()[0]
+                self.toStepPrepare()
         if (
             self.targetId is not None and
             self.getTimeNow() - self.lastVesselCaptureTime[self.targetId] < 0.1 and
