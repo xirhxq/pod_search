@@ -800,9 +800,6 @@ class PodSearch:
             f'[magenta2]'
             f'track ({self.trackX:6.2f}, {self.trackY:6.2f})'
         )
-        self.console.print(
-            f'{self.trackData[self.trackName]}'
-        )
         if self.landFlag == 1:
             self.toStepEnd()
         if self.getTimeNow() - self.lastUSVCaptureTime >= 5.0:
@@ -827,7 +824,10 @@ class PodSearch:
             self.rP2BDelayed,
             R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T
         )
-        print(f'{self.ekfs[self.trackName].ekf.x = }')
+        self.console.rule(
+            f'[bold blue3]'
+            f'USV @ ({self.ekfs[self.trackName].ekf.x.flatten()[:3]})'
+        )
         # if self.toc - self.tic >= 60:
         #     self.toStepEnd()
         # return
@@ -842,6 +842,12 @@ class PodSearch:
             else:
                 usvToTargetENU = self.targetPos - usvPos
                 usvToTargetTheta = np.degrees(np.arctan2(usvToTargetENU[1][0], usvToTargetENU[0][0]))
+            self.console.rule(
+                f'[pink3]'
+                f'USV To Target'
+                f'({usvToTargetENU.flatten()[:3]}), '
+                f'{usvToTargetTheta:.2f} Deg'
+            )
             if self.guideFake:
                 if usvPos[0][0] > self.uavPos[0][0]:
                     self.guideFake = False
@@ -1005,7 +1011,7 @@ class PodSearch:
         self.console.print(f'{self.vesselDict = }')
         self.console.print(f'{self.targetId = }')
         # self.console.print(f'{self.trackData = }')
-        self.console.print(f'{self.targetPos = }')
+        self.console.rule(f'Target Pos: {self.targetPos.flatten()}')
         self.getDatalinkR()
     
     def signalHandler(self, sig, frame):
