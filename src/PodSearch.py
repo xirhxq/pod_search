@@ -155,7 +155,15 @@ class PodSearch:
 
         # From suav: suav yaw
         self.uavYawDeg = 0
-        rospy.Subscriber(self.uavName + '/xy_fcu/flight_data', Float32MultiArray, lambda msg: setattr(self, 'uavYawDeg', np.mod(450 - np.degrees(msg.data[15]), 360)))
+        rospy.Subscriber(
+            self.uavName + '/xy_fcu/flight_data',
+            Float32MultiArray,
+            lambda msg: setattr(
+                self,
+                'uavYawDeg',
+                np.mod(450 - np.degrees(msg.data[15]) + self.config['yawOffsetToUSV'], 360)
+            )
+        )
 
         # From KSB: KSB state
         self.ksbState = 'None'

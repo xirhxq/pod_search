@@ -79,3 +79,5 @@ myDatalinkIpAddr: '192.168.147.30'
 usvDatalinkIpAddr: '192.168.147.60'
 
 oneShot: True
+
+yawOffsetToUSV: 13
