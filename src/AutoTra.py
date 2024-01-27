@@ -461,10 +461,10 @@ def testSingleAutoTra():
         drawNum=-1,
         config={
             'areaPoints': [
-                (0, 600),
-                (1500, 600),
-                (1500, -1100),
-                (0, -1100)
+                (0, 300),
+                (1300, 300),
+                (1300, 0),
+                (0, 0)
             ],
             # 'areaPoints': [
             #     (0, 750),
@@ -472,7 +472,7 @@ def testSingleAutoTra():
             #     (1500, -750),
             #     (0, -750)
             # ],
-            'uavPos': [-300, 0, 7.5],
+            'uavPos': [-500, 0, 7.5],
             'yaw': 0,
             'yawRange': 180,
             'theTime': 4,

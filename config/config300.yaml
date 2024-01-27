@@ -1,11 +1,11 @@
 SearchArea:
-  frontLength: 1500
-  leftLength: 600
-  rightLength: 1100
+  frontLength: 1300
+  leftLength: 300
+  rightLength: 0
 
 SearchPoints:
   - id: 0
-    uavPosF: -300
+    uavPosF: -500
     uavPosL: 0
     uavPosU: 7.5
     uavYaw: 0
