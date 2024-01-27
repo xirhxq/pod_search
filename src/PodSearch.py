@@ -824,14 +824,14 @@ class PodSearch:
             self.rP2BDelayed,
             R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T
         )
-        self.console.rule(
-            f'[bold blue3]'
-            f'USV @ ({self.ekfs[self.trackName].ekf.x.flatten()[:3]})'
-        )
         # if self.toc - self.tic >= 60:
         #     self.toStepEnd()
         # return
         if self.ekfs[self.trackName].ekf.x is not None:
+            self.console.rule(
+                f'[bold blue3]'
+                f'USV @ ({self.ekfs[self.trackName].ekf.x.flatten()[:3]})'
+            )
             usvPos = self.ekfs[self.trackName].ekf.x[:3].reshape((3, 1))
             self.ekfLogs[self.trackName].log('usvEKFx', self.ekfs[self.trackName].ekf.x)
             self.ekfLogs[self.trackName].newline()
