@@ -183,10 +183,13 @@ class PodSearch:
             rospy.Subscriber(f'/{name}/state', String, lambda msg, name=name: setattr(self, f'{name}State', msg.data))
         # rospy.Subscriber('/tuav6/state', String, lambda msg: setattr(self, 'tuav6State', msg.data))
         # rospy.Subscriber('/tuav1/state', String, lambda msg: setattr(self, 'tuav1State', msg.data))
-        
 
         # To streamer
         self.toStreamerPub = rospy.Publisher(self.uavName + '/toStreamer', Int8, queue_size=1)
+
+        # [PreSearch: shaking head]
+        self.preSearchCnt = 0
+        self.preSearchCntGen = itertools.cycle(range(len(self.config['preSearchData'])))
 
         # [StepPrepare: pre-search] pre-search counter
         self.preGuideCnt = 0
@@ -390,6 +393,10 @@ class PodSearch:
             startTime = (startTime + datetime.timedelta(seconds=1))
 
         while datetime.datetime.now() < startTime or self.systemState != 'COUNTDOWN':
+            self.expectedPodAngles = PodAngles(**self.config['preSearchData'][self.preSearchCnt])
+            if self.isAtTarget():
+                self.preSearchCnt = next(self.preSearchCntGen)
+            self.pubPYZMaxRate()
             if self.relatedAllReady:
                 self.systemState = 'READY'
             if self.systemState == 'READY' and self.othersAllReady:
@@ -671,12 +678,9 @@ class PodSearch:
         if self.isAtTarget() and self.toc - self.tic >= 3:
             self.traCnt += 1
         if self.traCnt == len(self.tra):
-            if self.config['oneShot']:
-                self.toStepDock()
-            else:
-                if len(self.vesselDict) > 0:
-                    self.targetId = self.getMinScoreTargetIdAndScore()[0]
-                self.toStepPrepare()
+            if len(self.vesselDict) > 0:
+                self.targetId = self.getMinScoreTargetIdAndScore()[0]
+            self.toStepPrepare()
         if (
             self.targetId is not None and
             self.getTimeNow() - self.lastVesselCaptureTime[self.targetId] < 0.1 and

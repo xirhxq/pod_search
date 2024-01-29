@@ -9,12 +9,29 @@ SearchPoints:
     uavPosL: 0
     uavPosU: 7.5
     uavYaw: 0
+    yawRange: 90
+    timeout: 300
+  - id: 0
+    uavPosF: -300
+    uavPosL: 0
+    uavPosU: 7.5
+    uavYaw: 0
     yawRange: 140
     timeout: 300
 
 uavInitialPos: [[0], [0], [7.5]]
 
 targetInitialPos: [[-358], [933], [0]]
+
+preSearchData:
+  - pitchDeg: 0
+    yawDeg: -70
+    hfovDeg: 3
+    maxRateDeg: 1
+  - pitchDeg: 0
+    yawDeg: 70
+    hfovDeg: 3
+    maxRateDeg: 1
 
 podInitialData:
   pitchDeg: 0
@@ -77,7 +94,5 @@ uavYawDeg: 120
 
 myDatalinkIpAddr: '192.168.147.30'
 usvDatalinkIpAddr: '192.168.147.60'
-
-oneShot: True
 
 yawOffsetToUSV: 13
