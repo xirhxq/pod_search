@@ -2,6 +2,7 @@
 
 import threading
 import argparse
+import itertools
 from collections import deque
 from datetime import datetime, timedelta
 from math import tan, degrees, radians, atan
@@ -498,7 +499,9 @@ if __name__ == '__main__':
     parser.add_argument('--port', help='serial port of pod', type=str, default='/dev/ttyUSB1')
     parser.add_argument('--frame', help='control mode: B or I', choices=['b', 'i'], default='i')
     args, unknown = parser.parse_known_args()
+    portsGen = itertools.cycle(['/dev/ttyUSB' + str(i) for i in range(1, 5)])
     while not rospy.is_shutdown():
+        args.port = next(portsGen)
         try:
             pod_comm = POD_COMM(args)
             pod_comm.spin()
@@ -507,4 +510,4 @@ if __name__ == '__main__':
         except Exception as e:
             print(e)
             print(f'Retrying......')
-            sleep(0.5)
+            sleep(0.1)
