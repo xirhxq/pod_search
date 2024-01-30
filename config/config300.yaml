@@ -10,7 +10,7 @@ SearchPoints:
     uavPosL: 0
     uavPosU: 7.5
     uavYaw: 0
-    yawRange: 80
+    yawRange: 140
     timeout: 300
   - id: 0
     uavPosF: 0
