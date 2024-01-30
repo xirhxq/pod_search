@@ -1,22 +1,24 @@
-SearchArea:
-  frontLength: 1300
-  leftLength: 600
-  rightLength: 1100
+'areaPoints': [
+  (121.14307977822178, 646.8642504334499),
+  (1649.0846494790262, 650.9779650751218),
+  (1647.1374512099173, -1129.4631447548738),
+  (419.0144723207828, -1130.546284647222)
+]
 
 SearchPoints:
   - id: 0
-    uavPosF: -800
+    uavPosF: -500
     uavPosL: 0
     uavPosU: 7.5
     uavYaw: 0
-    yawRange: 90
+    yawRange: 80
     timeout: 300
   - id: 0
-    uavPosF: -300
+    uavPosF: 0
     uavPosL: 0
     uavPosU: 7.5
     uavYaw: 0
-    yawRange: 140
+    yawRange: 180
     timeout: 300
 
 uavInitialPos: [[0], [0], [7.5]]

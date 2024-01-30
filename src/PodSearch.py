@@ -213,12 +213,7 @@ class PodSearch:
 
         # [StepSearch] trajectory setting
 
-        self.searchAreaPoints = [
-            (0, self.config['SearchArea']['leftLength']),
-            (self.config['SearchArea']['frontLength'], self.config['SearchArea']['leftLength']),
-            (self.config['SearchArea']['frontLength'], -self.config['SearchArea']['rightLength']),
-            (0, -self.config['SearchArea']['rightLength']),
-        ]
+        self.searchAreaPoints = self.config['areaPoints']
         self.autoTras = []
         for round in self.config['searchConfig']:
             tmpList = []
