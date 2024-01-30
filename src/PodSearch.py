@@ -673,6 +673,9 @@ class PodSearch:
         if self.isAtTarget() and self.toc - self.tic >= 3:
             self.traCnt += 1
         if self.traCnt == len(self.tra):
+            if self.targetId is not None:
+                self.vesselDict.clear()
+                self.targetId = None
             if len(self.vesselDict) > 0 and self.searchViewCnt == len(self.searchPoints) - 1:
                 self.targetId = self.getMinScoreTargetIdAndScore()[0]
             self.toStepPrepare()
