@@ -423,6 +423,9 @@ class PodSearch:
                     justify='center',
                     style=('green' if getattr(self, name + 'State', 'NONE') == 'READY' else 'red3')
                 )
+            for ls in self.autoTras:
+                for at in ls:
+                    self.console.print(f'{at.theList}')
             time.sleep(1)
 
         self.systemState = 'START'
