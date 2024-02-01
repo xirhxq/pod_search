@@ -105,4 +105,4 @@ ksbStates:
   - 'TargetRejected'
   - 'GoHome'
 
-ksbThreshold: 5
+ksbThreshold: 10
