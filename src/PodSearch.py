@@ -167,7 +167,8 @@ class PodSearch:
 
         # From KSB: KSB state
         self.ksbState = 'None'
-        rospy.Subscriber('/ksb/state', String, lambda msg: setattr(self, 'ksbState', msg.data)) 
+        self.ksbCounters = {name: 0 for name in self.config['ksbStates']}
+        rospy.Subscriber('/ksb/state', String, self.ksbFilter) 
 
         # To others: my state
         self.state = State.INIT
@@ -323,6 +324,16 @@ class PodSearch:
         self.taskTime = 0
         self.tic = self.getTimeNow()
         self.toc = self.getTimeNow()
+
+    def ksbFilter(self, msg):
+        newState = msg.data
+        for state in self.config['ksbStates']:
+            if state != newState:
+                self.ksbCounters[state] = 0
+            else:
+                self.ksbCounters[state] += 1
+                if self.ksbCounters[state] >= self.config['ksbThreshold']:
+                    self.ksbState = state
 
     def getDatalinkR(self):
         try:

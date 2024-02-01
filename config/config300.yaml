@@ -98,3 +98,11 @@ myDatalinkIpAddr: '192.168.147.30'
 usvDatalinkIpAddr: '192.168.147.60'
 
 yawOffsetToUSV: 10
+
+ksbStates:
+  - 'NormalState'
+  - 'TargetConfirmed'
+  - 'TargetRejected'
+  - 'GoHome'
+
+ksbThreshold: 5
