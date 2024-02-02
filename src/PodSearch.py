@@ -137,9 +137,9 @@ class PodSearch:
         self.trackX = 0
         self.trackY = -1
         
-        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/vessel_det', TargetsInFrame, self.vesselDetectionCallback, queue_size=1)
-        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/usv_detection', TargetsInFrame, self.usvDetectionCallback, queue_size=1)
-        rospy.Subscriber(self.uavName + '/' + self.deviceName + '/tv_det', TargetsInFrame, self.vesselDetectionCallback, queue_size=1)
+        rospy.Subscriber('/suav/' + self.deviceName + '/vessel_det', TargetsInFrame, self.vesselDetectionCallback, queue_size=1)
+        rospy.Subscriber('/suav/' + self.deviceName + '/usv_detection', TargetsInFrame, self.usvDetectionCallback, queue_size=1)
+        rospy.Subscriber('/suav/' + self.deviceName + '/tv_det', TargetsInFrame, self.vesselDetectionCallback, queue_size=1)
 
         # From localisation: location
         self.uavPos = np.array(self.config['uavInitialPos'])
