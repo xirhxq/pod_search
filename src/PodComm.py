@@ -191,7 +191,7 @@ class POD_COMM:
             raise AssertionError('Choose one from PI and P control')
 
         # ros related:
-        self.uavName = 'suav'
+        self.uavName = self.args.name
         self.deviceName = 'pod'
         rospy.init_node('pod_comm', anonymous=True)
         rospy.Rate(10)
@@ -498,6 +498,7 @@ if __name__ == '__main__':
     parser.add_argument('--no-enhance', dest='enhance', help='image enhance off', action='store_true')
     parser.add_argument('--port', help='serial port of pod', type=str, default='/dev/ttyUSB1')
     parser.add_argument('--frame', help='control mode: B or I', choices=['b', 'i'], default='i')
+    parser.add_argument('--name', choices=['suav', 'suavmini'], default='suav')
     args, unknown = parser.parse_known_args()
     portsGen = itertools.cycle(['/dev/ttyUSB' + str(i) for i in range(1, 5)])
     while not rospy.is_shutdown():
