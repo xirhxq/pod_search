@@ -22,7 +22,7 @@ from rich.console import Console
 import rospy
 import rospkg
 from std_msgs.msg import Float32, Bool, Float64MultiArray, Int8, Int16, MultiArrayDimension, Header, Float32MultiArray, String
-from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion, QuaternionStamped
+from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion, QuaternionStamped, Vector3
 from nav_msgs.msg import Odometry
 
 from spirecv_msgs.msg import TargetsInFrame
@@ -85,7 +85,7 @@ class PodSearch:
         self.rate = rospy.Rate(10)
 
         # namespaces
-        self.uavName = 'suav'
+        self.uavName = self.args.name
         self.deviceName = 'pod'
 
         # From PodComm: pod pitch, yaw, hfov, laser on, laser range
@@ -276,6 +276,21 @@ class PodSearch:
         # [StepGuide] last capture time of usv
         self.lastUSVCaptureTime = self.getTimeNow()
 
+        # [StepGuide] publish or receive usv position
+        self.usvPos = None
+        if self.args.name == 'suavmini':
+            self.usvPosPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/usvPos', Vector3, queue_size=1)
+        elif self.args.name == 'suav':
+            self.usvPosSub = rospy.Subscriber(
+                self.uavName + '/' + self.deviceName + '/usvPos', 
+                Vector3,
+                lambda msg: setattr(self, 'usvPos', np.array([
+                    [msg.x],
+                    [msg.y],
+                    [msg.z]
+                ]))
+            )
+
         # [StepTrack] ekfs for locating
         self.ekfNames = ['usv', 'boat']
         self.ekfs = {n: LocatingEKF(initialT=self.getTimeNow()) for n in self.ekfNames}
@@ -291,10 +306,6 @@ class PodSearch:
         # [StepRefind] target name & related pod angles
         self.refindName = None
         self.refindPodAngles = None
-
-        # [StepGuide] fake target position
-        self.fakeTargetPos = None
-        self.guideFake = None
 
         signal(SIGINT, self.signalHandler)
 
@@ -763,10 +774,40 @@ class PodSearch:
             R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T
         )
         print(f'{self.ekfs[self.trackName].ekf.x = }')
+        if self.usvPos is not None:
+            self.console.rule(
+                f'[bold blue3]'
+                f'USV @ ({self.usvPos.flatten()[:3]})'
+            )
+            self.console.rule(
+                f'[bold green4]'
+                f'Target Pos @ ({self.targetPos.flatten()[:3]})'
+            )
+            usvToTargetENU = self.targetPos - self.usvPos
+            usvToTargetTheta = np.degrees(np.arctan2(usvToTargetENU[1][0], usvToTargetENU[0][0]))
+            self.console.rule(
+                f'[pink3]'
+                f'USV To Target'
+                f'({usvToTargetENU.flatten()[:3]}), '
+                f'{usvToTargetTheta:.2f} Deg'
+            )
+            self.usvTargetPub.publish(
+                header=Header(frame_id='target'),
+                pose=Pose(
+                    position=Point(
+                        x=usvToTargetENU[0][0],
+                        y=usvToTargetENU[1][0]
+                    ),
+                    orientation=Quaternion(
+                        w=usvToTargetTheta
+                    )
+                )
+            )
         if self.ksbState == 'TargetConfirmed' and self.ekfs[self.trackName].ekf.x is not None:
             if not self.usingFakeR or self.toc - self.tic >= 25.0:
                 self.targetPos = self.ekfs[self.trackName].ekf.x[:3].reshape(3, 1)
-                self.toStepDock()
+                if self.args.one:
+                    self.toStepDock()
         if self.ksbState == 'TargetRejected' or self.toc - self.tic >= 300:
             self.reportNumber += 1
             if self.config['onReportFailure'] == 'next':
@@ -785,19 +826,11 @@ class PodSearch:
     @stepEntrance
     def toStepGuide(self):
         self.state = State.GUIDE
-        self.guideFake = False
         self.trackName = 'usv'
         self.trackData[self.trackName] = self.getPodAnglesNow()
         if self.ekfs[self.trackName] is None or self.ekfs[self.trackName].ekf.x is None:
             self.ekfs[self.trackName] = LocatingEKF(initialT=self.getTimeNow())
         self.expectedLaserOn = False
-        if self.guideFake:
-            factor = -1 if self.targetPos[1][0] < self.uavPos[1][0] else 1
-            self.fakeTargetPos = np.array([
-                [self.uavPos[0][0]],
-                [self.uavPos[1][0] + factor * self.config['usvGuideSideLength']],
-                [0]
-            ])
         if not self.podLaserOn and self.config['laserOn']:
             self.expectedLaserOn = True
         else:
@@ -857,29 +890,27 @@ class PodSearch:
                 f'USV @ ({self.ekfs[self.trackName].ekf.x.flatten()[:3]})'
             )
             usvPos = self.ekfs[self.trackName].ekf.x[:3].reshape((3, 1))
+            self.usvPosPub.publish(
+                x=usvPos[0][0],
+                y=usvPos[0][1],
+                z=usvPos[0][2]
+            )
             self.ekfLogs[self.trackName].log('usvEKFx', self.ekfs[self.trackName].ekf.x)
             self.ekfLogs[self.trackName].newline()
             self.console.rule(
                 f'[bold green4]'
                 f'Target Pos @ ({self.targetPos.flatten()[:3]})'
             )
-            if self.guideFake:
-                usvToTargetENU = self.fakeTargetPos - usvPos
-                usvToTargetTheta = np.degrees(np.arctan2(usvToTargetENU[1][0], usvToTargetENU[0][0]))
-            else:
-                usvToTargetENU = self.targetPos - usvPos
-                usvToTargetTheta = np.degrees(np.arctan2(usvToTargetENU[1][0], usvToTargetENU[0][0]))
+            usvToTargetENU = self.targetPos - usvPos
+            usvToTargetTheta = np.degrees(np.arctan2(usvToTargetENU[1][0], usvToTargetENU[0][0]))
             self.console.rule(
                 f'[pink3]'
                 f'USV To Target'
                 f'({usvToTargetENU.flatten()[:3]}), '
                 f'{usvToTargetTheta:.2f} Deg'
             )
-            if self.guideFake:
-                if usvPos[0][0] > self.uavPos[0][0]:
-                    self.guideFake = False
             self.usvTargetPub.publish(
-                header=Header(frame_id=('fake' if self.guideFake else 'target')),
+                header=Header(frame_id='target'),
                 pose=Pose(
                     position=Point(
                         x=usvToTargetENU[0][0],
@@ -1070,6 +1101,8 @@ if __name__ == '__main__':
     parser.add_argument('--head-only', help='no pod', action='store_true')
     parser.add_argument('--check', help='check other system state', action='store_true')
     parser.add_argument('--min', help='start minute', default=40)
+    parser.add_argument('--name', choices=['suav', 'suavmini'], default='suav')
+    parser.add_argument('--one', help='doing all the things in one UAV', action='store_true')
     args, unknown = parser.parse_known_args()
 
     if args.bag:
