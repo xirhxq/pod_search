@@ -282,7 +282,7 @@ class PodSearch:
             self.usvPosPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/usvPos', Vector3, queue_size=1)
         elif self.args.name == 'suav':
             self.usvPosSub = rospy.Subscriber(
-                self.uavName + '/' + self.deviceName + '/usvPos', 
+                '/suavmini/' + self.deviceName + '/usvPos', 
                 Vector3,
                 lambda msg: setattr(self, 'usvPos', np.array([
                     [msg.x],
