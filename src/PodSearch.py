@@ -316,7 +316,7 @@ class PodSearch:
         if args.trackVessel:
             self.toStepTrack(trackName=args.id)
             print('<<<TRACK MODE: Vessel>>>')
-        if args.dock:
+        if args.dock or self.args.name == 'suavmini':
             self.toStepDock()
             print('<<<DOCK MODE>>>')
 
@@ -774,7 +774,7 @@ class PodSearch:
             R.from_euler('zyx', [self.uavYawDeg, 0, 0], degrees=True).as_matrix().T
         )
         print(f'{self.ekfs[self.trackName].ekf.x = }')
-        if self.usvPos is not None:
+        if self.usvPos is not None and not self.args.one:
             self.console.rule(
                 f'[bold blue3]'
                 f'USV @ ({self.usvPos.flatten()[:3]})'
@@ -889,11 +889,11 @@ class PodSearch:
                 f'[bold blue3]'
                 f'USV @ ({self.ekfs[self.trackName].ekf.x.flatten()[:3]})'
             )
-            usvPos = self.ekfs[self.trackName].ekf.x[:3].reshape((3, 1))
+            self.usvPos = self.ekfs[self.trackName].ekf.x[:3].reshape((3, 1))
             self.usvPosPub.publish(
-                x=usvPos[0][0],
-                y=usvPos[0][1],
-                z=usvPos[0][2]
+                x=self.usvPos[0][0],
+                y=self.usvPos[0][1],
+                z=self.usvPos[0][2]
             )
             self.ekfLogs[self.trackName].log('usvEKFx', self.ekfs[self.trackName].ekf.x)
             self.ekfLogs[self.trackName].newline()
@@ -901,7 +901,7 @@ class PodSearch:
                 f'[bold green4]'
                 f'Target Pos @ ({self.targetPos.flatten()[:3]})'
             )
-            usvToTargetENU = self.targetPos - usvPos
+            usvToTargetENU = self.targetPos - self.usvPos
             usvToTargetTheta = np.degrees(np.arctan2(usvToTargetENU[1][0], usvToTargetENU[0][0]))
             self.console.rule(
                 f'[pink3]'
@@ -1024,7 +1024,7 @@ class PodSearch:
         )
         self.console.rule(
             f'[red3]'
-            f'suav in #{self.uavState} '
+            f'{self.args.name} in #{self.uavState} '
             f'@ ({", ".join([f"{self.uavPos[i][0]:.2f}" for i in range(3)])}), {self.uavYawDeg:.2f} Deg'
         )
         self.console.rule(
@@ -1035,12 +1035,6 @@ class PodSearch:
             f'[red3]'
             f'Datalink range: {self.datalinkR:.2f}'
         )
-        if (self.targetId is not None and self.searchRoundCnt > 0) or (self.searchRoundCnt == len(self.config['searchConfig']) - 1 and len(self.vesselDict) == 0):
-            self.console.rule(
-                f'[red3]'
-                f'RESET ' * 50,
-                style='red3'
-            )
         if self.args.head_only:
             self.console.print(
                 pyfiglet.figlet_format('Head Only'),
