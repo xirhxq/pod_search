@@ -277,7 +277,7 @@ class PodSearch:
         self.lastUSVCaptureTime = self.getTimeNow()
 
         # [StepGuide] publish or receive usv position
-        self.usvPos = None
+        self.usvPos = np.array([10, 10, 0])
         if self.args.name == 'suavmini':
             self.usvPosPub = rospy.Publisher(self.uavName + '/' + self.deviceName + '/usvPos', Vector3, queue_size=1)
         elif self.args.name == 'suav':
