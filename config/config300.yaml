@@ -26,13 +26,13 @@ targetInitialPos: [[-358], [933], [0]]
 
 preSearchData:
   - pitchDeg: 0
-    yawDeg: -53
-    hfovDeg: 3
-    maxRateDeg: 1
+    yawDeg: 95
+    hfovDeg: 30
+    maxRateDeg: 5
   - pitchDeg: 0
-    yawDeg: 70
-    hfovDeg: 3
-    maxRateDeg: 1
+    yawDeg: 100
+    hfovDeg: 30
+    maxRateDeg: 5
 
 podInitialData:
   pitchDeg: 0
@@ -69,8 +69,6 @@ usvGuideSideLength: 500
 others:
   - 'arm'
   - 'usv'
-  - 'tuav2'
-  - 'tuav3'
   - 'tuav6'
   - 'tuav8'
 
