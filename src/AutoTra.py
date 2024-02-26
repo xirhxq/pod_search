@@ -150,14 +150,17 @@ class AutoTra:
         print('################')
         print(f'Expected Total Time: {self.expectedTime:.2f}')
 
+        if 'center' in self.config and self.config['center']:
+            self.uavPos = Point(0, 0)
+
     def adjustAndShow(self, ax):
         ax.set_xlim(min(self.config['areaPoints'], key=lambda x: x[0])[0], max(self.config['areaPoints'], key=lambda x: x[0])[0])
         ax.set_ylim(min(self.config['areaPoints'], key=lambda x: x[1])[1], max(self.config['areaPoints'], key=lambda x: x[1])[1])
         # make sure that xlim & ylim include self.uavPos
         ax.set_xlim(min(ax.get_xlim()[0], self.uavPos.x), max(ax.get_xlim()[1], self.uavPos.x))
         ax.set_ylim(min(ax.get_ylim()[0], self.uavPos.y), max(ax.get_ylim()[1], self.uavPos.y))
-        ax.set_xlim(inflateInterval(ax.get_xlim(), 1))
-        ax.set_ylim(inflateInterval(ax.get_ylim(), 1))
+        ax.set_xlim(inflateInterval(ax.get_xlim(), 2))
+        ax.set_ylim(inflateInterval(ax.get_ylim(), 2))
         ax.set_aspect('equal')
         plt.show()
 
@@ -470,7 +473,8 @@ def testSingleAutoTra():
             'yaw': 0,
             'yawRange': 180,
             'theTime': 4,
-            'widthRatio': 0.1
+            'widthRatio': 0.1,
+            'center': True
         },
         fast=True
     )
@@ -484,6 +488,58 @@ def testSingleAutoTra():
     # print(autoTra.theList)
 
 
+def testFinalAutoTra():
+    autoTras = [
+        AutoTra(
+            pitchLevelOn=True,
+            overlapOn=True,
+            drawNum=-1,
+            config={
+                'areaPoints': [
+                    (121.14307977822178, 646.8642504334499),
+                    (1649.0846494790262, 650.9779650751218),
+                    (1647.1374512099173, -1129.4631447548738),
+                    (419.0144723207828, -1130.546284647222)
+                ],
+                'uavPos': [-500, 0, 7.5],
+                'yaw': 0,
+                'yawRange': 170,
+                'theTime': 4,
+                'widthRatio': 0.1,
+                'center': True
+            },
+            fast=True
+        ),
+        AutoTra(
+            pitchLevelOn=True,
+            overlapOn=True,
+            drawNum=-1,
+            config={
+                'areaPoints': [
+                    (121.14307977822178, 646.8642504334499),
+                    (1649.0846494790262, 650.9779650751218),
+                    (1647.1374512099173, -1129.4631447548738),
+                    (419.0144723207828, -1130.546284647222)
+                ],
+                'uavPos': [0, 0, 7.5],
+                'yaw': 0,
+                'yawRange': 180,
+                'theTime': 4,
+                'widthRatio': 0.1,
+                'center': True
+            },
+            fast=True
+        )
+    ]
+
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(111)
+    autoTras[0].drawBasic(ax)
+    [autoTra.draw(ax) for autoTra in autoTras]
+    autoTras[0].adjustAndShow(ax)
+
+
 if __name__ == '__main__':
-    testSingleAutoTra()
+    # testSingleAutoTra()
     # testMultipleAutoTras(3, baseYawDeg=90)
+    testFinalAutoTra()
